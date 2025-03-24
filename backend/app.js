@@ -1,13 +1,13 @@
 // app.js
 import express from 'express';
 import cors from 'cors';
-import app from express();
 import bodyParser from 'body-parser';
-import authRoutes from './routes/authRoutes';
-import questionRoutes from './routes/questionRoutes';
-import diaryRoutes from './routes/diaryRoutes';
-import pool from './db';
+import authRoutes from './routes/authRoutes.js';
+import questionRoutes from './routes/questionRoutes.js';
+import diaryRoutes from './routes/diaryRoutes.js';
+import pool from './db.js';
 
+const app = express();
 const port = process.env.PORT || 3001;
 
 // CORS 설정
