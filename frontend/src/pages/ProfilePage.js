@@ -1,12 +1,11 @@
-import React from "react";
+import React from 'react';
 
 function ProfilePage() {
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>내 프로필</h1>
-      <p>이름: 사용자</p>
-      <p>MBTI: ENFP</p>
-      <button>정보 수정</button>
+    <div className="p-6 bg-white rounded-md shadow-md">
+      <h2 className="text-2xl font-semibold mb-4">Profile</h2>
+      <p>User information and settings will go here.</p>
+      {/* Add profile details, edit options, etc. */}
     </div>
   );
 }
