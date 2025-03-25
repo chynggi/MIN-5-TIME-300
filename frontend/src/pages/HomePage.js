@@ -10,21 +10,28 @@ function HomePage() {
   useEffect(() => {
     const fetchDailyQuestion = async () => {
       try {
-        const response = await api.get('/api/daily-question'); // Replace with your actual API endpoint
-        setDailyQuestion(response.data.question);
+        const response = await api.get('/api/questions');
+        if (response.data && response.data.question) {
+          setDailyQuestion(response.data.question);
+        } else if (response.data) {
+          // response.data가 직접 질문 객체인 경우
+          setDailyQuestion(response.data);
+        } else {
+          throw new Error('질문 데이터가 없습니다.');
+        }
         setLoading(false);
       } catch (error) {
         console.error("Error fetching daily question:", error);
-        setError("Failed to load daily question.");
+        setError("오늘의 질문을 불러오는데 실패했습니다.");
         setLoading(false);
       }
     };
 
     fetchDailyQuestion();
-  },);
+  }, []);
 
   if (loading) {
-    return <div className="text-center py-8">Loading daily question...</div>;
+    return <div className="text-center py-8">오늘의 질문을 불러오는 중...</div>;
   }
 
   if (error) {
@@ -33,12 +40,12 @@ function HomePage() {
 
   return (
     <div className="p-6 bg-white rounded-md shadow-md">
-      <h2 className="text-2xl font-semibold mb-4">Welcome to MIN 5 TIME 300!</h2>
-      <p className="mb-4">Here's your daily prompt to get you started:</p>
+      <h2 className="text-2xl font-semibold mb-4">5분 일기에 오신 것을 환영합니다!</h2>
+      <p className="mb-4">오늘의 질문으로 하루를 시작해보세요:</p>
       <div className="bg-gray-200 p-4 rounded-md">
-        <p className="font-bold">{dailyQuestion}</p>
+        <p className="font-bold">{typeof dailyQuestion === 'object' ? dailyQuestion.question : dailyQuestion}</p>
       </div>
-      <p className="mt-4">Ready to reflect? Head over to the <Link to="/write" className="text-blue-500 hover:underline">Write</Link> page.</p>
+      <p className="mt-4">지금 바로 <Link to="/write" className="text-blue-500 hover:underline">일기 쓰기</Link>를 시작해보세요.</p>
     </div>
   );
 }

@@ -1,13 +1,28 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 
-function DiaryCard({ entry }) {
+const DiaryCard = ({ diary }) => {
   return (
-    <div className="bg-gray-100 p-4 rounded-md shadow-sm">
-      <p className="text-gray-800">{entry.text.substring(0, 150)}...</p> {/* Display a snippet */}
-      <p className="text-sm text-gray-500 mt-2">Shared on: {new Date(entry.createdAt).toLocaleDateString()}</p> {/* Assuming your backend provides a createdAt field */}
-      {/* You might want to add a "Read More" button or similar */}
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.3 }}
+      className="bg-white p-6 rounded-lg shadow-md mb-4 hover:shadow-lg transition-shadow"
+    >
+      <h3 className="text-xl font-semibold mb-2">{diary.title}</h3>
+      <p className="text-gray-600">{diary.content}</p>
+      <div className="mt-4 flex justify-between items-center">
+        <span className="text-sm text-gray-500">{new Date(diary.created_at).toLocaleDateString()}</span>
+        <div className="flex items-center">
+          <span className="text-sm text-gray-500 mr-2">감정 점수:</span>
+          <span className="text-sm font-semibold">{diary.rating}/5</span>
+        </div>
+      </div>
+    </motion.div>
   );
-}
+};
 
 export default DiaryCard;

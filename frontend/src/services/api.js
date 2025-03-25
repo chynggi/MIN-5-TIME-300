@@ -1,13 +1,36 @@
 import axios from 'axios';
 
-const baseURL = 'http://localhost:3001'; // Replace with your Node.js backend URL
-
 const api = axios.create({
-  baseURL: baseURL,
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:3001',
   headers: {
     'Content-Type': 'application/json',
-    // You might include authorization headers here if needed
   },
 });
+
+// 요청 인터셉터 추가
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// 응답 인터셉터 추가
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;
