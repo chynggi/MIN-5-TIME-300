@@ -34,7 +34,7 @@ app.use(cors({
 app.use(bodyParser.json());
 
 // 정적 파일 서빙 설정
-app.use('/uploads', express.static(uploadConfig.baseDir));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // 라우트 설정
 app.use('/api/auth', authRoutes);
@@ -58,5 +58,5 @@ pool.connect((err) => {
 });
 
 app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+  console.log(`서버가 http://localhost:${port} 에서 실행 중입니다`);
 });

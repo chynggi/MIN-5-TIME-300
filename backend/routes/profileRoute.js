@@ -1,6 +1,6 @@
 import express from 'express';
 import { auth } from '../middlewares/authMiddleware.js';
-import { uploadImage } from '../middlewares/uploadMiddleware.js';
+import upload from '../middlewares/uploadMiddleware.js';
 import {
   getProfile,
   updateProfile,
@@ -17,9 +17,9 @@ router.get('/profile', auth, getProfile);
 router.put('/profile', auth, updateProfile);
 
 // 프로필 이미지 업데이트
-router.post('/profile-image', auth, uploadImage.single('image'), updateProfileImage);
+router.post('/profile-image', auth, upload.single('image'), updateProfileImage);
 
 // 비밀번호 변경
 router.post('/change-password', auth, changePassword);
 
-export default router; 
+export default router;

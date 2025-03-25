@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const Navbar = ({ isLoggedIn, onLogout }) => {
+const Navbar = ({ user, onLogout }) => {
+  // user 객체가 존재하면 로그인 상태로 간주합니다.
+  const isLoggedIn = !!user;
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const dropdownVariants = {
@@ -70,7 +72,15 @@ const Navbar = ({ isLoggedIn, onLogout }) => {
               className="hover:text-blue-300 flex items-center space-x-1"
               onClick={() => setIsProfileOpen(!isProfileOpen)}
             >
-              <span>프로필</span>
+              {isLoggedIn && user.profile_image ? (
+                <img 
+                  src={`/uploads/${user.profile_image}`} 
+                  alt="Profile" 
+                  className="w-8 h-8 rounded-full"
+                />
+              ) : (
+                <span>프로필</span>
+              )}
               <svg 
                 className={`w-4 h-4 transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}
                 fill="none" 
@@ -88,17 +98,35 @@ const Navbar = ({ isLoggedIn, onLogout }) => {
                   initial="hidden"
                   animate="visible"
                   exit="exit"
-                  className="absolute right-0 mt-2 py-2 w-48 bg-white rounded-lg shadow-xl"
+                  className="absolute right-0 mt-2 py-2 w-56 bg-white rounded-lg shadow-xl"
                   onClick={() => setIsProfileOpen(false)}
                 >
                   {isLoggedIn ? (
                     <>
-                      <Link to="/profile" className="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white">
+                      <div className="px-4 py-2 flex items-center space-x-3 border-b border-gray-200">
+                        {user.profile_image ? (
+                          <img 
+                            src={`/uploads/${user.profile_image}`} 
+                            alt="Profile" 
+                            className="w-10 h-10 rounded-full"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gray-300" />
+                        )}
+                        <div>
+                          <div className="font-bold text-gray-800">{user.username}</div>
+                          <div className="text-sm text-gray-600">{user.mbti}</div>
+                        </div>
+                      </div>
+                      <Link
+                        to="/profile"
+                        className="block px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white"
+                      >
                         회원정보
                       </Link>
                       <button
                         onClick={onLogout}
-                        className="block w-full text-left px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white"
+                        className="w-full text-left px-4 py-2 text-gray-800 hover:bg-blue-500 hover:text-white"
                       >
                         로그아웃
                       </button>

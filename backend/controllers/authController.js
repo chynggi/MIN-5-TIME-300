@@ -1,17 +1,23 @@
 // controllers/authController.js
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import User from '../models/user';
+import User from '../models/user.js';
 import config from '../config/config';
 import { validationResult } from 'express-validator';
 
-const register = async (req, res) => {
+export const register = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { username, password } = req.body;
+  const { username, password, mbti } = req.body;
+  let profileImage = null;
+  // 파일 업로드 미들웨어가 적용된 경우 req.file에서 파일 정보 확인
+  if (req.file) {
+    // 파일명 또는 파일 경로를 저장할 수 있습니다.
+    profileImage = req.file.filename;
+  }
 
   try {
     const existingUser = await User.findByUsername(username);
@@ -19,7 +25,7 @@ const register = async (req, res) => {
       return res.status(409).json({ message: 'Username already exists' });
     }
 
-    const newUser = await User.createUser(username, password);
+    const newUser = await User.createUser(username, password, mbti || null, profileImage);
     const token = jwt.sign({ id: newUser.id }, config.jwtSecret);
     res.status(201).json({ message: 'User registered successfully', token });
   } catch (error) {
@@ -55,4 +61,4 @@ const login = async (req, res) => {
   }
 };
 
-export default { register, login }; 
+export default { register, login };

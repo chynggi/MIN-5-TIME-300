@@ -1,9 +1,9 @@
 // middlewares/authMiddleware.js
 import jwt from 'jsonwebtoken';
-import config from '../config/config';
-import User from '../models/user';
+import config from '../config/config.js';
+import User from '../models/user.js';
 
-const authenticateToken = async (req, res, next) => {
+export const auth = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -28,5 +28,3 @@ const authenticateToken = async (req, res, next) => {
     return res.status(500).json({ message: '서버 오류가 발생했습니다' });
   }
 };
-
-export default { authenticateToken };
