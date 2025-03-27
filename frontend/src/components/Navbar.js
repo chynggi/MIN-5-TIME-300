@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Navbar = ({ user, onLogout }) => {
-  // user 객체가 존재하면 로그인 상태로 간주합니다.
-  const isLoggedIn = !!user;
+  // 디버그용 출력 추가
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  
+  useEffect(() => {
+    // user 객체 로깅
+    console.log("Navbar user:", user);
+    setIsLoggedIn(!!user);
+  }, [user]);
+
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const dropdownVariants = {
@@ -40,6 +47,13 @@ const Navbar = ({ user, onLogout }) => {
       transition={{ type: "spring", stiffness: 100 }}
       className="bg-blue-500 text-white p-4 relative"
     >
+      {/* 디버그 정보 */}
+      {process.env.NODE_ENV !== 'production' && (
+        <div className="absolute top-0 right-0 bg-red-500 px-2 text-xs">
+          {isLoggedIn ? '로그인됨' : '로그인안됨'}
+        </div>
+      )}
+      
       <div className="container mx-auto flex justify-between items-center">
         <motion.div 
           whileHover={{ scale: 1.05 }}

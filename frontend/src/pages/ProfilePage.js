@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import axios from 'axios';
+import React, { useState, useRef, useEffect } from 'react';
+import api from '../services/api'; // axios 대신 api 인스턴스 사용
 
 function PasswordModal({ isOpen, onClose }) {
   const [passwords, setPasswords] = useState({
@@ -24,7 +24,7 @@ function PasswordModal({ isOpen, onClose }) {
     }
 
     try {
-      await axios.post('/api/user/change-password', passwords);
+      await api.post('/api/user/update-password', passwords); // '/api/user/change-password' → '/api/user/update-password'
       onClose();
       alert('비밀번호가 성공적으로 변경되었습니다.');
     } catch (error) {
@@ -104,10 +104,11 @@ function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [userData, setUserData] = useState({
-    name: '홍길동',
-    email: 'hong@example.com',
-    bio: '안녕하세요! 반갑습니다.',
-    profileImage: 'https://via.placeholder.com/150'
+    username: '',
+    email: '',
+    mbti: '',
+    profile_image: null,
+    created_at: null
   });
   const fileInputRef = useRef(null);
 
@@ -117,7 +118,12 @@ function ProfilePage() {
 
   const handleSave = async () => {
     try {
-      await axios.put('/api/user/profile', userData);
+      // API 경로 수정
+      await api.put('/api/user/profile', { // '/api/user/update' → '/api/user/profile'로 변경
+        username: userData.username,
+        email: userData.email,
+        mbti: userData.mbti
+      });
       setIsEditing(false);
       alert('프로필이 성공적으로 업데이트되었습니다.');
     } catch (error) {
@@ -137,22 +143,29 @@ function ProfilePage() {
     formData.append('image', file);
 
     try {
-      const response = await axios.post('/api/user/profile-image', formData, {
+      const response = await api.post('/api/user/profile-image', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      setUserData({ ...userData, profileImage: response.data.imageUrl });
+      
+      // 백엔드 응답에 맞게 수정
+      setUserData({ 
+        ...userData, 
+        profile_image: response.data.imageUrl // imageUrl이 백엔드에서 응답하는 필드명임을 확인
+      });
     } catch (error) {
+      console.error('이미지 업로드 오류:', error.response?.data || error.message);
       alert('이미지 업로드 중 오류가 발생했습니다.');
     }
   };
 
   // 컴포넌트 마운트 시 사용자 데이터 로드
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const response = await axios.get('/api/user/profile');
+        // API 경로를 백엔드 라우트에 맞게 수정
+        const response = await api.get('/api/user/profile'); // '/api/user/me' → '/api/user/profile'로 변경
         setUserData(response.data);
       } catch (error) {
         console.error('사용자 데이터 로드 중 오류 발생:', error);
@@ -160,6 +173,10 @@ function ProfilePage() {
     };
     fetchUserData();
   }, []);
+
+  const profileImageUrl = userData.profile_image 
+    ? `/uploads/${userData.profile_image}`
+    : 'https://via.placeholder.com/150';
 
   return (
     <div className="p-6 bg-white rounded-md shadow-md max-w-2xl mx-auto">
@@ -176,7 +193,7 @@ function ProfilePage() {
       <div className="flex items-start space-x-6 mb-6">
         <div className="relative">
           <img
-            src={userData.profileImage}
+            src={profileImageUrl}
             alt="프로필 이미지"
             className="w-32 h-32 rounded-full object-cover cursor-pointer"
             onClick={handleImageClick}
@@ -199,34 +216,52 @@ function ProfilePage() {
         </div>
         <div className="flex-1">
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">이름</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">사용자 이름</label>
             {isEditing ? (
               <input
                 type="text"
-                value={userData.name}
-                onChange={(e) => setUserData({ ...userData, name: e.target.value })}
+                value={userData.username}
+                onChange={(e) => setUserData({ ...userData, username: e.target.value })}
                 className="w-full p-2 border rounded-md"
               />
             ) : (
-              <p className="text-lg">{userData.name}</p>
+              <p className="text-lg">{userData.username}</p>
             )}
           </div>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
-            <p className="text-lg">{userData.email}</p>
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">자기소개</label>
             {isEditing ? (
-              <textarea
-                value={userData.bio}
-                onChange={(e) => setUserData({ ...userData, bio: e.target.value })}
+              <input
+                type="email"
+                value={userData.email || ''}
+                onChange={(e) => setUserData({ ...userData, email: e.target.value })}
                 className="w-full p-2 border rounded-md"
-                rows="3"
+                required
               />
             ) : (
-              <p className="text-lg">{userData.bio}</p>
+              <p className="text-lg">{userData.email || '이메일 미설정'}</p>
             )}
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">MBTI</label>
+            {isEditing ? (
+              <input
+                type="text"
+                value={userData.mbti || ''}
+                onChange={(e) => setUserData({ ...userData, mbti: e.target.value })}
+                className="w-full p-2 border rounded-md"
+                placeholder="예: INFP"
+                maxLength={4}
+              />
+            ) : (
+              <p className="text-lg">{userData.mbti || '미설정'}</p>
+            )}
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">가입일</label>
+            <p className="text-lg">
+              {userData.created_at ? new Date(userData.created_at).toLocaleDateString() : ''}
+            </p>
           </div>
         </div>
       </div>

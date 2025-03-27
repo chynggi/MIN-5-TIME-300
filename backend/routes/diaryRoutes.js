@@ -216,6 +216,26 @@ router.get('/shared-entries', auth, async (req, res) => {
 router.get('/entries/:id/comments', auth, async (req, res) => {
   try {
     const { id } = req.params;
+
+    // 일기 존재 여부 확인
+    const diaryExists = await pool.query(
+      'SELECT 1 FROM diaries WHERE id = $1',
+      [req.params.id]
+    );
+
+    if (diaryExists.rows.length === 0) {
+      return res.status(404).json({ message: '해당 일기를 찾을 수 없습니다.' });
+    }
+
+    // 권한 확인 (본인 소유 또는 공유된 일기만 액세스 가능)
+    const accessCheck = await pool.query(
+      'SELECT 1 FROM diaries WHERE id = $1 AND (user_id = $2 OR is_shared = true)',
+      [req.params.id, req.user.id]
+    );
+
+    if (accessCheck.rows.length === 0) {
+      return res.status(403).json({ message: '이 일기에 접근할 권한이 없습니다.' });
+    }
     
     const comments = await pool.query(
       `SELECT c.id, c.content, c.created_at, 

@@ -123,6 +123,7 @@ function SharedDiariesPage() {
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
   const pendingLikes = useRef(new Set()); // 좋아요 처리 중인 항목 추적
+  const [isLoggedIn, setIsLoggedIn] = useState(true); // 로그인 상태 추적을 위한 state 추가
 
   const fetchSharedEntries = useCallback(async () => {
     if (loadingRef.current) return;
@@ -130,6 +131,15 @@ function SharedDiariesPage() {
     setLoading(true);
     
     try {
+      // 토큰 확인
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setIsLoggedIn(false); // 로그인 상태 업데이트
+        setLoading(false);
+        loadingRef.current = false;
+        return; // 토큰이 없으면 API 호출을 중단
+      }
+      
       // 커서 기반 페이지네이션 적용
       const endpoint = cursor 
         ? `/api/shared-entries?cursor=${cursor}&limit=10` 
@@ -166,7 +176,13 @@ function SharedDiariesPage() {
       setError(null);
     } catch (error) {
       console.error("Error fetching shared entries:", error.response || error);
-      setError("일기 목록을 불러오는데 실패했습니다. " + (error.response?.data?.message || error.message));
+      
+      // 인증 오류 처리
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        setIsLoggedIn(false); // 인증 오류 시 로그인 상태 업데이트
+      } else {
+        setError("일기 목록을 불러오는데 실패했습니다. " + (error.response?.data?.message || error.message));
+      }
       
       if (retryCount < maxRetries) {
         setTimeout(() => {
@@ -180,8 +196,16 @@ function SharedDiariesPage() {
   }, [cursor, retryCount]);
 
   useEffect(() => {
+    // 토큰 유효성 확인
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setIsLoggedIn(false); // 로그인 상태 업데이트
+      setLoading(false);
+      return;
+    }
+    
     fetchSharedEntries();
-  }, []); // fetchSharedEntries 의존성 제거
+  }, []); // 컴포넌트 마운트 시 실행
 
   // 별도의 재시도 이펙트
   useEffect(() => {
@@ -313,10 +337,56 @@ function SharedDiariesPage() {
     };
   }, [hasMore, loading, fetchSharedEntries]);
 
+  // 비로그인 상태일 때 표시할 컴포넌트
+  const renderNotLoggedInView = () => (
+    <div className="max-w-lg mx-auto p-6 mt-8">
+      <div className="bg-white rounded-lg shadow-md p-8 text-center">
+        <svg
+          className="w-16 h-16 mx-auto mb-4 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+          />
+        </svg>
+        <h3 className="text-xl font-semibold mb-2">로그인이 필요합니다</h3>
+        <p className="text-gray-600 mb-6">
+          다른 사용자들의 일기를 보려면 로그인해 주세요.
+        </p>
+        <div className="flex justify-center gap-4">
+          <Link
+            to="/login"
+            className="inline-block px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            로그인
+          </Link>
+          <Link
+            to="/signup"
+            className="inline-block px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+          >
+            회원가입
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+
+  // 로딩 중이고 항목이 없는 경우
   if (loading && sharedEntries.length === 0) {
     return <div className="text-center py-8">일기를 불러오는 중...</div>;
   }
 
+  // 비로그인 상태일 때
+  if (!isLoggedIn) {
+    return renderNotLoggedInView();
+  }
+
+  // 로그인 상태지만 항목이 없는 경우
   if (!loading && sharedEntries.length === 0 && !error) {
     return (
       <div className="max-w-lg mx-auto p-6 mt-8">
@@ -349,6 +419,7 @@ function SharedDiariesPage() {
     );
   }
 
+  // 기존의 일기 목록 표시
   return (
     <div className="max-w-3xl mx-auto p-4">
       {error && <ErrorMessage message={error} onDismiss={() => setError(null)} />}

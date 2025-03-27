@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../services/api';
 
-const LoginPage = () => {
+const LoginPage = ({ onLoginSuccess }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: '',
@@ -26,9 +26,22 @@ const LoginPage = () => {
 
     try {
       const response = await api.post('/api/auth/login', formData);
+      
+      if (!response.data || !response.data.token) {
+        throw new Error('서버에서 인증 토큰을 받지 못했습니다.');
+      }
+      
+      console.log('로그인 성공:', response.data.user.username);
       localStorage.setItem('token', response.data.token);
+      
+      // 부모 컴포넌트에 로그인 성공 알림
+      if (onLoginSuccess) {
+        onLoginSuccess(response.data.user);
+      }
+      
       navigate('/');
     } catch (error) {
+      console.error('로그인 오류:', error);
       setError(error.response?.data?.message || '로그인 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
@@ -115,4 +128,4 @@ const LoginPage = () => {
   );
 };
 
-export default LoginPage; 
+export default LoginPage;

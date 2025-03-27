@@ -7,6 +7,7 @@ const RegisterPage = () => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
         username: '',
+        email: '',  // 이메일 필드 추가
         password: '',
         confirmPassword: '',
         mbti: ''
@@ -42,6 +43,7 @@ const RegisterPage = () => {
         try {
             const payload = new FormData();
             payload.append('username', formData.username);
+            payload.append('email', formData.email);  // 이메일 추가
             payload.append('password', formData.password);
             payload.append('mbti', formData.mbti);
             if(profileImageFile) {
@@ -110,6 +112,21 @@ const RegisterPage = () => {
                             />
                         </div>
                         <div>
+                            <label htmlFor="email" className="sr-only">
+                                이메일
+                            </label>
+                            <input
+                                id="email"
+                                name="email"
+                                type="email"
+                                required
+                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                                placeholder="이메일"
+                                value={formData.email}
+                                onChange={handleChange}
+                            />
+                        </div>
+                        <div>
                             <label htmlFor="password" className="sr-only">
                                 비밀번호
                             </label>
@@ -133,7 +150,7 @@ const RegisterPage = () => {
                                 name="confirmPassword"
                                 type="password"
                                 required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                                 placeholder="비밀번호 확인"
                                 value={formData.confirmPassword}
                                 onChange={handleChange}
