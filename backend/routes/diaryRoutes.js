@@ -97,75 +97,150 @@ router.post('/entries/:id/like', auth, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { id } = req.params;
-    
-    // 좋아요 토글 기능 추가
+    const diaryId = req.params.id;
+    const userId = req.user.id;
+
+    // 먼저 이미 좋아요를 눌렀는지 확인
     const existingLike = await client.query(
-      'SELECT * FROM likes WHERE user_id = $1 AND diary_id = $2',
-      [req.user.id, id]
+      'SELECT * FROM likes WHERE diary_id = $1 AND user_id = $2',
+      [diaryId, userId]
     );
-    
+
+    let isLiked = false;
+
     if (existingLike.rows.length > 0) {
-      // 이미 좋아요가 있으면 삭제 (토글)
+      // 이미 좋아요를 눌렀다면 취소
       await client.query(
-        'DELETE FROM likes WHERE user_id = $1 AND diary_id = $2',
-        [req.user.id, id]
+        'DELETE FROM likes WHERE diary_id = $1 AND user_id = $2',
+        [diaryId, userId]
       );
+      isLiked = false;
     } else {
-      // 좋아요가 없으면 추가
+      // 좋아요 추가
       await client.query(
-        'INSERT INTO likes (user_id, diary_id) VALUES ($1, $2)',
-        [req.user.id, id]
+        'INSERT INTO likes (diary_id, user_id) VALUES ($1, $2)',
+        [diaryId, userId]
       );
+      isLiked = true;
     }
-    
-    // 최신 좋아요 정보 반환
+
+    // 업데이트된 좋아요 수 조회
     const likeCount = await client.query(
-      'SELECT COUNT(*) FROM likes WHERE diary_id = $1',
-      [id]
+      'SELECT COUNT(*) as count FROM likes WHERE diary_id = $1',
+      [diaryId]
     );
 
     await client.query('COMMIT');
     
-    res.status(200).json({ 
+    // 응답에서 일관된 필드명 사용
+    res.json({ 
       likes: parseInt(likeCount.rows[0].count),
-      isLiked: existingLike.rows.length === 0
+      isLiked: isLiked  // 프론트엔드 코드와 일치하도록 isLiked 사용
     });
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('좋아요 처리 중 오류:', error);
+    console.error('Error updating like:', error);
     res.status(500).json({ message: '좋아요 처리 중 오류가 발생했습니다.' });
   } finally {
     client.release();
   }
 });
 
-// 공유된 일기 목록 조회
+// 공유된 일기 목록 조회 개선 (기존 라우트 대체)
 router.get('/shared-entries', auth, async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = 10;
-    const offset = (page - 1) * limit;
+    const { cursor, limit = 10 } = req.query;
+    const limitNum = parseInt(limit);
     
-    const entries = await pool.query(
-      `SELECT d.*, u.username, u.profile_image, 
-       COUNT(DISTINCT l.id) as likes,
-       COUNT(DISTINCT c.id) as comment_count,
-       EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND diary_id = d.id) as is_liked
-       FROM diaries d
-       JOIN users u ON d.user_id = u.id
-       LEFT JOIN likes l ON d.id = l.diary_id
-       LEFT JOIN comments c ON d.id = c.diary_id
-       WHERE d.is_shared = true
-       GROUP BY d.id, u.id, u.username, u.profile_image
-       ORDER BY d.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [req.user.id, limit, offset]
-    );
+    let query;
+    let params;
     
-    res.json(entries.rows);
+    if (cursor) {
+      // 커서가 있을 경우 쿼리 수정
+      query = `
+        SELECT d.id, d.content, d.is_shared, d.rating, d.created_at, 
+          u.username, u.profile_image, 
+          COUNT(l.diary_id) as likes,
+          COUNT(DISTINCT c.id) as comment_count,
+          EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND diary_id = d.id) as is_liked
+        FROM diaries d
+        JOIN users u ON d.user_id = u.id
+        LEFT JOIN likes l ON d.id = l.diary_id
+        LEFT JOIN comments c ON d.id = c.diary_id
+        WHERE d.is_shared = true 
+        AND d.created_at < (SELECT created_at FROM diaries WHERE id = $2)
+        GROUP BY d.id, u.id, u.username, u.profile_image
+        ORDER BY d.created_at DESC
+        LIMIT $3
+      `;
+      params = [req.user.id, cursor, limitNum];
+    } else {
+      // 첫 페이지 로드시 쿼리 수정
+      query = `
+        SELECT d.id, d.content, d.is_shared, d.rating, d.created_at, 
+          u.username, u.profile_image, 
+          COUNT(l.diary_id) as likes,
+          COUNT(DISTINCT c.id) as comment_count,
+          EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND diary_id = d.id) as is_liked
+        FROM diaries d
+        JOIN users u ON d.user_id = u.id
+        LEFT JOIN likes l ON d.id = l.diary_id
+        LEFT JOIN comments c ON d.id = c.diary_id
+        WHERE d.is_shared = true
+        GROUP BY d.id, u.id, u.username, u.profile_image
+        ORDER BY d.created_at DESC
+        LIMIT $2
+      `;
+      params = [req.user.id, limitNum];
+    }
+    
+    const entries = await pool.query(query, params);
+    
+    // 다음 페이지 커서 계산
+    let nextCursor = null;
+    if (entries.rows.length === limitNum) {
+      nextCursor = entries.rows[entries.rows.length - 1].id;
+    }
+    
+    res.json({
+      entries: entries.rows,
+      nextCursor
+    });
   } catch (error) {
     console.error('공유된 일기 목록 조회 중 오류:', error);
+    res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// 특정 일기에 대한 댓글만 조회하는 새 API 추가
+router.get('/entries/:id/comments', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const comments = await pool.query(
+      `SELECT c.id, c.content, c.created_at, 
+        u.id as user_id, u.username, u.profile_image
+      FROM comments c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.diary_id = $1
+      ORDER BY c.created_at ASC`,
+      [id]
+    );
+    
+    const formattedComments = comments.rows.map(comment => ({
+      id: comment.id,
+      content: comment.content,
+      createdAt: comment.created_at,
+      author: {
+        id: comment.user_id,
+        username: comment.username,
+        profileImage: comment.profile_image
+      }
+    }));
+    
+    res.json(formattedComments);
+  } catch (error) {
+    console.error('댓글 조회 중 오류:', error);
     res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 });
