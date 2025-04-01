@@ -8,7 +8,9 @@ import authRoutes from './routes/authRoutes.js';
 import questionRoutes from './routes/questionRoutes.js';
 import diaryRoutes from './routes/diaryRoutes.js';
 import profileRoutes from './routes/profileRoute.js';
+import adminRoutes from './routes/adminRoutes.js';
 import pool from './db.js';
+import recommendationRoutes from './routes/recommendationRoutes.js';
 import { uploadConfig, initializeUploadDirectories } from './config/uploadConfig.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -41,6 +43,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api', questionRoutes);
 app.use('/api', diaryRoutes);
 app.use('/api/user', profileRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api', recommendationRoutes);
 
 // Basic error handling
 app.use((err, req, res, next) => {

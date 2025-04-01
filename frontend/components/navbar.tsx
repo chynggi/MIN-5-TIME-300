@@ -4,7 +4,7 @@ import type React from "react"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Book, Users, Home, User } from "lucide-react"
+import { Book, Users, Home, User, Lightbulb } from "lucide-react"
 
 export function Navbar() {
   const pathname = usePathname()
@@ -30,6 +30,9 @@ export function Navbar() {
             <NavLink href="/journals" isActive={isActive("/journals")} icon={<Book className="w-4 h-4 mr-2" />}>
               My Journals
             </NavLink>
+            <NavLink href="/questions" isActive={isActive("/questions")} icon={<Lightbulb className="w-4 h-4 mr-2" />}>
+              질문 추천
+            </NavLink>
             <NavLink href="/community" isActive={isActive("/community")} icon={<Users className="w-4 h-4 mr-2" />}>
               Community
             </NavLink>
@@ -45,25 +48,31 @@ export function Navbar() {
 
       {/* Mobile navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
-        <div className="grid grid-cols-4 h-16">
+        <div className="grid grid-cols-5 h-16">
           <MobileNavLink href="/" isActive={isActive("/")} icon={<Home className="w-5 h-5" />} label="Home" />
           <MobileNavLink
             href="/journals"
             isActive={isActive("/journals")}
             icon={<Book className="w-5 h-5" />}
-            label="Journals"
+            label="일기"
+          />
+          <MobileNavLink
+            href="/questions"
+            isActive={isActive("/questions")}
+            icon={<Lightbulb className="w-5 h-5" />}
+            label="질문"
           />
           <MobileNavLink
             href="/community"
             isActive={isActive("/community")}
             icon={<Users className="w-5 h-5" />}
-            label="Community"
+            label="커뮤니티"
           />
           <MobileNavLink
             href="/profile"
             isActive={isActive("/profile")}
             icon={<User className="w-5 h-5" />}
-            label="Profile"
+            label="프로필"
           />
         </div>
       </div>

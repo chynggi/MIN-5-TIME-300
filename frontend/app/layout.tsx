@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { Navbar } from "@/components/navbar"
+import { QueryProvider } from '@/providers/query-provider'
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -18,17 +19,15 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="ko">
       <body className={`${inter.className} bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-50`}>
-        <div className="flex min-h-screen flex-col">
-          <Navbar />
-          <main className="flex-1 container mx-auto px-4 py-6">{children}</main>
-        </div>
+        <QueryProvider>
+          <div className="flex min-h-screen flex-col">
+            <Navbar />
+            <main className="flex-1 container mx-auto px-4 py-6">{children}</main>
+          </div>
+        </QueryProvider>
       </body>
     </html>
   )
 }
-
-
-
-import './globals.css'
