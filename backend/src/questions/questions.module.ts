@@ -1,17 +1,11 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { QuestionsController } from './questions.controller';
 import { QuestionsService } from './questions.service';
-import { Question } from './entities/question.entity';
+import { QuestionsController } from './questions.controller';
+import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
-import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Question]), 
-    UsersModule,
-    AuthModule
-  ],
+  imports: [PrismaModule, UsersModule],
   controllers: [QuestionsController],
   providers: [QuestionsService],
   exports: [QuestionsService],

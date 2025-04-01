@@ -32,21 +32,21 @@ export class QuestionsController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'tags', required: false, type: [String] })
-  findAll(
-    @Query('page') page = 1, 
-    @Query('limit') limit = 10,
+  async findAll(
+    @Query('page') page: string,
+    @Query('limit') limit: string,
     @Query('search') search?: string,
-    @Query('tags') tags?: string[],
+    @Query('tags') tags?: string,
   ) {
-    return this.questionsService.findAll(+page, +limit, search, tags);
+    return this.questionsService.findAll(Number(page), Number(limit), search, tags);
   }
 
   @Get(':id')
   @ApiOperation({ summary: '특정 질문 조회' })
   @ApiResponse({ status: 200, description: '질문 조회 성공' })
   @ApiResponse({ status: 404, description: '질문을 찾을 수 없음' })
-  findOne(@Param('id') id: string) {
-    return this.questionsService.findOne(+id);
+  async findOne(@Param('id') id: string) {
+    return this.questionsService.findOne(id);
   }
 
   @Patch(':id')
@@ -55,13 +55,12 @@ export class QuestionsController {
   @ApiOperation({ summary: '질문 업데이트' })
   @ApiResponse({ status: 200, description: '질문 업데이트 성공' })
   @ApiResponse({ status: 403, description: '질문 수정 권한 없음' })
-  update(
+  async update(
     @Param('id') id: string, 
     @Body() updateQuestionDto: UpdateQuestionDto,
-    @Req() req: RequestWithUser
+    @Query('userId') userId: string,
   ) {
-    const userId = req.user.id;
-    return this.questionsService.update(+id, updateQuestionDto, userId);
+    return this.questionsService.update(id, updateQuestionDto, userId);
   }
 
   @Delete(':id')
@@ -70,24 +69,23 @@ export class QuestionsController {
   @ApiOperation({ summary: '질문 삭제' })
   @ApiResponse({ status: 200, description: '질문 삭제 성공' })
   @ApiResponse({ status: 403, description: '질문 삭제 권한 없음' })
-  remove(
+  async remove(
     @Param('id') id: string,
-    @Req() req: RequestWithUser
+    @Query('userId') userId: string
   ) {
-    const userId = req.user.id;
-    return this.questionsService.remove(+id, userId);
+    return this.questionsService.remove(id, userId);
   }
 
   @Patch(':id/answered')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: '질문 해결 상태 변경' })
-  markAsAnswered(
+  async markAsAnswered(
     @Param('id') id: string,
-    @Body('isAnswered') isAnswered: boolean,
-    @Req() req: RequestWithUser
+    @Query('isAnswered') isAnswered: string,
+    @Query('userId') userId: string,
   ) {
-    const userId = req.user.id;
-    return this.questionsService.markAsAnswered(+id, isAnswered, userId);
+    // isAnswered를 boolean으로 변환 필요
+    return this.questionsService.markAsAnswered(id, isAnswered === 'true', userId);
   }
 }

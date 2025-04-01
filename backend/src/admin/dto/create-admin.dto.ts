@@ -3,7 +3,7 @@ import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-vali
 export class CreateAdminDto {
   @IsNotEmpty({ message: '이름은 필수 입력값입니다.' })
   @IsString()
-  name: string;
+  username: string;
 
   @IsNotEmpty({ message: '이메일은 필수 입력값입니다.' })
   @IsEmail({}, { message: '유효한 이메일 형식이 아닙니다.' })

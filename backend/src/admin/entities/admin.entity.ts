@@ -7,12 +7,15 @@ export class Admin {
   id: number;
 
   @Column()
-  name: string;
+  username: string;
 
   @Column({ unique: true })
   email: string;
 
-  @Column()
+  @Column({ unique: true })
+  googleId: string;
+
+  @Column({ nullable: true })
   password: string;
 
   @Column({ nullable: true })

@@ -49,7 +49,7 @@ export class CommunityService {
           user: {
             select: {
               username: true,
-              profile_image: true,
+              profileImage: true, // profile_image -> profileImage
             },
           },
           _count: {
@@ -83,7 +83,7 @@ export class CommunityService {
         user: {
           select: {
             username: true,
-            profile_image: true,
+            profileImage: true, // profile_image -> profileImage
           },
         },
       },
@@ -132,7 +132,7 @@ export class CommunityService {
         user: {
           select: {
             username: true,
-            profile_image: true,
+            profileImage: true, // profile_image -> profileImage
           },
         },
       },
@@ -146,7 +146,7 @@ export class CommunityService {
         user: {
           select: {
             username: true,
-            profile_image: true,
+            profileImage: true, // profile_image -> profileImage
           },
         },
       },

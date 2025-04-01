@@ -61,7 +61,7 @@ import {
     @ApiResponse({ status: 200, description: '사용자 조회 성공' })
     @ApiResponse({ status: 404, description: '사용자를 찾을 수 없음' })
     async findOne(@Param('id') id: string) {
-      return this.usersService.findById(+id);
+      return this.usersService.findById(id.toString());
     }
   
     @Put('profile')

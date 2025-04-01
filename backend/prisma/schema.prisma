@@ -11,7 +11,8 @@ model User {
   id               String    @id @default(uuid())
   username         String    @unique
   email            String?   @unique
-  password         String
+  googleId         String?   @unique
+  password         String?
   profileImage     String?
   mbti             String?
   createdAt        DateTime  @default(now())
@@ -103,10 +104,10 @@ model Diary {
   id        Int      @id @default(autoincrement())
   title     String
   content   String   @db.Text
-  userId    String   // User의 id와 타입 일치
+  userId    String // User의 id와 타입 일치
   isPrivate Boolean  @default(false)
-  mood      String?  // 추가 필요
-  weather   String?  // 추가 필요
+  mood      String? // 추가 필요
+  weather   String? // 추가 필요
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -130,4 +131,19 @@ model DiaryTag {
   tag   Tag   @relation(fields: [tagId], references: [id])
 
   @@unique([diaryId, tagId])
+}
+
+model Admin {
+  id               String    @id @default(uuid())
+  username         String    @unique
+  email            String    @unique
+  password         String
+  role             String    @default("admin") // 'admin', 'superadmin' 등 역할 구분
+  name             String?
+  profileImage     String?
+  isActive         Boolean   @default(true)
+  loginAttempts    Int       @default(0)
+  lastLoginAttempt DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }

@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { PrismaService } from 'src/prisma/prisma.service';
 import { Recommendation } from './entities/recommendation.entity';
 import { CreateRecommendationDto } from './dto/create-recommendation.dto';
 import { UpdateRecommendationDto } from './dto/update-recommendation.dto';
@@ -8,40 +7,38 @@ import { GetRecommendationsQueryDto } from './dto/get-recommendations-query.dto'
 
 @Injectable()
 export class RecommendationsService {
-  constructor(
-    @InjectRepository(Recommendation)
-    private readonly recommendationsRepository: Repository<Recommendation>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(createRecommendationDto: CreateRecommendationDto): Promise<Recommendation> {
-    const recommendation = this.recommendationsRepository.create(createRecommendationDto);
-    return this.recommendationsRepository.save(recommendation);
+    return this.prisma.recommendation.create({ data: createRecommendationDto });
   }
 
   async findAll(query: GetRecommendationsQueryDto): Promise<{ items: Recommendation[]; total: number }> {
     const { userId, type, limit = 10, offset = 0 } = query;
-    
-    const queryBuilder = this.recommendationsRepository.createQueryBuilder('recommendation');
+    const where: any = {};
     
     if (userId) {
-      queryBuilder.andWhere('recommendation.userId = :userId', { userId });
+      where.userId = userId;
     }
     
     if (type) {
-      queryBuilder.andWhere('recommendation.type = :type', { type });
+      where.type = type;
     }
     
-    queryBuilder.orderBy('recommendation.score', 'DESC');
-    queryBuilder.limit(limit);
-    queryBuilder.offset(offset);
+    const items = await this.prisma.recommendation.findMany({
+      where,
+      orderBy: { score: 'desc' },
+      skip: offset,
+      take: limit,
+    });
     
-    const [items, total] = await queryBuilder.getManyAndCount();
+    const total = await this.prisma.recommendation.count({ where });
     
     return { items, total };
   }
 
   async findOne(id: string): Promise<Recommendation> {
-    const recommendation = await this.recommendationsRepository.findOne({ where: { id } });
+    const recommendation = await this.prisma.recommendation.findUnique({ where: { id } });
     if (!recommendation) {
       throw new NotFoundException(`Recommendation with ID "${id}" not found`);
     }
@@ -49,22 +46,24 @@ export class RecommendationsService {
   }
 
   async update(id: string, updateRecommendationDto: UpdateRecommendationDto): Promise<Recommendation> {
-    const recommendation = await this.findOne(id);
-    Object.assign(recommendation, updateRecommendationDto);
-    return this.recommendationsRepository.save(recommendation);
+    // 확인을 위해 존재하는 엔티티를 먼저 조회합니다.
+    await this.findOne(id);
+    return this.prisma.recommendation.update({
+      where: { id },
+      data: updateRecommendationDto,
+    });
   }
 
   async remove(id: string): Promise<void> {
-    const result = await this.recommendationsRepository.delete(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(`Recommendation with ID "${id}" not found`);
-    }
+    // 존재 여부 확인 후 삭제합니다.
+    await this.findOne(id);
+    await this.prisma.recommendation.delete({ where: { id } });
   }
 
   async getUserRecommendations(userId: string, limit = 10): Promise<Recommendation[]> {
-    return this.recommendationsRepository.find({
+    return this.prisma.recommendation.findMany({
       where: { userId, isSeen: false },
-      order: { score: 'DESC' },
+      orderBy: { score: 'desc' },
       take: limit,
     });
   }

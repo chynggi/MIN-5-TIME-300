@@ -1,31 +1,32 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Admin } from './entities/admin.entity';
+import { PrismaService } from '../prisma/prisma.service'; // PrismaService 경로는 실제 경로에 맞게 조정하세요.
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 
 @Injectable()
 export class AdminService {
-  constructor(
-    @InjectRepository(Admin)
-    private adminRepository: Repository<Admin>,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
-  async create(createAdminDto: CreateAdminDto): Promise<Admin> {
-    const admin = this.adminRepository.create(createAdminDto);
-    return this.adminRepository.save(admin);
+  async create(createAdminDto: CreateAdminDto) {
+    return this.prisma.admin.create({
+      data: createAdminDto,
+    });
   }
 
   async findAll(options: { page: number; limit: number }) {
     const { page, limit } = options;
     const skip = (page - 1) * limit;
-    
-    const [data, total] = await this.adminRepository.findAndCount({
-      skip,
-      take: limit,
-      order: { createdAt: 'DESC' },
-    });
+
+    const [data, total] = await Promise.all([
+      this.prisma.admin.findMany({
+        skip,
+        take: limit,
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+      this.prisma.admin.count(),
+    ]);
 
     return {
       data,
@@ -38,24 +39,28 @@ export class AdminService {
     };
   }
 
-  async findOne(id: number): Promise<Admin> {
-    const admin = await this.adminRepository.findOne({ where: { id } });
+  async findOne(id: string) {
+    const admin = await this.prisma.admin.findUnique({
+      where: { id },
+    });
     if (!admin) {
       throw new NotFoundException(`관리자 ID ${id}를 찾을 수 없습니다.`);
     }
     return admin;
   }
 
-  async update(id: number, updateAdminDto: UpdateAdminDto): Promise<Admin> {
-    const admin = await this.findOne(id);
-    Object.assign(admin, updateAdminDto);
-    return this.adminRepository.save(admin);
+  async update(id: string, updateAdminDto: UpdateAdminDto) {
+    await this.findOne(id);
+    return this.prisma.admin.update({
+      where: { id },
+      data: updateAdminDto,
+    });
   }
 
-  async remove(id: number): Promise<void> {
-    const result = await this.adminRepository.delete(id);
-    if (result.affected === 0) {
-      throw new NotFoundException(`관리자 ID ${id}를 찾을 수 없습니다.`);
-    }
+  async remove(id: string): Promise<void> {
+    await this.findOne(id);
+    await this.prisma.admin.delete({
+      where: { id },
+    });
   }
 }
