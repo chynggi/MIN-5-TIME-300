@@ -41,20 +41,32 @@ export const authOptions: NextAuthOptions = {
           const payload = ticket.getPayload();
           if (!payload) return false;
           
-          // 백엔드에 사용자 정보 전송
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: payload.email,
-              name: payload.name,
-              picture: payload.picture,
-              sub: payload.sub
-            })
-          });
+          // 백엔드 연결 시도
+          try {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({
+                email: payload.email,
+                name: payload.name,
+                picture: payload.picture,
+                sub: payload.sub
+              })
+            });
 
-          if (!response.ok) return false;
-          return true;
+            if (!response.ok) {
+              console.error('백엔드 응답 에러:', await response.text());
+              return false;
+            }
+
+            return true;
+          } catch (error) {
+            console.error('백엔드 연결 에러:', error);
+            return true; // 백엔드 연결 실패시에도 로그인은 허용
+          }
         } catch (error) {
           console.error('Google 인증 에러:', error);
           return false;
