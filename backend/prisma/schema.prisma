@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String
+  password      String?   // 소셜 로그인 사용자는 비밀번호가 없을 수 있음
+  profile_image String?
+  mbti          String?
+  googleId      String?   @unique // Google 고유 식별자
+  provider      String?   // 인증 제공자 (google, email 등)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // 관계 필드 추가
+  entries   CommunityEntry[]
+  comments  Comment[]
+  likes     Like[]
+
+  @@map("users")
+}
+
+model CommunityEntry {
+  id        Int       @id @default(autoincrement())
+  userId    String
+  prompt    String
+  content   String    @db.Text
+  emotion   String
+  isPublic  Boolean   @default(true)
+  likes     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id])
+  comments  Comment[]
+  likedBy   Like[]
+
+  @@map("community_entries")
+}
+
+model Comment {
+  id        Int       @id @default(autoincrement())
+  content   String
+  userId    String
+  entryId   Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user      User           @relation(fields: [userId], references: [id])
+  entry     CommunityEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model Like {
+  userId    String
+  entryId   Int
+  createdAt DateTime  @default(now())
+
+  user      User           @relation(fields: [userId], references: [id])
+  entry     CommunityEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@id([userId, entryId])
+  @@map("likes")
+}

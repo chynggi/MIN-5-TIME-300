@@ -1,16 +1,107 @@
 "use client"
 
 import type React from "react"
-
 import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Book, Users, Home, User, Lightbulb } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
+import { Book, Users, Home, User, Lightbulb, LogIn, UserPlus, LogOut } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+
+// 임시로 인증 상태를 확인하는 함수 (실제로는 상태 관리 라이브러리나 context를 사용해야 함)
+const useAuth = () => {
+  return {
+    isAuthenticated: false, // 여기서 인증 상태를 관리
+    user: null
+  }
+}
 
 export function Navbar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const { isAuthenticated, user } = useAuth()
 
   const isActive = (path: string) => {
     return pathname === path
+  }
+
+  // 데스크탑 프로필 드롭다운
+  const DesktopProfile = () => {
+    if (isAuthenticated) {
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger>
+            <button 
+              className={`p-2 rounded-full transition-colors ${
+                isActive("/profile")
+                  ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-400"
+                  : "bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 dark:bg-slate-800 dark:hover:bg-indigo-900 dark:hover:text-indigo-400"
+              }`}
+            >
+              <User className="w-5 h-5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => router.push('/profile')}>
+              <User className="w-4 h-4 mr-2" />
+              프로필
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>
+              <LogOut className="w-4 h-4 mr-2" />
+              로그아웃
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    }
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger>
+          <button className="p-2 rounded-full transition-colors bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 dark:bg-slate-800 dark:hover:bg-indigo-900 dark:hover:text-indigo-400">
+            <User className="w-5 h-5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => router.push('/login')}>
+            <LogIn className="w-4 h-4 mr-2" />
+            로그인
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push('/register')}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            회원가입
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  // 모바일 프로필 링크
+  const MobileProfile = () => {
+    if (isAuthenticated) {
+      return (
+        <MobileNavLink
+          href="/profile"
+          isActive={isActive("/profile")}
+          icon={<User className="w-5 h-5" />}
+          label="프로필"
+        />
+      )
+    }
+
+    return (
+      <MobileNavLink
+        href="/login"
+        isActive={isActive("/login")}
+        icon={<LogIn className="w-5 h-5" />}
+        label="로그인"
+      />
+    )
   }
 
   return (
@@ -39,9 +130,7 @@ export function Navbar() {
           </nav>
 
           <div className="hidden md:block">
-            <button className="p-2 rounded-full bg-slate-100 dark:bg-slate-800">
-              <User className="w-5 h-5" />
-            </button>
+            <DesktopProfile />
           </div>
         </div>
       </div>
@@ -68,12 +157,7 @@ export function Navbar() {
             icon={<Users className="w-5 h-5" />}
             label="커뮤니티"
           />
-          <MobileNavLink
-            href="/profile"
-            isActive={isActive("/profile")}
-            icon={<User className="w-5 h-5" />}
-            label="프로필"
-          />
+          <MobileProfile />
         </div>
       </div>
     </div>
