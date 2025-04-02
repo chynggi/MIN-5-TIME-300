@@ -19,6 +19,7 @@ model User {
   updatedAt        DateTime  @updatedAt
   loginAttempts    Int       @default(0)
   lastLoginAttempt DateTime?
+  provider         String?   @default("local")
 
   // 관계 정의
   questions        Question[]
@@ -65,7 +66,7 @@ model Comment {
   userId    String
   entryId   Int
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now())
 
   user  User           @relation(fields: [userId], references: [id])
   entry CommunityEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)

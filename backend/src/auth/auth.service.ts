@@ -27,7 +27,7 @@ export class AuthService {
 
   async googleAuth(googleAuthDto: GoogleAuthDto) {
     // 기존 사용자 확인
-    let user = await this.prisma.user.findUnique({
+    let user = await this.prisma.user.findFirst({
       where: {
         email: googleAuthDto.email,
       },
@@ -41,7 +41,7 @@ export class AuthService {
           username: googleAuthDto.name,
           profileImage: googleAuthDto.picture,
           googleId: googleAuthDto.sub,
-          password: null, // 비밀번호는 필요 없음
+          //password: null, // 비밀번호는 필요 없음
           // isAdmin: false, // 기본값으로 설정
           // mbti: null, // 기본값으로 설정
           // loginAttempts: 0, // 기본값으로 설정
@@ -49,7 +49,8 @@ export class AuthService {
           // createdAt: new Date(), // 기본값으로 설정
           // updatedAt: new Date(), // 기본값으로 설정
           // questions: [], // 기본값으로 설정
-          // provider 필드 제거
+          provider: 'google', // 구글 로그인으로 설정
+          // 추가 필드들에 대한 기본값 설정
         },
       });
     }

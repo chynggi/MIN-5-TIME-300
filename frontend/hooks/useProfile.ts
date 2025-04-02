@@ -23,9 +23,18 @@ export const useProfile = () => {
   return useQuery<ProfileData>({
     queryKey: ['profile'],
     queryFn: async () => {
-      const { data } = await axios.get('/api/user/profile')
-      return data
-    }
+      try {
+        const { data } = await axios.get('/api/user/profile')
+        return data
+      } catch (error) {
+        console.error('프로필 데이터 가져오기 실패:', error)
+        throw error
+      }
+    },
+    // 오류 시 자동 재시도 제한
+    retry: 1,
+    // 세션이 있는 경우에만 요청
+    enabled: typeof window !== 'undefined' && !!sessionStorage.getItem('next-auth.session-token')
   })
 }
 
@@ -48,7 +57,7 @@ export const useUpdateProfileImage = () => {
   
   return useMutation({
     mutationFn: async (formData: FormData) => {
-      const { data } = await axios.post('/api/user/profile-image', formData, {
+      const { data } = await axios.post('/api/user/profile/image', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

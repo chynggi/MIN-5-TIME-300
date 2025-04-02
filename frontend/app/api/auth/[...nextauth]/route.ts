@@ -43,7 +43,8 @@ export const authOptions: NextAuthOptions = {
           
           // 백엔드 연결 시도
           try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
+            console.log(process.env.NEXT_PUBLIC_API_URL);
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/google`, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json',

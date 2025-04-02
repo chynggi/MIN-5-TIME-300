@@ -24,7 +24,7 @@ import { UpdateDiaryDto } from './dto/update-diary.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('diaries')
-@Controller('api/diaries')
+@Controller('diaries')
 export class DiariesController {
   constructor(private readonly diariesService: DiariesService) {}
 

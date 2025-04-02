@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -23,6 +24,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useProfile } from '@/hooks/useProfile'
 
 export default function ProfilePage() {
+  const router = useRouter()
+  const { data: session, status } = useSession()
   const { data: profile, isLoading, error } = useProfile()
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({
@@ -34,8 +37,21 @@ export default function ProfilePage() {
     confirmPassword: ''
   })
   
-  if (isLoading) return <div>로딩 중...</div>
-  if (error) return <div>에러가 발생했습니다.</div>
+  // 세션 상태에 따른 리다이렉트 처리
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    }
+  }, [status, router])
+
+  // 로딩 중이거나 인증 확인 중일 때
+  if (status === 'loading' || isLoading) return <div>로딩 중...</div>
+  
+  // 인증되지 않았을 때 (위 useEffect에서 리다이렉트 처리하지만, 방어적 코딩)
+  if (status === 'unauthenticated') return null
+
+  // 에러 발생 시
+  if (error) return <div>에러가 발생했습니다: {error.message}</div>
 
   return (
     <div className="container mx-auto py-6">
