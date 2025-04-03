@@ -1,36 +1,40 @@
-import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import "./globals.css"
-import { Navbar } from "@/components/navbar"
-import Providers from '@/providers/providers'
-import { AuthProvider } from '@/contexts/auth-context'
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { MainNavigation } from "@/components/main-navigation";
+import { cn } from "@/lib/utils";
+import { AuthProvider } from "@/contexts/auth-context";
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "5MIN Journal",
-  description: "Daily 5-minute journaling app",
-  generator: 'v0.dev'
-}
+  title: "MIN 5 TIME 300",
+  description: "지금 솔직한 마음을 나누세요",
+};
 
 export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode
-}) {
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="ko">
-      <body className={`${inter.className} bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-50`}>
-        <Providers>
-          <AuthProvider>
-            <div className="flex min-h-screen flex-col">
-              <Navbar />
-              <main className="flex-1 container mx-auto px-4 py-6">{children}</main>
+      <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
+        <AuthProvider>
+          <div className="flex flex-col md:flex-row min-h-screen">
+            <div className="hidden md:block md:w-16 border-r">
+              <MainNavigation className="hidden md:block" />
             </div>
-          </AuthProvider>
-        </Providers>
+            <div className="flex-1">
+              <div className="mx-auto w-full px-4 sm:px-6 md:max-w-5xl lg:max-w-6xl">
+                {children}
+              </div>
+            </div>
+            <MainNavigation className="md:hidden" />
+          </div>
+        </AuthProvider>
       </body>
     </html>
-  )
+  );
 }
+

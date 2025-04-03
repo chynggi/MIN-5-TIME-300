@@ -1,169 +1,196 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
-import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { useProfile } from '@/hooks/useProfile'
+import { useState, useEffect } from 'react';
+import { MainNavigation } from "@/components/main-navigation";
+import { Settings, Users, Book, Heart, Upload, Loader2 } from "lucide-react";
+import { profileService, ProfileData } from "@/lib/api/profile";
+import Image from "next/image";
 
 export default function ProfilePage() {
-  const router = useRouter()
-  const { data: session, status } = useSession()
-  const { data: profile, isLoading, error } = useProfile()
-  const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    mbti: '',
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  })
-  
-  // 세션 상태에 따른 리다이렉트 처리
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login')
+    async function fetchProfile() {
+      try {
+        setLoading(true);
+        const profileData = await profileService.getProfile();
+        setProfile(profileData);
+        setError(null);
+      } catch (err) {
+        console.error('프로필 로딩 중 오류 발생:', err);
+        setError('프로필을 불러오는 중 오류가 발생했습니다.');
+      } finally {
+        setLoading(false);
+      }
     }
-  }, [status, router])
 
-  // 로딩 중이거나 인증 확인 중일 때
-  if (status === 'loading' || isLoading) return <div>로딩 중...</div>
-  
-  // 인증되지 않았을 때 (위 useEffect에서 리다이렉트 처리하지만, 방어적 코딩)
-  if (status === 'unauthenticated') return null
+    fetchProfile();
+  }, []);
 
-  // 에러 발생 시
-  if (error) return <div>에러가 발생했습니다: {error.message}</div>
+  // 프로필 이미지 업로드 처리
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const file = e.target.files[0];
+    try {
+      setLoading(true);
+      const { profileImage } = await profileService.uploadProfileImage(file);
+      // 프로필 상태 업데이트 - 백엔드 응답 형식에 맞춤
+      setProfile(prev => prev ? { ...prev, profileImage } : null);
+    } catch (err) {
+      console.error('이미지 업로드 중 오류 발생:', err);
+      setError('이미지 업로드에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="mt-4 text-muted-foreground">프로필을 불러오는 중...</p>
+        <MainNavigation />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-white">
+        <p className="text-red-500">{error}</p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="mt-4 px-4 py-2 bg-primary text-white rounded-md"
+        >
+          다시 시도
+        </button>
+        <MainNavigation />
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">프로필 설정</h1>
-      
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* 프로필 이미지 카드 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>프로필 이미지</CardTitle>
-            <CardDescription>프로필 이미지를 변경할 수 있습니다</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center gap-4">
-            <Avatar className="h-32 w-32">
-              <AvatarImage src={profile?.profile_image || '/placeholder-user.jpg'} />
-              <AvatarFallback>프로필</AvatarFallback>
-            </Avatar>
-            <Button variant="outline">이미지 변경</Button>
-          </CardContent>
-        </Card>
-
-        {/* 프로필 정보 카드 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>프로필 정보</CardTitle>
-            <CardDescription>기본 정보를 수정할 수 있습니다</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">사용자 이름</Label>
-              <Input
-                id="username"
-                value={formData.username}
-                onChange={(e) => setFormData(prev => ({...prev, username: e.target.value}))}
-                readOnly={!isEditing}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">이메일</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData(prev => ({...prev, email: e.target.value}))}
-                readOnly={!isEditing}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mbti">MBTI</Label>
-              <Select 
-                disabled={!isEditing} 
-                value={formData.mbti}
-                onValueChange={(value) => setFormData(prev => ({...prev, mbti: value}))}
+    <div className="flex min-h-screen flex-col bg-white">
+      <header className="sticky top-0 z-10 border-b bg-white p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-gray-700"
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="MBTI 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {['INTJ', 'INTP', 'ENTJ', 'ENTP', 'INFJ', 'INFP', 'ENFJ', 'ENFP',
-                    'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ', 'ISTP', 'ISFP', 'ESTP', 'ESFP'].map(type => (
-                    <SelectItem key={type} value={type}>{type}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
             </div>
-            <Button 
-              className="w-full"
-              onClick={() => setIsEditing(!isEditing)}
-            >
-              {isEditing ? '저장' : '수정'}
-            </Button>
-          </CardContent>
-        </Card>
+            <span className="font-bold">5MIN</span>
+          </div>
+          <button className="rounded-full p-1 hover:bg-gray-100">
+            <Settings className="w-5 h-5" />
+          </button>
+        </div>
+      </header>
 
-        {/* 비밀번호 변경 카드 */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>비밀번호 변경</CardTitle>
-            <CardDescription>새로운 비밀번호로 변경할 수 있습니다</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="currentPassword">현재 비밀번호</Label>
-              <Input 
-                id="currentPassword" 
-                type="password"
-                value={formData.currentPassword}
-                onChange={(e) => setFormData(prev => ({...prev, currentPassword: e.target.value}))}
-              />
+      <main className="py-8">
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="md:w-1/3">
+              <div className="bg-card rounded-xl p-6 flex flex-col items-center">
+                <div className="relative w-24 h-24">
+                  {profile?.profileImage ? (
+                    <Image
+                      src={profile.profileImage}
+                      alt={profile.username}
+                      fill
+                      className="rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-muted-foreground/20 flex items-center justify-center">
+                      <label htmlFor="profile-image" className="cursor-pointer">
+                        <Upload className="h-8 w-8 text-muted-foreground" />
+                        <input
+                          id="profile-image"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+                <h2 className="mt-4 text-xl font-bold">{profile?.username}</h2>
+                <p className="text-muted-foreground">@{profile?.username}</p>
+                {profile?.mbti && (
+                  <div className="mt-2 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary text-primary-foreground hover:bg-primary/80">
+                    {profile.mbti}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">새 비밀번호</Label>
-              <Input 
-                id="newPassword" 
-                type="password"
-                value={formData.newPassword}
-                onChange={(e) => setFormData(prev => ({...prev, newPassword: e.target.value}))}
-              />
+            
+            <div className="space-y-4 md:w-2/3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="bg-card rounded-xl p-4">
+                  <p className="text-muted-foreground text-sm">일기</p>
+                  <p className="text-2xl font-bold">{profile?.stats?.diaryCount || 0}</p>
+                </div>
+                <div className="bg-card rounded-xl p-4">
+                  <p className="text-muted-foreground text-sm">친구</p>
+                  <p className="text-2xl font-bold">{profile?.stats?.friendCount || 0}</p>
+                </div>
+                <div className="bg-card rounded-xl p-4">
+                  <p className="text-muted-foreground text-sm">좋아요</p>
+                  <p className="text-2xl font-bold">{profile?.stats?.likeCount || 0}</p>
+                </div>
+              </div>
+              
+              <div className="bg-card rounded-xl p-4">
+                <h3 className="font-medium">자기소개</h3>
+                <p className="text-muted-foreground mt-2">{profile?.bio || '자기소개가 없습니다.'}</p>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">비밀번호 확인</Label>
-              <Input 
-                id="confirmPassword" 
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData(prev => ({...prev, confirmPassword: e.target.value}))}
-              />
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="p-6 rounded-xl bg-yellow-100 flex items-center gap-4 cursor-pointer hover:bg-yellow-200 transition-colors">
+              <Settings className="h-6 w-6 text-yellow-700" />
+              <div>
+                <h3 className="font-medium">설정</h3>
+                <p className="text-sm text-muted-foreground">앱 설정 관리</p>
+              </div>
             </div>
-            <Button className="w-full">비밀번호 변경</Button>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="p-6 rounded-xl bg-pink-100 flex items-center gap-4 cursor-pointer hover:bg-pink-200 transition-colors">
+              <Users className="h-6 w-6 text-pink-700" />
+              <div>
+                <h3 className="font-medium">친구 관리</h3>
+                <p className="text-sm text-muted-foreground">친구 목록 확인</p>
+              </div>
+            </div>
+            <div className="p-6 rounded-xl bg-green-100 flex items-center gap-4 cursor-pointer hover:bg-green-200 transition-colors">
+              <Book className="h-6 w-6 text-green-700" />
+              <div>
+                <h3 className="font-medium">일기장</h3>
+                <p className="text-sm text-muted-foreground">내 일기 모아보기</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <MainNavigation />
     </div>
-  )
+  );
 }
+

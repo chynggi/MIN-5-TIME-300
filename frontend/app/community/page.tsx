@@ -1,217 +1,139 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Heart, MessageSquare, Filter, Search, MoreVertical, Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { useCommunityEntries, useToggleLike } from "@/hooks/useCommunity"
-import { useAuth } from "@/hooks/useAuth"
-import { Entry } from '@/types/community';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { communityService, CommunityPost } from '@/lib/api/community';
+import { useAuth } from '@/contexts/auth-context';
+import styles from '@/styles/Community.module.css';
 
 export default function CommunityPage() {
-  const router = useRouter()
-  const { isAuthenticated } = useAuth()
-  const [page, setPage] = useState(1)
-  const [selectedEmotions, setSelectedEmotions] = useState<string[]>([])
-  const [sortBy, setSortBy] = useState<'latest' | 'popular' | 'comments'>('latest')
-  const [searchQuery, setSearchQuery] = useState("")
+  const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   
-  const { data, isLoading } = useCommunityEntries({
-    page,
-    emotion: selectedEmotions,
-    sortBy,
-    search: searchQuery,
-  })
-  
-  const toggleLikeMutation = useToggleLike()
+  const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
 
-  const toggleEmotion = (emotion: string) => {
-    setSelectedEmotions((prev) => 
-      prev.includes(emotion) ? prev.filter((e) => e !== emotion) : [...prev, emotion]
-    )
-  }
+  useEffect(() => {
+    loadPosts();
+  }, [page]);
 
-  const handleReport = async (entryId: number) => {
-    if (!isAuthenticated) {
-      router.push('/login')
-      return
+  const loadPosts = async () => {
+    try {
+      setLoading(true);
+      const response = await communityService.getPosts(page, 10);
+      
+      if (page === 1) {
+        setPosts(response.posts);
+      } else {
+        setPosts(prev => [...prev, ...response.posts]);
+      }
+      
+      setHasMore(response.posts.length === 10); // 10개 미만이면 더 이상 없는 것으로 간주
+    } catch (err) {
+      console.error('게시글 목록을 불러오는 중 오류 발생:', err);
+      setError('게시글 목록을 불러오는 데 실패했습니다.');
+    } finally {
+      setLoading(false);
     }
-    // 신고 API 호출
-  }
+  };
+
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      setPage(prev => prev + 1);
+    }
+  };
+
+  // 날짜 포맷팅 함수
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(date);
+  };
+
+  // 내용 미리보기 생성
+  const createPreview = (content: string, maxLength = 100) => {
+    if (content.length <= maxLength) return content;
+    return content.substring(0, maxLength) + '...';
+  };
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <div className="flex flex-col gap-4 mb-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">커뮤니티 일기</h1>
-          {isAuthenticated && (
-            <Button onClick={() => router.push('/community/write')}>
-              <Plus className="w-4 h-4 mr-2" />
-              일기 공유하기
-            </Button>
-          )}
-        </div>
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>커뮤니티</h1>
+        {user && (
+          <Link href="/community/new">
+            <button className={styles.newButton}>새 글 작성</button>
+          </Link>
+        )}
+      </div>
 
-        <div className="flex gap-2">
-          <Input 
-            placeholder="검색어를 입력하세요" 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="max-w-xs"
-          />
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                {sortBy === 'latest' ? '최신순' : 
-                 sortBy === 'popular' ? '인기순' : '댓글순'}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onSelect={() => setSortBy('latest')}>
-                최신순
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setSortBy('popular')}>
-                인기순
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setSortBy('comments')}>
-                댓글순
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+      {error && <div className={styles.error}>{error}</div>}
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Filter className="w-4 h-4 mr-2" />
-                감정 필터
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {["😊", "😢", "😡", "😌"].map((emotion) => (
-                <DropdownMenuCheckboxItem
-                  key={emotion}
-                  checked={selectedEmotions.includes(emotion)}
-                  onCheckedChange={() => toggleEmotion(emotion)}
-                >
-                  <span className="mr-2">{emotion}</span>
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+      <div className={styles.filterBar}>
+        <div className={styles.filterOptions}>
+          <button className={`${styles.filterButton} ${styles.active}`}>최신순</button>
+          <button className={styles.filterButton}>인기순</button>
+          <button className={styles.filterButton}>댓글순</button>
         </div>
       </div>
 
-      {isLoading ? (
-        <div>로딩 중...</div>
-      ) : (
-        <div className="space-y-4">
-          {data?.entries.map((entry: Entry) => (
-            <div key={entry.id} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6">
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center">
-                  <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center mr-2">
-                    {entry.userImage ? (
-                      <img 
-                        src={entry.userImage} 
-                        alt={entry.username} 
-                        className="w-full h-full rounded-full"
-                      />
-                    ) : (
-                      <span className="text-xs">{entry.username[0]}</span>
-                    )}
+      <div className={styles.postList}>
+        {posts.length === 0 && !loading ? (
+          <div className={styles.emptyState}>
+            <p>등록된 게시글이 없습니다.</p>
+            <p>첫 번째 게시글을 작성해보세요!</p>
+          </div>
+        ) : (
+          posts.map(post => (
+            <Link href={`/community/${post.id}`} key={post.id}>
+              <div className={styles.postCard}>
+                <h2 className={styles.postTitle}>{post.title}</h2>
+                <p className={styles.postPreview}>{createPreview(post.content)}</p>
+                
+                {post.tags && post.tags.length > 0 && (
+                  <div className={styles.postTags}>
+                    {post.tags.map((tag, index) => (
+                      <span key={index} className={styles.tag}>{tag}</span>
+                    ))}
                   </div>
-                  <div>
-                    <h3 className="font-medium">{entry.username}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {new Date(entry.date).toLocaleDateString()}
-                    </p>
+                )}
+                
+                <div className={styles.postMeta}>
+                  <div className={styles.postAuthor}>
+                    <span>작성자: {post.authorName}</span>
+                  </div>
+                  <div className={styles.postInfo}>
+                    <span className={styles.postDate}>{formatDate(post.createdAt)}</span>
+                    <span className={styles.postStats}>
+                      <span className={styles.likes}>❤️ {post.likes}</span>
+                      <span className={styles.comments}>💬 {post.comments}</span>
+                    </span>
                   </div>
                 </div>
-                
-                <DropdownMenu>
-                  <DropdownMenuTrigger>
-                    <Button variant="ghost" size="sm">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onSelect={() => handleReport(entry.id)}>
-                      신고하기
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
+            </Link>
+          ))
+        )}
+      </div>
 
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-                {entry.prompt}
-              </p>
-              <p className="text-slate-700 dark:text-slate-300 my-4">
-                {entry.content}
-              </p>
-
-              <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-slate-400">
-                <button
-                  onClick={() => toggleLikeMutation.mutate(entry.id)}
-                  className={`flex items-center space-x-1 ${
-                    entry.isLiked ? "text-rose-500 dark:text-rose-400" : ""
-                  }`}
-                  disabled={toggleLikeMutation.isPending}
-                >
-                  <Heart className="w-4 h-4" />
-                  <span>{entry.likes}</span>
-                </button>
-
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <button className="flex items-center space-x-1">
-                      <MessageSquare className="w-4 h-4" />
-                      <span>{entry.comments}</span>
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>댓글</DialogTitle>
-                      <DialogDescription>
-                        다른 사용자의 이야기에 댓글을 남겨보세요
-                      </DialogDescription>
-                    </DialogHeader>
-                    {/* 댓글 컴포넌트는 별도로 구현 */}
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </div>
-          ))}
+      {hasMore && posts.length > 0 && (
+        <div className={styles.loadMoreContainer}>
+          <button 
+            onClick={loadMore} 
+            disabled={loading} 
+            className={styles.loadMoreButton}
+          >
+            {loading ? '로딩 중...' : '더 보기'}
+          </button>
         </div>
       )}
-
-      {data?.hasMore && (
-        <Button
-          variant="outline"
-          className="w-full mt-4"
-          onClick={() => setPage((p) => p + 1)}
-        >
-          더 보기
-        </Button>
-      )}
     </div>
-  )
+  );
 }
-
