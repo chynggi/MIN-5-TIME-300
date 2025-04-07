@@ -1,16 +1,28 @@
 import { apiClient } from '@/lib/api-client';
 
+export interface CategoryInfo {
+  id: number;
+  name: string;
+  description: string;
+}
+
 export interface Question {
   id: string;
   title: string;
   content: string;
   authorId: string;
-  authorName: string;
+  author: {
+    id: string;
+    username: string;
+    profileImage: string;
+  };
+  category: number;
+  categoryInfo?: CategoryInfo;
+  tags?: string[];
   createdAt: string;
   updatedAt: string;
   isResolved: boolean;
   answerCount: number;
-  tags?: string[];
 }
 
 export interface Answer {
@@ -35,6 +47,7 @@ export interface QuestionListResponse {
 export interface QuestionCreateDto {
   title: string;
   content: string;
+  category: number;
   tags?: string[];
 }
 
@@ -42,20 +55,44 @@ export interface QuestionUpdateDto {
   title?: string;
   content?: string;
   tags?: string[];
+  category?: number;
   isResolved?: boolean;
 }
 
 export const questionsService = {
+  // 카테고리 목록 가져오기
+  getCategories: async (): Promise<CategoryInfo[]> => {
+    const response = await apiClient.get('/questions/categories');
+    return response.data;
+  },
+
   // 질문 목록 가져오기
   getQuestions: async (
     page = 1, 
     limit = 10, 
+    search?: string, 
+    tags?: string,
+    category?: number,
     filter?: 'all' | 'open' | 'resolved'
   ): Promise<QuestionListResponse> => {
     let url = `/questions?page=${page}&limit=${limit}`;
+    
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`;
+    }
+    
+    if (tags) {
+      url += `&tags=${encodeURIComponent(tags)}`;
+    }
+    
+    if (category !== undefined) {
+      url += `&category=${category}`;
+    }
+
     if (filter && filter !== 'all') {
       url += `&filter=${filter}`;
     }
+    
     const response = await apiClient.get(url);
     return response.data;
   },

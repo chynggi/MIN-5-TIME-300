@@ -9,23 +9,43 @@ import styles from '@/styles/Questions.module.css';
 
 export default function QuestionsPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<number | undefined>(undefined);
   
   const router = useRouter();
   const { user } = useAuth();
 
   useEffect(() => {
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
     loadQuestions();
-  }, [page, filter]);
+  }, [page, selectedCategory]);
+
+  const loadCategories = async () => {
+    try {
+      const categoriesData = await questionsService.getCategories();
+      setCategories(categoriesData);
+    } catch (err) {
+      console.error('카테고리 목록을 불러오는 중 오류 발생:', err);
+    }
+  };
 
   const loadQuestions = async () => {
     try {
       setLoading(true);
-      const response = await questionsService.getQuestions(page, 10, filter);
+      const response = await questionsService.getQuestions(
+        page, 
+        10, 
+        undefined, 
+        undefined, 
+        selectedCategory
+      );
       
       if (page === 1) {
         setQuestions(response.questions);
@@ -42,16 +62,14 @@ export default function QuestionsPage() {
     }
   };
 
+  const handleCategoryChange = (categoryId: number | undefined) => {
+    setSelectedCategory(categoryId);
+    setPage(1); // 카테고리 변경 시 첫 페이지로 돌아가기
+  };
+
   const loadMore = () => {
     if (!loading && hasMore) {
       setPage(prev => prev + 1);
-    }
-  };
-
-  const handleFilterChange = (newFilter: 'all' | 'open' | 'resolved') => {
-    if (filter !== newFilter) {
-      setFilter(newFilter);
-      setPage(1); // 필터 변경시 1페이지로 돌아감
     }
   };
 
@@ -68,63 +86,60 @@ export default function QuestionsPage() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>질문 &amp; 답변</h1>
+        <h1 className={styles.title}>일기 질문 프롬프트</h1>
         {user && (
           <Link href="/questions/new">
-            <button className={styles.askButton}>질문하기</button>
+            <button className={styles.askButton}>질문 작성하기</button>
           </Link>
         )}
       </div>
 
-      {error && <div className={styles.error}>{error}</div>}
+      <div className={styles.description}>
+        육하원칙(5W1H)에 따른 질문들을 통해 다양한 관점에서 일기를 작성해보세요.
+      </div>
 
-      <div className={styles.filterBar}>
-        <div className={styles.filterOptions}>
-          <button 
-            className={`${styles.filterButton} ${filter === 'all' ? styles.active : ''}`}
-            onClick={() => handleFilterChange('all')}
+      {error && <div className={styles.error}>{error}</div>}
+      
+      <div className={styles.categoryFilter}>
+        <button 
+          className={`${styles.categoryButton} ${selectedCategory === undefined ? styles.active : ''}`}
+          onClick={() => handleCategoryChange(undefined)}
+        >
+          전체
+        </button>
+        
+        {categories.map((category) => (
+          <button
+            key={category.id}
+            className={`${styles.categoryButton} ${selectedCategory === category.id ? styles.active : ''}`}
+            onClick={() => handleCategoryChange(category.id)}
           >
-            전체 질문
+            {category.name}
           </button>
-          <button 
-            className={`${styles.filterButton} ${filter === 'open' ? styles.active : ''}`}
-            onClick={() => handleFilterChange('open')}
-          >
-            미해결 질문
-          </button>
-          <button 
-            className={`${styles.filterButton} ${filter === 'resolved' ? styles.active : ''}`}
-            onClick={() => handleFilterChange('resolved')}
-          >
-            해결된 질문
-          </button>
-        </div>
+        ))}
       </div>
 
       <div className={styles.questionList}>
         {questions.length === 0 && !loading ? (
           <div className={styles.emptyState}>
-            <p>등록된 질문이 없습니다.</p>
-            <p>첫 번째 질문을 남겨보세요!</p>
+            <p>등록된 질문 프롬프트가 없습니다.</p>
+            <p>새로운 질문을 작성해보세요!</p>
           </div>
         ) : (
           questions.map(question => (
             <Link href={`/questions/${question.id}`} key={question.id}>
               <div className={styles.questionCard}>
-                <div className={styles.questionStatus}>
-                  <div className={styles.answerCount}>
-                    <span className={styles.count}>{question.answerCount}</span>
-                    <span className={styles.label}>답변</span>
-                  </div>
-                  {question.isResolved && (
-                    <div className={styles.resolvedBadge}>
-                      해결됨
-                    </div>
-                  )}
-                </div>
-
                 <div className={styles.questionContent}>
+                  <div className={styles.questionCategory}>
+                    {question.categoryInfo?.name || '기타'}
+                  </div>
                   <h2 className={styles.questionTitle}>{question.title}</h2>
+                  
+                  <p className={styles.questionDescription}>
+                    {question.content.length > 120 
+                      ? `${question.content.substring(0, 120)}...` 
+                      : question.content}
+                  </p>
                   
                   {question.tags && question.tags.length > 0 && (
                     <div className={styles.questionTags}>
@@ -135,7 +150,7 @@ export default function QuestionsPage() {
                   )}
                   
                   <div className={styles.questionMeta}>
-                    <span className={styles.questionAuthor}>{question.authorName}</span>
+                    <span className={styles.questionAuthor}>{question.author?.username}</span>
                     <span className={styles.questionDate}>
                       {formatDate(question.createdAt)}
                     </span>

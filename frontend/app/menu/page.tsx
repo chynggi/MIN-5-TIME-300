@@ -59,7 +59,7 @@ export default function MenuPage() {
 
       <main className="flex-1 p-4">
         <h1 className="text-2xl font-bold mb-6">메뉴</h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="hidden lg:grid lg:grid-cols-1 lg:gap-4">
           {menuItems.map((item) => (
             <Link href={item.href} key={item.name}>
               <div className={`p-6 rounded-xl hover:opacity-80 transition-opacity ${item.color}`}>
@@ -67,6 +67,16 @@ export default function MenuPage() {
                   <item.icon className="h-8 w-8 mb-2" />
                   <h3 className="font-medium text-lg">{item.name}</h3>
                 </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+        <div className="fixed bottom-0 left-0 right-0 z-10 flex justify-around bg-white border-t p-2 lg:hidden">
+          {menuItems.map((item) => (
+            <Link href={item.href} key={item.name}>
+              <div className="flex flex-col items-center text-gray-700">
+                <item.icon className="h-6 w-6 mb-1" />
+                <span className="text-sm font-medium">{item.name}</span>
               </div>
             </Link>
           ))}

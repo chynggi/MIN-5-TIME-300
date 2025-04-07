@@ -27,18 +27,26 @@ export class QuestionsController {
   }
 
   @Get()
-  @ApiOperation({ summary: '모든 질문 조회' })
+  @ApiOperation({ summary: '모든 질문 프롬프트 조회' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'tags', required: false, type: [String] })
+  @ApiQuery({ name: 'tags', required: false, type: String })
+  @ApiQuery({ name: 'category', required: false, type: Number, description: '육하원칙 카테고리 ID' })
   async findAll(
-    @Query('page') page: string,
-    @Query('limit') limit: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
     @Query('search') search?: string,
     @Query('tags') tags?: string,
+    @Query('category') category?: string,
   ) {
-    return this.questionsService.findAll(Number(page), Number(limit), search, tags);
+    return this.questionsService.findAll(
+      Number(page), 
+      Number(limit), 
+      search, 
+      tags, 
+      category !== undefined ? Number(category) : undefined
+    );
   }
 
   @Get(':id')
@@ -87,5 +95,27 @@ export class QuestionsController {
   ) {
     // isAnswered를 boolean으로 변환 필요
     return this.questionsService.markAsAnswered(id, isAnswered === 'true', userId);
+  }
+
+  // 카테고리 목록 조회 API 추가
+  @Get('categories')
+  @ApiOperation({ summary: '육하원칙 기반 질문 카테고리 목록 조회' })
+  @ApiResponse({ 
+    status: 200, 
+    description: '육하원칙(5W1H) 카테고리 목록', 
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'number' },
+          name: { type: 'string' },
+          description: { type: 'string' }
+        }
+      }
+    }
+  })
+  getCategories() {
+    return this.questionsService.getCategories();
   }
 }

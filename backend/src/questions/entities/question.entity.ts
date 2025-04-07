@@ -12,9 +12,9 @@ export class Question {
   @Column('text')
   content: string;
 
-  @Column({ default: false })
-  isAnswered: boolean;
-
+  @Column()
+  category: number;
+  
   @Column('simple-array', { nullable: true, default: [] })
   tags: string[];
 

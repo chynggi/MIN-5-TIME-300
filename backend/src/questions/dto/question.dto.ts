@@ -36,6 +36,9 @@ export class QuestionDto {
   content: string;
 
   @ApiProperty()
+  category: number;
+
+  @ApiProperty()
   authorId: string;
 
   @ApiProperty({ type: UserDto, nullable: true })

@@ -9,6 +9,9 @@ export class CreateQuestionDto {
   @IsString()
   content: string;
 
+  @IsNotEmpty()
+  category: number;
+
   @IsOptional()
   @IsArray()
   tags?: string[];
