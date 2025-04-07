@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { communityService } from '@/lib/api/community';

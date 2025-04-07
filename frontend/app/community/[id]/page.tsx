@@ -1,11 +1,11 @@
-import { useRouter } from 'next/router';
+"use client";
+import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { communityService, CommunityPost } from '@/lib/api/community';
 import styles from '@/styles/Community.module.css';
 
 export default function CommunityDetailPage() {
-  const router = useRouter();
-  const { id } = router.query;
+  const { id } = useParams();
   const [post, setPost] = useState<CommunityPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
