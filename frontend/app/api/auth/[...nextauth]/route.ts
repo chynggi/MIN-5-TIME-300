@@ -1,8 +1,7 @@
-import NextAuth from "next-auth"
-import GoogleProvider from "next-auth/providers/google"
-import { OAuth2Client } from 'google-auth-library'
-import type { NextAuthOptions } from "next-auth"
-import { Session } from "next-auth"
+import NextAuth from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
+import { OAuth2Client } from 'google-auth-library';
+import type { NextAuthOptions } from "next-auth";
 
 // Extend the Session type
 declare module "next-auth" {
@@ -25,10 +24,10 @@ export const authOptions: NextAuthOptions = {
         params: {
           prompt: "consent",
           access_type: "offline",
-          response_type: "code"
-        }
-      }
-    })
+          response_type: "code",
+        },
+      },
+    }),
   ],
   callbacks: {
     async signIn({ account, profile }) {
@@ -36,26 +35,25 @@ export const authOptions: NextAuthOptions = {
         try {
           const ticket = await googleClient.verifyIdToken({
             idToken: account.id_token!,
-            audience: process.env.GOOGLE_CLIENT_ID
+            audience: process.env.GOOGLE_CLIENT_ID,
           });
           const payload = ticket.getPayload();
           if (!payload) return false;
-          
+
           // 백엔드 연결 시도
           try {
-            console.log(process.env.NEXT_PUBLIC_API_URL);
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/google`, {
               method: 'POST',
-              headers: { 
+              headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
               },
               body: JSON.stringify({
                 email: payload.email,
                 name: payload.name,
                 picture: payload.picture,
-                sub: payload.sub
-              })
+                sub: payload.sub,
+              }),
             });
 
             if (!response.ok) {
@@ -86,7 +84,7 @@ export const authOptions: NextAuthOptions = {
         session.accessToken = token.accessToken as string;
       }
       return session;
-    }
+    },
   },
   pages: {
     signIn: '/login',
@@ -106,5 +104,8 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
+// Create the handler using NextAuth
 const handler = NextAuth(authOptions);
+
+// Export the handler for GET and POST requests
 export { handler as GET, handler as POST };
