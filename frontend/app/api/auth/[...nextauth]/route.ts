@@ -15,7 +15,7 @@ const googleClient = new OAuth2Client({
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
 });
 
-export const authOptions: NextAuthOptions = {
+const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
