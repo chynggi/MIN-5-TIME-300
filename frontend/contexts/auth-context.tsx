@@ -7,6 +7,7 @@ import { ProfileData } from '@/lib/api/profile';
 type AuthContextType = {
   user: ProfileData | null;
   isLoading: boolean;
+  isAuthenticated: boolean; // Added this property
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   register: (userData: { 
@@ -75,8 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const isAuthenticated = !!user; // Added this logic
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, register }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated, login, logout, register }}>
       {children}
     </AuthContext.Provider>
   );
