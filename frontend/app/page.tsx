@@ -1,8 +1,38 @@
+"use client";
+
 import { Calendar } from "@/components/calendar";
 import { MainNavigation } from "@/components/main-navigation";
 import { UserAvatars } from "@/components/user-avatars";
+import { useState, useEffect } from "react";
+import { checkDiaryStatus, checkMessageStatus } from "@/lib/api/status";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function Home() {
+  const { isAuthenticated } = useAuth();
+
+  const [showDiaryMessage, setShowDiaryMessage] = useState(false);
+  const [showNewMessage, setShowNewMessage] = useState(false);
+  const [showQuestionMessage, setShowQuestionMessage] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    async function fetchStatuses() {
+      try {
+        const diaryStatus = await checkDiaryStatus();
+        const messageStatus = await checkMessageStatus();
+
+        setShowDiaryMessage(!diaryStatus.hasWrittenToday);
+        setShowNewMessage(messageStatus.hasNewMessages);
+        setShowQuestionMessage(messageStatus.hasUnansweredQuestions);
+      } catch (error) {
+        console.error("Error fetching statuses:", error);
+      }
+    }
+
+    fetchStatuses();
+  }, [isAuthenticated]);
+
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <header className="sticky top-0 z-10 border-b bg-white p-4">
@@ -39,19 +69,24 @@ export default function Home() {
             <Calendar />
           </div>
           <div className="space-y-4">
-            <div className="p-4 bg-yellow-100 rounded-xl">
-              <p className="text-sm text-yellow-800">오늘의 일기를 작성해보세요!</p>
-            </div>
-            <div className="p-4 bg-pink-100 rounded-xl">
-              <p className="text-sm text-pink-800">새로운 메시지가 도착했어요.</p>
-            </div>
-            <div className="p-4 bg-green-100 rounded-xl">
-              <p className="text-sm text-green-800">질문에 답변해보세요.</p>
-            </div>
+            {showDiaryMessage && (
+              <div className="p-4 bg-yellow-100 rounded-xl">
+                <p className="text-sm text-yellow-800">오늘의 일기를 작성해보세요!</p>
+              </div>
+            )}
+            {showNewMessage && (
+              <div className="p-4 bg-pink-100 rounded-xl">
+                <p className="text-sm text-pink-800">새로운 메시지가 도착했어요.</p>
+              </div>
+            )}
+            {showQuestionMessage && (
+              <div className="p-4 bg-green-100 rounded-xl">
+                <p className="text-sm text-green-800">질문에 답변해보세요.</p>
+              </div>
+            )}
           </div>
         </div>
       </main>
-
     </div>
   );
 }

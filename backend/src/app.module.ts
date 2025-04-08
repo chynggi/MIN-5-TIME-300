@@ -10,6 +10,7 @@ import { QuestionsModule } from './questions/questions.module';
 import { AdminModule } from './admin/admin.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { MessageModule } from './message/message.module';
 
 @Module({
   imports: [
@@ -34,6 +35,8 @@ import { PrismaModule } from './prisma/prisma.module';
     QuestionsModule,
     AdminModule,
     RecommendationsModule,
+    MessageModule,
   ],
+  controllers: [],
 })
 export class AppModule {}

@@ -227,4 +227,20 @@ export class DiariesService {
       where: { id },
     });
   }
+
+  async hasWrittenToday(userId: string): Promise<boolean> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diaryCount = await this.prisma.diary.count({
+      where: {
+        userId,
+        createdAt: {
+          gte: today,
+        },
+      },
+    });
+
+    return diaryCount > 0;
+  }
 }

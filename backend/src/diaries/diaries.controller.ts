@@ -1,23 +1,5 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Param, 
-  Delete, 
-  Put, 
-  UseGuards, 
-  Req, 
-  Query 
-} from '@nestjs/common';
-import { 
-  ApiBearerAuth, 
-  ApiOperation, 
-  ApiParam, 
-  ApiQuery, 
-  ApiResponse, 
-  ApiTags 
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Param, Delete, Put, UseGuards, Req, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { DiariesService } from './diaries.service';
 import { CreateDiaryDto } from './dto/create-diary.dto';
 import { UpdateDiaryDto } from './dto/update-diary.dto';
@@ -58,6 +40,15 @@ export class DiariesController {
     @Req() req
   ) {
     return this.diariesService.findSharedEntries(cursor, limit || 10, req.user.id);
+  }
+
+  @Get('status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '오늘 일기 작성 여부 확인' })
+  async getStatus(@Req() req) {
+    const hasWrittenDiary = await this.diariesService.hasWrittenToday(req.user.id);
+    return { status: hasWrittenDiary  };
   }
 
   @Get(':id')

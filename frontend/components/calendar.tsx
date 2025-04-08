@@ -1,11 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 export function Calendar() {
-  const [currentMonth, setCurrentMonth] = useState(0)
-  const [currentYear, setCurrentYear] = useState(2023)
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+
+  useEffect(() => {
+    const today = new Date();
+    setCurrentMonth(today.getMonth());
+    setCurrentYear(today.getFullYear());
+  }, []);
 
   const months = [
     "January",
@@ -60,35 +66,40 @@ export function Calendar() {
   }
 
   const renderCalendarDays = () => {
-    const daysInMonth = getDaysInMonth(currentYear, currentMonth)
-    const firstDay = getFirstDayOfMonth(currentYear, currentMonth)
-    const days = []
+    const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+    const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
+    const days = [];
 
     // Adjust for Monday as first day of week
-    const firstDayAdjusted = firstDay === 0 ? 6 : firstDay - 1
+    const firstDayAdjusted = firstDay === 0 ? 6 : firstDay - 1;
 
     // Add empty cells for days before the first day of the month
     for (let i = 0; i < firstDayAdjusted; i++) {
-      days.push(<div key={`empty-${i}`} className="h-8 w-8"></div>)
+      days.push(<div key={`empty-${i}`} className="h-8 w-8"></div>);
     }
 
     // Add cells for each day of the month
     for (let day = 1; day <= daysInMonth; day++) {
-      const isToday = day === 15 // Just for demo purposes
+      const today = new Date();
+      const isToday =
+        day === today.getDate() &&
+        currentMonth === today.getMonth() &&
+        currentYear === today.getFullYear();
+
       days.push(
         <div
           key={day}
           className={`flex h-8 w-8 items-center justify-center rounded-full ${
-            isToday ? "bg-yellow-400" : "bg-yellow-200"
+            isToday ? "bg-red-400 text-white" : "bg-yellow-200"
           }`}
         >
           <span className="text-xs">{day}</span>
-        </div>,
-      )
+        </div>
+      );
     }
 
-    return days
-  }
+    return days;
+  };
 
   return (
     <div className="calendar">

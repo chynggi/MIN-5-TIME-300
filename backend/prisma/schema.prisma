@@ -28,6 +28,8 @@ model User {
   likes            Like[]
   recommendations  Recommendation[]
   diaries          Diary[] // 추가된 역방향 관계
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
 }
 
 model Question {
@@ -148,4 +150,18 @@ model Admin {
   lastLoginAttempt DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+}
+
+model Message {
+  id          Int      @id @default(autoincrement())
+  senderId    String
+  recipientId String
+  content     String   @db.Text
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  sender    User @relation("SentMessages", fields: [senderId], references: [id])
+  recipient User @relation("ReceivedMessages", fields: [recipientId], references: [id])
+
+  @@index([recipientId, isRead])
 }
