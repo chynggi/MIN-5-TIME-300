@@ -59,7 +59,7 @@ export default function MenuPage() {
 
       <main className="flex-1 p-4">
         <h1 className="text-2xl font-bold mb-6">메뉴</h1>
-        <div className="hidden lg:grid lg:grid-cols-1 lg:gap-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">
           {menuItems.map((item) => (
             <Link href={item.href} key={item.name}>
               <div className={`p-6 rounded-xl hover:opacity-80 transition-opacity ${item.color}`}>
@@ -82,8 +82,7 @@ export default function MenuPage() {
           ))}
         </div>
       </main>
-
-      <MainNavigation />
+      
     </div>
   );
 }

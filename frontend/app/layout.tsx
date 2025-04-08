@@ -22,15 +22,19 @@ export default function RootLayout({
       <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
         <AuthProvider>
           <div className="flex flex-col md:flex-row min-h-screen">
+            {/* PC에서 왼쪽에 네비게이션 바 */}
             <div className="hidden md:block md:w-16 border-r">
-              <MainNavigation className="hidden md:block" />
+              <MainNavigation />
             </div>
             <div className="flex-1">
               <div className="mx-auto w-full px-4 sm:px-6 md:max-w-5xl lg:max-w-6xl">
                 {children}
               </div>
             </div>
-            <MainNavigation className="md:hidden" />
+            {/* 모바일에서 하단에 네비게이션 바 */}
+            <div className="md:hidden">
+              <MainNavigation />
+            </div>
           </div>
         </AuthProvider>
       </body>

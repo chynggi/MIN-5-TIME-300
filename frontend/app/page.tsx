@@ -1,6 +1,6 @@
-import { Calendar } from "@/components/calendar"
-import { MainNavigation } from "@/components/main-navigation"
-import { UserAvatars } from "@/components/user-avatars"
+import { Calendar } from "@/components/calendar";
+import { MainNavigation } from "@/components/main-navigation";
+import { UserAvatars } from "@/components/user-avatars";
 
 export default function Home() {
   return (
@@ -31,14 +31,14 @@ export default function Home() {
       </header>
 
       <main className="space-y-4 py-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <div className="p-4 bg-card rounded-xl">
             <UserAvatars />
           </div>
-          <div className="p-4 bg-card rounded-xl md:col-span-1 lg:col-span-2">
+          <div className="p-4 bg-card rounded-xl">
             <Calendar />
           </div>
-          <div className="space-y-4 md:col-span-2 lg:col-span-1">
+          <div className="space-y-4">
             <div className="p-4 bg-yellow-100 rounded-xl">
               <p className="text-sm text-yellow-800">오늘의 일기를 작성해보세요!</p>
             </div>
@@ -52,8 +52,7 @@ export default function Home() {
         </div>
       </main>
 
-      <MainNavigation />
     </div>
-  )
+  );
 }
 

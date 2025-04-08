@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { GoogleAuthDto } from './dto/google-auth.dto';
+import axios from 'axios'; // Google API 호출을 위해 axios 사용
 
 @Injectable()
 export class AuthService {
@@ -70,5 +71,80 @@ export class AuthService {
         profileImage: user.profileImage,
       },
     };
+  }
+
+  getServiceAuthURL(service: string): string {
+    switch (service) {
+      case 'google':
+        return this.getGoogleAuthURL();
+      case 'facebook':
+        return this.getFacebookAuthURL();
+      case 'github':
+        return this.getGithubAuthURL();
+      default:
+        throw new Error(`Unsupported service: ${service}`);
+    }
+  }
+
+  async handleServiceAuthCallback(service: string, code: string) {
+    switch (service) {
+      case 'google':
+        // Google API 호출
+        const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
+          code,
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET,
+          redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+          grant_type: 'authorization_code',
+        });
+
+        const accessToken = tokenResponse.data.access_token;
+
+        // 사용자 정보 가져오기
+        const userInfoResponse = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        const userInfo = userInfoResponse.data;
+
+        // GoogleAuthDto 객체 생성
+        const googleAuthDto: GoogleAuthDto = {
+          sub: userInfo.id,
+          email: userInfo.email,
+          name: userInfo.name,
+          picture: userInfo.picture,
+        };
+
+        return this.googleAuth(googleAuthDto);
+
+      case 'facebook':
+        return this.facebookAuth(code);
+
+      case 'github':
+        return this.githubAuth(code);
+
+      default:
+        throw new Error(`Unsupported service: ${service}`);
+    }
+  }
+
+  getFacebookAuthURL(): string {
+    // Facebook OAuth URL 생성 로직
+    return 'https://www.facebook.com/v10.0/dialog/oauth?...';
+  }
+
+  getGithubAuthURL(): string {
+    // GitHub OAuth URL 생성 로직
+    return 'https://github.com/login/oauth/authorize?...';
+  }
+
+  async facebookAuth(code: string) {
+    // Facebook 인증 처리 로직
+  }
+
+  async githubAuth(code: string) {
+    // GitHub 인증 처리 로직
   }
 }

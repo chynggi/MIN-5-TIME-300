@@ -52,7 +52,7 @@ export default function ProfilePage() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-white">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
         <p className="mt-4 text-muted-foreground">프로필을 불러오는 중...</p>
-        <MainNavigation />
+        
       </div>
     );
   }
@@ -67,7 +67,6 @@ export default function ProfilePage() {
         >
           다시 시도
         </button>
-        <MainNavigation />
       </div>
     );
   }
@@ -188,8 +187,7 @@ export default function ProfilePage() {
           </div>
         </div>
       </main>
-
-      <MainNavigation />
+      
     </div>
   );
 }
