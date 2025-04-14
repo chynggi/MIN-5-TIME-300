@@ -1,25 +1,26 @@
-import NextAuth from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import { OAuth2Client } from 'google-auth-library';
-import type { NextAuthOptions } from "next-auth";
+import NextAuth from "next-auth"
+import GoogleProvider from "next-auth/providers/google"
+import { OAuth2Client } from "google-auth-library"
+import type { NextAuthOptions } from "next-auth"
 
-// Extend the Session type
+// Session 타입 확장
 declare module "next-auth" {
   interface Session {
-    accessToken?: string;
+    accessToken?: string
   }
 }
 
 const googleClient = new OAuth2Client({
   clientId: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-});
+})
 
 const authOptions: NextAuthOptions = {
+  debug: true,
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID?.toString()!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET?.toString()!,
       authorization: {
         params: {
           prompt: "consent",
@@ -30,23 +31,23 @@ const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ account, profile }) {
-      if (account?.provider === 'google') {
+    async signIn({ account }) {
+      if (account?.provider === "google") {
         try {
           const ticket = await googleClient.verifyIdToken({
             idToken: account.id_token!,
             audience: process.env.GOOGLE_CLIENT_ID,
-          });
-          const payload = ticket.getPayload();
-          if (!payload) return false;
+          })
+          const payload = ticket.getPayload()
+          if (!payload) return false
 
-          // 백엔드 연결 시도
+          // 백엔드 API 호출하여 사용자 정보 동기화 시도
           try {
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/google`, {
-              method: 'POST',
+              method: "POST",
               headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
+                "Content-Type": "application/json",
+                Accept: "application/json",
               },
               body: JSON.stringify({
                 email: payload.email,
@@ -54,58 +55,74 @@ const authOptions: NextAuthOptions = {
                 picture: payload.picture,
                 sub: payload.sub,
               }),
-            });
+            })
 
             if (!response.ok) {
-              console.error('백엔드 응답 에러:', await response.text());
-              return false;
+              console.error("백엔드 응답 에러:", await response.text())
+              return false
             }
 
-            return true;
+            return true
           } catch (error) {
-            console.error('백엔드 연결 에러:', error);
-            return true; // 백엔드 연결 실패시에도 로그인은 허용
+            console.error("백엔드 연결 에러:", error)
+            return true // 연결 실패 시에도 로그인 허용
           }
         } catch (error) {
-          console.error('Google 인증 에러:', error);
-          return false;
+          console.error("Google 인증 에러:", error)
+          return false
         }
       }
-      return true;
+      return true
     },
     async jwt({ token, account }) {
       if (account) {
-        token.accessToken = account.access_token;
+        token.accessToken = account.access_token
       }
-      return token;
+      return token
     },
     async session({ session, token }) {
       if (token.accessToken) {
-        session.accessToken = token.accessToken as string;
+        session.accessToken = token.accessToken as string
       }
-      return session;
+      return session
     },
   },
   pages: {
-    signIn: '/login',
-    error: '/auth/error',
+    signIn: "/login",
+    error: "/auth/error",
   },
   secret: process.env.NEXTAUTH_SECRET,
   cookies: {
-    state: {
-      name: `__Secure-next-auth.state`,
+    sessionToken: {
+      name: `next-auth.session-token`,
       options: {
         httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    state: {
+      name: `next-auth.state`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/api/auth", // OAuth flow에 필요한 state 쿠키 설정
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
       },
     },
   },
-};
+}
 
-// Create the handler using NextAuth
-const handler = NextAuth(authOptions);
+const handler = NextAuth(authOptions)
 
-// Export the handler for GET and POST requests
-export { handler as GET, handler as POST };
+export { handler as GET, handler as POST }

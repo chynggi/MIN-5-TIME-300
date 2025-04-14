@@ -3,6 +3,7 @@
 import { useState, FormEvent, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { signIn } from "next-auth/react";
 import { useAuth } from '@/contexts/auth-context';
 import styles from '@/styles/Register.module.css';
 
@@ -56,8 +57,8 @@ const Register = () => {
   };
 
   const handleGoogleLogin = () => {
-    // 백엔드의 Google OAuth 엔드포인트로 리다이렉션
-    window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google`;
+    // NextAuth의 signIn 메소드를 사용하여 OAuth 플로우 시작
+    signIn('google', { callbackUrl: '/' });
   };
 
   return (

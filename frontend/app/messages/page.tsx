@@ -118,7 +118,6 @@ export default function MessagesPage() {
         </div>
       </main>
 
-      <MainNavigation />
     </div>
   )
 }

@@ -21,26 +21,10 @@ export type ProfileData = {
 export const profileService = {
   // 사용자 프로필 가져오기 (백엔드 UsersController의 getProfile 엔드포인트 사용)
   getProfile: async (): Promise<ProfileData> => {
-    const { data } = await apiClient.get('/user/profile');
-    
-    // 백엔드에서 제공하지 않는 통계 정보를 위해 추가 API 호출
     try {
-      const diariesRes = await apiClient.get('/diaries');
-      const friendsRes = await apiClient.get('/users/friends');
-      const likesRes = await apiClient.get('/users/likes');
+      const { data } = await apiClient.get('/user/profile');
       
-      // 백엔드 응답에 통계 필드 추가
-      return {
-        ...data,
-        stats: {
-          diaryCount: diariesRes.data?.length || 0,
-          friendCount: friendsRes.data?.length || 0,
-          likeCount: likesRes.data?.total || 0
-        }
-      };
-    } catch (error) {
-      console.error('프로필 통계 정보 가져오기 실패:', error);
-      // 통계 정보가 없어도 기본 프로필 정보는 반환
+      // 통계 필드 추가 (백엔드에서 아직 제공하지 않으므로 하드코딩)
       return {
         ...data,
         stats: {
@@ -49,6 +33,9 @@ export const profileService = {
           likeCount: 0
         }
       };
+    } catch (error) {
+      console.error('프로필 정보 가져오기 실패:', error);
+      throw error;
     }
   },
 
@@ -69,6 +56,6 @@ export const profileService = {
       },
     });
     
-    return data; // 백엔드는 { profileImage: "경로" } 형식으로 반환
+    return data;
   }
 };
