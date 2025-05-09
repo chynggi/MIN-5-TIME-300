@@ -77,10 +77,6 @@ export class AuthService {
     switch (service) {
       case 'google':
         return this.getGoogleAuthURL();
-      case 'facebook':
-        return this.getFacebookAuthURL();
-      case 'github':
-        return this.getGithubAuthURL();
       default:
         throw new Error(`Unsupported service: ${service}`);
     }
@@ -119,27 +115,10 @@ export class AuthService {
 
         return this.googleAuth(googleAuthDto);
 
-      case 'facebook':
-        return this.facebookAuth(code);
-
-      case 'github':
-        return this.githubAuth(code);
-
-      default:
+           default:
         throw new Error(`Unsupported service: ${service}`);
     }
   }
-
-  getFacebookAuthURL(): string {
-    // Facebook OAuth URL 생성 로직
-    return 'https://www.facebook.com/v10.0/dialog/oauth?...';
-  }
-
-  getGithubAuthURL(): string {
-    // GitHub OAuth URL 생성 로직
-    return 'https://github.com/login/oauth/authorize?...';
-  }
-
   async facebookAuth(code: string) {
     // Facebook 인증 처리 로직
   }

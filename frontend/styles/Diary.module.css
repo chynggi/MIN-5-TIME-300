@@ -1,168 +1,69 @@
 .container {
-  max-width: 800px;
-  margin: 0 auto;
   padding: 20px;
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
 .title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #333;
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
 }
 
-.newButton {
-  padding: 10px 16px;
-  background-color: #6366f1;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.newButton:hover {
-  background-color: #4f46e5;
-}
-
-.error {
-  padding: 12px;
-  background-color: #fee2e2;
-  color: #ef4444;
-  border-radius: 4px;
-  margin-bottom: 16px;
-  text-align: center;
+.filters {
+  margin-bottom: 20px;
 }
 
 .diaryList {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .diaryCard {
-  padding: 16px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background-color: white;
-  transition: transform 0.15s, box-shadow 0.15s;
-  cursor: pointer;
-}
-
-.diaryCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.diaryHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
+  border: 1px solid #ccc;
+  padding: 10px;
+  border-radius: 5px;
 }
 
 .diaryTitle {
   font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin: 0;
+  font-weight: bold;
 }
 
-.diaryDate {
+.diaryContent {
   font-size: 14px;
-  color: #666;
-  margin: 4px 0 8px;
+  color: #555;
 }
 
-.diaryPreview {
-  font-size: 15px;
-  color: #444;
-  line-height: 1.5;
-  margin-bottom: 8px;
-}
-
-.diaryMood {
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-weight: 500;
-}
-
-.mood-happy {
-  background-color: #ecfccb;
-  color: #65a30d;
-}
-
-.mood-sad {
-  background-color: #e0f2fe;
-  color: #0284c7;
-}
-
-.mood-angry {
-  background-color: #fee2e2;
-  color: #dc2626;
-}
-
-.mood-calm {
-  background-color: #f3e8ff;
-  color: #9333ea;
-}
-
-.mood-excited {
-  background-color: #fff7ed;
-  color: #ea580c;
-}
-
-.diaryTags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.tag {
-  font-size: 12px;
-  background-color: #f3f4f6;
-  color: #4b5563;
-  padding: 3px 8px;
-  border-radius: 12px;
-}
-
-.emptyState {
+.loading {
   text-align: center;
-  padding: 40px 0;
-  color: #6b7280;
+  font-size: 16px;
 }
 
-.loadMoreContainer {
-  display: flex;
-  justify-content: center;
-  margin-top: 24px;
+.error {
+  color: red;
+  text-align: center;
 }
 
-.loadMoreButton {
-  padding: 8px 16px;
-  background-color: white;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  color: #4b5563;
-  font-size: 14px;
+.enhancedInput {
+  border: 2px solid #4caf50;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 16px;
+  width: 80%;
+  margin-right: 10px;
+}
+
+.enhancedButton {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 16px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.3s ease;
 }
 
-.loadMoreButton:hover {
-  background-color: #f9fafb;
-}
-
-.loadMoreButton:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.enhancedButton:hover {
+  background-color: #45a049;
 }

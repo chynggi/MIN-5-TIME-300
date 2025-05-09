@@ -1,44 +1,34 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { MainNavigation } from "@/components/main-navigation";
-import { cn } from "@/lib/utils";
-import { AuthProvider } from "@/contexts/auth-context";
+import type React from "react"
+import "./globals.css"
+import { Inter } from "next/font/google"
+import { ThemeProvider } from "@/components/theme-provider"
+import BottomNavigation from "@/components/bottom-navigation"
+import { Toaster } from "@/components/ui/toaster"
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"] })
 
-export const metadata: Metadata = {
-  title: "MIN 5 TIME 300",
-  description: "지금 솔직한 마음을 나누세요",
-};
+export const metadata = {
+  title: "Diary Social App",
+  description: "A diary-based social media app",
+    generator: 'v0.dev'
+}
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <html lang="ko">
-      <body className={cn("min-h-screen bg-background font-sans antialiased", inter.className)}>
-        <AuthProvider>
-          <div className="flex flex-col md:flex-row min-h-screen">
-            {/* PC에서 왼쪽에 네비게이션 바 */}
-            <div className="hidden md:block md:w-16 border-r">
-              <MainNavigation />
-            </div>
-            <div className="flex-1">
-              <div className="mx-auto w-full px-4 sm:px-6 md:max-w-5xl lg:max-w-6xl">
-                {children}
-              </div>
-            </div>
-            {/* 모바일에서 하단에 네비게이션 바 */}
-            <div className="md:hidden">
-              <MainNavigation />
-            </div>
-          </div>
-        </AuthProvider>
+    <html lang="en">
+      <body className={`${inter.className} bg-gray-50 dark:bg-gray-900 min-h-screen`}>
+        <ThemeProvider attribute="class" defaultTheme="light">
+          <main className="max-w-md mx-auto bg-white dark:bg-gray-800 min-h-screen pb-16 relative">
+            {children}
+            <BottomNavigation />
+          </main>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
-  );
+  )
 }
-

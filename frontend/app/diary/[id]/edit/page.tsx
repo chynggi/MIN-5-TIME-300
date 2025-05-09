@@ -1,158 +1,83 @@
-'use client';
+"use client";
 
-import { useState, useEffect, FormEvent } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { diaryService, DiaryEntry } from '@/lib/api/diary';
-import { useAuth } from '@/contexts/auth-context';
-import styles from '@/styles/DiaryForm.module.css';
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { diaryService } from "@/lib/api/diary";
+import styles from "@/styles/Diary.module.css";
 
 export default function EditDiaryPage() {
   const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    mood: 'neutral',
+    title: "",
+    content: "",
+    mood: "neutral",
+    isPrivate: true,
   });
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [wordCount, setWordCount] = useState(0);
-  const [originalDiary, setOriginalDiary] = useState<DiaryEntry | null>(null);
-  
-  const params = useParams();
+  const [fetching, setFetching] = useState(true);
   const router = useRouter();
-  const diaryId = params.id as string;
-  const { user, isLoading: authLoading } = useAuth();
+  const { id } = useParams();
 
-  // 인증과 일기 데이터 로드
   useEffect(() => {
-    const checkAuthAndLoadDiary = async () => {
-      // 인증 확인
-      if (!authLoading && !user) {
-        router.push('/login');
-        return;
-      }
-
-      if (user) {
-        try {
-          setFetchLoading(true);
-          const data = await diaryService.getDiary(diaryId);
-          
-          // 소유권 확인
-          if (data.userId !== user.id) {
-            router.push('/diary');
-            return;
-          }
-          
-          setOriginalDiary(data);
+    const fetchDiary = async () => {
+      try {
+        if (typeof id === "number") {
+          const diary = await diaryService.getDiary(id);
           setFormData({
-            title: data.title,
-            content: data.content,
-            mood: data.mood || 'neutral',
+            title: diary.title,
+            content: diary.content,
+            mood: diary.mood || "neutral",
+            isPrivate: diary.isPrivate,
           });
-          
-          if (data.tags && data.tags.length > 0) {
-            setTags(data.tags);
-          }
-          
-          // 단어 수 계산
-          const words = data.content.trim() ? data.content.trim().split(/\s+/).length : 0;
-          setWordCount(words);
-        } catch (err: any) {
-          console.error('일기 불러오기 실패:', err);
-          setError('일기를 불러오는 데 실패했습니다.');
-        } finally {
-          setFetchLoading(false);
+        } else {
+          throw new Error("Invalid diary ID");
         }
+        
+      } catch (err: any) {
+        console.error("다이어리를 불러오는 중 오류 발생:", err);
+        setError("다이어리를 불러오는 데 실패했습니다.");
+      } finally {
+        setFetching(false);
       }
     };
 
-    checkAuthAndLoadDiary();
-  }, [authLoading, user, diaryId, router]);
-
-  // 내용 변경 시 단어 수 업데이트
-  useEffect(() => {
-    const words = formData.content.trim() ? formData.content.trim().split(/\s+/).length : 0;
-    setWordCount(words);
-  }, [formData.content]);
+    fetchDiary();
+  }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
-    if (!formData.title.trim()) {
-      setError('제목을 입력해주세요.');
-      return;
-    }
-
-    if (!formData.content.trim()) {
-      setError('내용을 입력해주세요.');
-      return;
-    }
-
     setLoading(true);
     setError(null);
-    
+
     try {
-      await diaryService.updateDiary(diaryId, {
-        title: formData.title,
-        content: formData.content,
-        mood: formData.mood,
-        tags: tags.length > 0 ? tags : undefined,
-      });
-      router.push(`/diary/${diaryId}`);
+      if (typeof id === "number") {
+        await diaryService.updateDiary(id, formData);
+      } else {
+        throw new Error("Invalid diary ID");
+      }
+      router.push(`/diary/${id}`);
     } catch (err: any) {
-      console.error('일기 수정 중 오류:', err);
-      setError(err.response?.data?.message || '일기를 저장하는 중 오류가 발생했습니다.');
+      console.error("다이어리 수정 중 오류:", err);
+      setError("다이어리를 저장하는 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
   };
 
-  const addTag = () => {
-    const trimmedTag = tagInput.trim();
-    if (trimmedTag && !tags.includes(trimmedTag)) {
-      setTags([...tags, trimmedTag]);
-      setTagInput('');
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
-  };
-
-  if (authLoading || fetchLoading) {
-    return <div className={styles.loading}>로딩 중...</div>;
-  }
-
-  if (error && !originalDiary) {
-    return <div className={styles.error}>{error}</div>;
-  }
+  if (fetching) return <div className={styles.loading}>로딩 중...</div>;
+  if (error) return <div className={styles.error}>{error}</div>;
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>일기 수정</h1>
-        <div className={styles.date}>
-          {originalDiary ? new Date(originalDiary.createdAt).toLocaleDateString('ko-KR', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            weekday: 'long'
-          }) : ''}
-        </div>
-      </div>
-
-      {error && <div className={styles.error}>{error}</div>}
-
+      <h1 className={styles.title}>다이어리 수정</h1>
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.formGroup}>
           <label htmlFor="title">제목</label>
@@ -163,7 +88,19 @@ export default function EditDiaryPage() {
             value={formData.title}
             onChange={handleChange}
             className={styles.input}
-            placeholder="일기의 제목을 입력하세요"
+            placeholder="다이어리 제목을 입력하세요"
+          />
+        </div>
+
+        <div className={styles.formGroup}>
+          <label htmlFor="content">내용</label>
+          <textarea
+            id="content"
+            name="content"
+            value={formData.content}
+            onChange={handleChange}
+            className={styles.textarea}
+            placeholder="다이어리 내용을 입력하세요"
           />
         </div>
 
@@ -178,89 +115,39 @@ export default function EditDiaryPage() {
           >
             <option value="happy">행복함 😊</option>
             <option value="sad">슬픔 😢</option>
-            <option value="angry">화남 😠</option>
             <option value="neutral">보통 😐</option>
-            <option value="excited">신남 😃</option>
-            <option value="tired">피곤함 😫</option>
-            <option value="anxious">불안함 😰</option>
-            <option value="peaceful">평온함 😌</option>
           </select>
         </div>
 
         <div className={styles.formGroup}>
-          <label htmlFor="content">내용</label>
-          <textarea
-            id="content"
-            name="content"
-            value={formData.content}
-            onChange={handleChange}
-            className={styles.textarea}
-            placeholder="오늘 있었던 일이나 생각, 느낌을 자유롭게 적어보세요."
-            rows={15}
-          />
-          <div className={styles.wordCount}>{wordCount}단어</div>
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="tags">태그</label>
-          <div className={styles.tagInput}>
-            <input
-              type="text"
-              id="tags"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              className={styles.input}
-              placeholder="태그를 입력하고 Enter를 누르세요"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addTag();
-                }
-              }}
-            />
-            <button 
-              type="button" 
-              onClick={addTag}
-              className={styles.addTagButton}
-            >
-              추가
-            </button>
+          <label>공개 범위</label>
+          <div className={styles.radioGroup}>
+            <label>
+              <input
+                type="radio"
+                name="isPrivate"
+                value="true"
+                checked={formData.isPrivate === true}
+                onChange={() => setFormData((prev) => ({ ...prev, isPrivate: true }))}
+              />
+              비공개
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="isPrivate"
+                value="false"
+                checked={formData.isPrivate === false}
+                onChange={() => setFormData((prev) => ({ ...prev, isPrivate: false }))}
+              />
+              공개
+            </label>
           </div>
-          
-          {tags.length > 0 && (
-            <div className={styles.tagsContainer}>
-              {tags.map((tag, index) => (
-                <span key={index} className={styles.tag}>
-                  {tag}
-                  <button 
-                    type="button" 
-                    onClick={() => removeTag(tag)} 
-                    className={styles.removeTagButton}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
-        <div className={styles.formActions}>
-          <button 
-            type="button" 
-            onClick={() => router.back()} 
-            className={styles.cancelButton}
-          >
-            취소
-          </button>
-          <button 
-            type="submit" 
-            className={styles.submitButton} 
-            disabled={loading}
-          >
-            {loading ? '저장 중...' : '저장하기'}
-          </button>
-        </div>
+        <button type="submit" className={styles.submitButton} disabled={loading}>
+          {loading ? "저장 중..." : "저장하기"}
+        </button>
       </form>
     </div>
   );

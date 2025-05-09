@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
-import { User } from '@prisma/client';
+import { User, Prisma } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -198,5 +198,40 @@ export class UsersService {
       attempts: user.loginAttempts, 
       lastAttempt: user.lastLoginAttempt 
     };
+  }
+
+  async addInterest(userId: string, interest: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        interests: {
+          push: interest,
+        },
+      },
+    });
+  }
+
+  async updateInterest(userId: string, oldInterest: string, newInterest: string): Promise<User> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+
+    const updatedInterests = user.interests.map((i) => (i === oldInterest ? newInterest : i));
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { interests: updatedInterests },
+    });
+  }
+
+  async deleteInterest(userId: string, interest: string): Promise<User> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+
+    const filteredInterests = user.interests.filter((i) => i !== interest);
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { interests: filteredInterests },
+    });
   }
 }

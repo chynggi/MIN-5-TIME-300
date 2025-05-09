@@ -134,4 +134,31 @@ import {
     async remove(@Req() req) {
       return this.usersService.remove(req.user.id);
     }
+  
+    @Post('interests')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: '관심사 추가' })
+    @ApiResponse({ status: 201, description: '관심사가 성공적으로 추가됨' })
+    async addInterest(@Req() req, @Body() interestData: { interest: string }) {
+      return this.usersService.addInterest(req.user.id, interestData.interest);
+    }
+  
+    @Put('interests')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: '관심사 수정' })
+    @ApiResponse({ status: 200, description: '관심사가 성공적으로 수정됨' })
+    async updateInterest(@Req() req, @Body() interestData: { oldInterest: string; newInterest: string }) {
+      return this.usersService.updateInterest(req.user.id, interestData.oldInterest, interestData.newInterest);
+    }
+  
+    @Delete('interests')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: '관심사 삭제' })
+    @ApiResponse({ status: 200, description: '관심사가 성공적으로 삭제됨' })
+    async deleteInterest(@Req() req, @Body() interestData: { interest: string }) {
+      return this.usersService.deleteInterest(req.user.id, interestData.interest);
+    }
   }

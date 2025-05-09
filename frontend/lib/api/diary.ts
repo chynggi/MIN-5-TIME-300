@@ -1,64 +1,39 @@
-import { apiClient } from '@/lib/api-client';
+import { apiClient } from "@/lib/api-client";
+import { DiaryEntry } from "@/lib/types";
 
-export interface DiaryEntry {
-  id: string;
-  title: string;
-  content: string;
-  mood?: string;
-  createdAt: string;
-  updatedAt: string;
-  userId: string;
-  tags?: string[];
-}
-
-export interface DiaryListResponse {
-  diaries: DiaryEntry[];
-  total: number;
-  page: number;
-  limit: number;
-}
-
-export interface DiaryCreateDto {
-  title: string;
-  content: string;
-  mood?: string;
-  tags?: string[];
-}
-
-export interface DiaryUpdateDto {
-  title?: string;
-  content?: string;
-  mood?: string;
-  tags?: string[];
-}
+// 공유된 다이어리 가져오기
+export const getSharedDiaries = async (): Promise<DiaryEntry[]> => {
+  const response = await apiClient.get(`/diaries/shared`);
+  return response.data;
+};
 
 export const diaryService = {
-  // 일기 목록 가져오기
-  getDiaries: async (page = 1, limit = 10): Promise<DiaryListResponse> => {
-    const response = await apiClient.get(`/diaries?page=${page}&limit=${limit}`);
+  getSharedDiaries,
+  getDiaries: async (filter: string): Promise<DiaryEntry[]> => {
+    const response = await apiClient.get(`/diaries`, { params: { filter } });
     return response.data;
   },
-
-  // 일기 상세 정보 가져오기
-  getDiary: async (id: string): Promise<DiaryEntry> => {
+  createDiary: async (data: { title: string; content: string; mood: string; isPrivate: boolean }): Promise<DiaryEntry> => {
+    const response = await apiClient.post(`/diaries`, data);
+    return response.data;
+  },
+  updateDiary: async (id: number, data: { title: string; content: string; mood: string; isPrivate: boolean }): Promise<DiaryEntry> => {
+    const response = await apiClient.put(`/diaries/${id}`, data);
+    return response.data;
+  },
+  getDiary: async (id: number): Promise<DiaryEntry> => {
     const response = await apiClient.get(`/diaries/${id}`);
     return response.data;
   },
-
-  // 일기 생성하기
-  createDiary: async (diaryData: DiaryCreateDto): Promise<DiaryEntry> => {
-    const response = await apiClient.post('/diaries', diaryData);
-    return response.data;
-  },
-
-  // 일기 수정하기
-  updateDiary: async (id: string, diaryData: DiaryUpdateDto): Promise<DiaryEntry> => {
-    const response = await apiClient.put(`/diaries/${id}`, diaryData);
-    return response.data;
-  },
-
-  // 일기 삭제하기
-  deleteDiary: async (id: string): Promise<void> => {
+  deleteDiary: async (id: number): Promise<void> => {
     await apiClient.delete(`/diaries/${id}`);
   },
+  addFriend: async (data: { name: string }): Promise<void> => {
+    await apiClient.post(`/friends`, data);
+  },
+  deleteFriend: async (id: number): Promise<void> => {
+    await apiClient.delete(`/friends/${id}`);
+  }
 };
+
+export type { DiaryEntry };

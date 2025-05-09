@@ -1,124 +1,109 @@
-import { MainNavigation } from "@/components/main-navigation"
+"use client";
 
-export default function MessagesPage() {
-  const messages = [
-    { id: 1, time: "23:45:39 pm", color: "bg-green-300" },
-    { id: 2, time: "22:32:03 pm", color: "bg-blue-400" },
-    { id: 3, time: "22:07:54 pm", color: "bg-red-400" },
-    { id: 4, time: "21:24:30 pm", color: "bg-cyan-400" },
-    { id: 5, time: "22:42:13 pm", color: "bg-fuchsia-400" },
-    { id: 6, time: "20:40:29 pm", color: "bg-yellow-300" },
-  ]
+import { useState, useEffect, useRef } from "react";
+import { apiClient } from "@/lib/api-client";
+import styles from "@/styles/Diary.module.css";
 
-  return (
-    <div className="flex min-h-screen flex-col bg-white">
-      <header className="sticky top-0 z-10 border-b bg-white p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-gray-700"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-            </div>
-            <span className="font-bold">5MIN</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="rounded-full p-1 hover:bg-gray-100">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </button>
-            <button className="rounded-full p-1 hover:bg-gray-100">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex-1 p-4">
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <div key={message.id} className="flex items-center gap-2">
-              <div className="h-10 w-10 overflow-hidden rounded-full bg-white">
-                <div className="h-full w-full bg-gray-200"></div>
-              </div>
-              <div className={`flex-1 rounded-full ${message.color} px-4 py-2`}>
-                <div className="flex items-center justify-between text-sm">
-                  <span>{message.time}</span>
-                  <div className="flex gap-2">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-                      <circle cx="12" cy="13" r="3" />
-                    </svg>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
-                      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </main>
-
-    </div>
-  )
+interface Message {
+  id: number;
+  sender: string;
+  content: string;
+  timestamp: string;
 }
 
+export default function MessagesPage() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const response = await apiClient.get("/messages");
+        setMessages(response.data);
+      } catch (err) {
+        console.error("메시지 불러오기 오류:", err);
+
+        // 에러 메시지 개선
+        setError("메시지를 불러오는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      }
+    };
+
+    fetchMessages();
+
+    // WebSocket 연결 설정
+    socketRef.current = new WebSocket("ws://localhost:3001/messages");
+
+    socketRef.current.onmessage = (event) => {
+      const newMessage = JSON.parse(event.data);
+      setMessages((prev) => [...prev, newMessage]);
+    };
+
+    socketRef.current.onerror = (err) => {
+      console.error("WebSocket 오류:", err);
+
+      // 에러 메시지 개선
+      setError("실시간 메시지 업데이트에 문제가 발생했습니다. 네트워크 상태를 확인해주세요.");
+    };
+
+    return () => {
+      socketRef.current?.close();
+    };
+  }, []);
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) {
+      alert("메시지를 입력하세요.");
+      return;
+    }
+
+    try {
+      const response = await apiClient.post("/messages", { content: newMessage });
+      setMessages((prev) => [...prev, response.data]);
+      setNewMessage("");
+
+      // 성공 알림
+      alert("메시지가 성공적으로 전송되었습니다!");
+
+      // WebSocket을 통해 서버에 메시지 전송
+      socketRef.current?.send(JSON.stringify(response.data));
+    } catch (err) {
+      console.error("메시지 전송 오류:", err);
+
+      // 실패 알림
+      alert("메시지를 전송하는 중 오류가 발생했습니다.");
+    }
+  };
+
+  return (
+    <div className={styles.container}>
+      <h1 className={styles.title}>메시지</h1>
+
+      {error && <div className={styles.error}>{error}</div>}
+
+      <div className={styles.messagesList}>
+        {messages.map((message) => (
+          <div key={message.id} className={styles.messageItem}>
+            <div className={styles.messageSender}>{message.sender}</div>
+            <div className={styles.messageContent}>{message.content}</div>
+            <div className={styles.messageTimestamp}>{new Date(message.timestamp).toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className={styles.messageInputContainer}>
+        <input
+          type="text"
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          placeholder="메시지를 입력하세요"
+          className={styles.messageInput}
+        />
+        <button onClick={handleSendMessage} className={styles.sendButton}>
+          전송
+        </button>
+      </div>
+    </div>
+  );
+}
