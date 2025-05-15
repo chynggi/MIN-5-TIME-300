@@ -1,6 +1,7 @@
 /// <reference types="@types/navermaps" />
 
 import { useEffect, useRef } from "react";
+// Removed import as naver is globally available
 
 interface MapProps {
   center: { lat: number; lng: number };
@@ -12,15 +13,14 @@ export default function Map({ center, zoom }: MapProps) {
 
   useEffect(() => {
     const initializeMap = () => {
-      if (mapRef.current) {
-        const map = new naver.maps.Map(mapRef.current, {
-          center: new naver.maps.LatLng(center.lat, center.lng),
+      if (mapRef.current && window.naver) {
+        const map = new window.naver.maps.Map(mapRef.current, {
+          center: new window.naver.maps.LatLng(center.lat, center.lng),
           zoom,
         });
 
-        // Example marker
-        new naver.maps.Marker({
-          position: new naver.maps.LatLng(center.lat, center.lng),
+        new window.naver.maps.Marker({
+          position: new window.naver.maps.LatLng(center.lat, center.lng),
           map,
         });
       }
@@ -41,5 +41,11 @@ export default function Map({ center, zoom }: MapProps) {
     }
   }, [center, zoom]);
 
-  return <div ref={mapRef} style={{ width: "100%", height: "400px" }} />;
+  return (
+    <div
+      ref={mapRef}
+      className="max-w-md md:max-w-screen-lg mx-auto"
+      style={{ width: "100%", height: "400px" }}
+    />
+  );
 }

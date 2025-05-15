@@ -22,7 +22,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.className} bg-gray-50 dark:bg-gray-900 min-h-screen`}>
         <ThemeProvider attribute="class" defaultTheme="light">
-          <main className="max-w-md mx-auto bg-white dark:bg-gray-800 min-h-screen pb-16 relative">
+          <main className="max-w-md md:max-w-screen-lg mx-auto bg-white dark:bg-gray-800 min-h-screen pb-16 relative">
             {children}
             <BottomNavigation />
           </main>
