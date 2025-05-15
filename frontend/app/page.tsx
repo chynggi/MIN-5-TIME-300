@@ -5,7 +5,7 @@ import Link from "next/link"
 
 export default function DailyPage() {
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 max-w-screen-lg mx-auto">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">나의 일기</h1>
         <Link href="/write">

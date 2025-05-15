@@ -113,38 +113,40 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">My Profile</h1>
+    <div className="p-4 max-w-screen-lg mx-auto">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+        <h1 className="text-2xl md:text-4xl font-bold">My Profile</h1>
         <Link href="/profile/edit">
-          <Button size="sm" variant="outline">
+          <Button size="sm" variant="outline" className="mt-4 md:mt-0">
             <Edit className="h-4 w-4 mr-2" />
             Edit
           </Button>
         </Link>
       </div>
 
-      <div className="flex flex-col items-center mb-6">
-        <Avatar className={`h-24 w-24 mb-4 border-4 border-${userProfile.color}-400`}>
+      <div className="flex flex-col md:flex-row items-center md:items-start mb-6 gap-6">
+        <Avatar className={`h-24 w-24 md:h-32 md:w-32 mb-4 md:mb-0 border-4 border-${userProfile.color}-400`}>
           <AvatarImage src={userProfile.avatar || "/placeholder.svg"} alt={userProfile.name} />
-          <AvatarFallback className="text-3xl">{userProfile.name[0]}</AvatarFallback>
+          <AvatarFallback className="text-3xl md:text-4xl">{userProfile.name[0]}</AvatarFallback>
         </Avatar>
 
-        <h2 className="text-xl font-bold">{userProfile.name}</h2>
-        <div className="text-sm text-gray-500 mb-2">{userProfile.mbti}</div>
+        <div className="text-center md:text-left">
+          <h2 className="text-xl md:text-2xl font-bold">{userProfile.name}</h2>
+          <div className="text-sm md:text-base text-gray-500 mb-2">{userProfile.mbti}</div>
 
-        <div className="flex gap-6 mt-2">
-          <div className="text-center">
-            <div className="font-medium">{userProfile.followers}</div>
-            <div className="text-xs text-gray-500">Followers</div>
-          </div>
-          <div className="text-center">
-            <div className="font-medium">{userProfile.following}</div>
-            <div className="text-xs text-gray-500">Following</div>
-          </div>
-          <div className="text-center">
-            <div className="font-medium">{userProfile.recordScore}</div>
-            <div className="text-xs text-gray-500">Score</div>
+          <div className="flex gap-6 mt-2 justify-center md:justify-start">
+            <div className="text-center">
+              <div className="font-medium text-base md:text-lg">{userProfile.followers}</div>
+              <div className="text-xs md:text-sm text-gray-500">Followers</div>
+            </div>
+            <div className="text-center">
+              <div className="font-medium text-base md:text-lg">{userProfile.following}</div>
+              <div className="text-xs md:text-sm text-gray-500">Following</div>
+            </div>
+            <div className="text-center">
+              <div className="font-medium text-base md:text-lg">{userProfile.recordScore}</div>
+              <div className="text-xs md:text-sm text-gray-500">Score</div>
+            </div>
           </div>
         </div>
       </div>
@@ -159,25 +161,25 @@ export default function ProfilePage() {
         <TabsContent value="info" className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Basic Info</CardTitle>
+              <CardTitle className="text-base md:text-lg">Basic Info</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Birthday</span>
-                  <span className="text-sm">{userProfile.birthday}</span>
+                  <span className="text-sm md:text-base text-gray-500">Birthday</span>
+                  <span className="text-sm md:text-base">{userProfile.birthday}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Height</span>
-                  <span className="text-sm">{userProfile.height}</span>
+                  <span className="text-sm md:text-base text-gray-500">Height</span>
+                  <span className="text-sm md:text-base">{userProfile.height}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Weight</span>
-                  <span className="text-sm">{userProfile.weight}</span>
+                  <span className="text-sm md:text-base text-gray-500">Weight</span>
+                  <span className="text-sm md:text-base">{userProfile.weight}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Job</span>
-                  <span className="text-sm">{userProfile.job}</span>
+                  <span className="text-sm md:text-base text-gray-500">Job</span>
+                  <span className="text-sm md:text-base">{userProfile.job}</span>
                 </div>
               </div>
             </CardContent>
@@ -185,15 +187,15 @@ export default function ProfilePage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Interests</CardTitle>
+              <CardTitle className="text-base md:text-lg">Interests</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {userProfile.interests.map((interest) => (
                   <div key={interest.name} className="space-y-1">
                     <div className="flex justify-between">
-                      <span className="text-sm">{interest.name}</span>
-                      <span className="text-sm text-gray-500">{interest.level}%</span>
+                      <span className="text-sm md:text-base">{interest.name}</span>
+                      <span className="text-sm md:text-base text-gray-500">{interest.level}%</span>
                     </div>
                     <Progress value={interest.level} className="h-2" />
                   </div>
@@ -206,7 +208,7 @@ export default function ProfilePage() {
         <TabsContent value="lifestyle" className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Daily Habits</CardTitle>
+              <CardTitle className="text-base md:text-lg">Daily Habits</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -214,16 +216,16 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-2">
                     <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded-full">
                       {userProfile.lifestyle.morningPerson ? (
-                        <Sun className="h-5 w-5 text-yellow-500" />
+                        <Sun className="h-5 w-5 md:h-6 md:w-6 text-yellow-500" />
                       ) : (
-                        <Moon className="h-5 w-5 text-indigo-400" />
+                        <Moon className="h-5 w-5 md:h-6 md:w-6 text-indigo-400" />
                       )}
                     </div>
                     <div>
-                      <div className="text-sm font-medium">
+                      <div className="text-sm md:text-base font-medium">
                         {userProfile.lifestyle.morningPerson ? "Morning Person" : "Night Owl"}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs md:text-sm text-gray-500">
                         {userProfile.lifestyle.morningPerson ? "You prefer early mornings" : "You come alive at night"}
                       </div>
                     </div>
@@ -233,13 +235,13 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded-full">
-                      <Coffee className="h-5 w-5 text-amber-700" />
+                      <Coffee className="h-5 w-5 md:h-6 md:w-6 text-amber-700" />
                     </div>
                     <div>
-                      <div className="text-sm font-medium">
+                      <div className="text-sm md:text-base font-medium">
                         {userProfile.lifestyle.coffeeDrinker ? "Coffee Lover" : "Tea Drinker"}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs md:text-sm text-gray-500">
                         {userProfile.lifestyle.coffeeDrinker
                           ? "You enjoy your daily coffee"
                           : "You prefer tea over coffee"}
@@ -251,11 +253,11 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded-full">
-                      <Bed className="h-5 w-5 text-blue-400" />
+                      <Bed className="h-5 w-5 md:h-6 md:w-6 text-blue-400" />
                     </div>
                     <div>
-                      <div className="text-sm font-medium">Sleep Schedule</div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-sm md:text-base font-medium">Sleep Schedule</div>
+                      <div className="text-xs md:text-sm text-gray-500">
                         You average {userProfile.lifestyle.averageSleep} of sleep
                       </div>
                     </div>
@@ -267,25 +269,25 @@ export default function ProfilePage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Record Score</CardTitle>
+              <CardTitle className="text-base md:text-lg">Record Score</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Diary Consistency</span>
-                  <span className="text-sm font-medium">92%</span>
+                  <span className="text-sm md:text-base">Diary Consistency</span>
+                  <span className="text-sm md:text-base font-medium">92%</span>
                 </div>
                 <Progress value={92} className="h-2" />
 
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Interaction Rate</span>
-                  <span className="text-sm font-medium">78%</span>
+                  <span className="text-sm md:text-base">Interaction Rate</span>
+                  <span className="text-sm md:text-base font-medium">78%</span>
                 </div>
                 <Progress value={78} className="h-2" />
 
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">Content Quality</span>
-                  <span className="text-sm font-medium">85%</span>
+                  <span className="text-sm md:text-base">Content Quality</span>
+                  <span className="text-sm md:text-base font-medium">85%</span>
                 </div>
                 <Progress value={85} className="h-2" />
               </div>
@@ -296,12 +298,12 @@ export default function ProfilePage() {
         <TabsContent value="settings" className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Privacy Settings</CardTitle>
+              <CardTitle className="text-base md:text-lg">Privacy Settings</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-base">Diary Visibility</Label>
+                  <Label className="text-base md:text-lg">Diary Visibility</Label>
                   <div className="grid grid-cols-3 gap-2">
                     <Button
                       variant={privacy.diary === "private" ? "default" : "outline"}
@@ -328,7 +330,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-base">Profile Visibility</Label>
+                  <Label className="text-base md:text-lg">Profile Visibility</Label>
                   <div className="grid grid-cols-3 gap-2">
                     <Button
                       variant={privacy.profile === "private" ? "default" : "outline"}
@@ -359,7 +361,7 @@ export default function ProfilePage() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Notification Settings</CardTitle>
+              <CardTitle className="text-base md:text-lg">Notification Settings</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -385,12 +387,12 @@ export default function ProfilePage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="new-messages" className="flex-1">
-                  New Messages
+                    New Messages
                   </Label>
                   <Switch
-                  id="new-messages"
-                  checked={notifications.newMessages}
-                  onCheckedChange={(value: boolean) => handleNotificationChange("newMessages", value)}
+                    id="new-messages"
+                    checked={notifications.newMessages}
+                    onCheckedChange={(value: boolean) => handleNotificationChange("newMessages", value)}
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -410,15 +412,15 @@ export default function ProfilePage() {
       </Tabs>
 
       <div className="mt-6">
-        <h2 className="text-xl font-bold mb-4">관심사 관리</h2>
+        <h2 className="text-xl md:text-2xl font-bold mb-4">관심사 관리</h2>
 
-        <div className="mb-4">
+        <div className="mb-4 flex flex-col md:flex-row gap-2">
           <input
             type="text"
             value={newInterest}
             onChange={(e) => setNewInterest(e.target.value)}
             placeholder="새 관심사 추가"
-            className="border p-2 mr-2"
+            className="border p-2 flex-1"
           />
           <button
             onClick={handleAddInterest}
@@ -430,19 +432,19 @@ export default function ProfilePage() {
 
         <ul>
           {interests.map((interest, index) => (
-            <li key={index} className="flex items-center justify-between mb-2">
-              <span>{interest.name}</span>
-              <div>
+            <li key={index} className="flex flex-col md:flex-row items-center justify-between mb-2 gap-2">
+              <span className="text-sm md:text-base">{interest.name}</span>
+              <div className="flex flex-col md:flex-row items-center gap-2">
                 <input
                   type="text"
                   value={editInterest.old === interest.name ? editInterest.new : ""}
                   onChange={(e) => setEditInterest({ old: interest.name, new: e.target.value })}
                   placeholder="수정할 이름"
-                  className="border p-2 mr-2"
+                  className="border p-2"
                 />
                 <button
                   onClick={handleUpdateInterest}
-                  className="bg-green-500 text-white px-4 py-2 rounded mr-2"
+                  className="bg-green-500 text-white px-4 py-2 rounded"
                 >
                   수정
                 </button>

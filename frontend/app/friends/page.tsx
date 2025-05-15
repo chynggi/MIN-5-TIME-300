@@ -139,7 +139,7 @@ export default function FriendsPage() {
   };
 
   return (
-    <div className="p-4">
+    <div className="p-4 max-w-screen-lg mx-auto">
       <h1 className="text-2xl font-bold mb-4">Friends</h1>
 
       <div className="relative mb-6">
@@ -219,7 +219,7 @@ export default function FriendsPage() {
         ))}
       </div>
 
-      <Dialog open={!!selectedFriend} onOpenChange={(open) => !open && setSelectedFriend(null)}>
+      <Dialog open={!!selectedFriend} onOpenChange={(open: boolean) => !open && setSelectedFriend(null)}>
         {selectedFriend && (
           <DialogContent className="max-w-md">
             <DialogHeader>

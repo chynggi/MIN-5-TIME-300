@@ -30,15 +30,17 @@ export default function SharedDiaryPage() {
   if (error) return <div className={styles.error}>{error}</div>;
 
   return (
-    <div className={styles.container}>
-      <h1 className={styles.title}>공유된 다이어리</h1>
-      <div className={styles.diaryList}>
-        {diaries.map((diary) => (
-          <div key={diary.id} className={styles.diaryCard}>
-            <h2 className={styles.diaryTitle}>{diary.title}</h2>
-            <p className={styles.diaryContent}>{diary.content}</p>
-          </div>
-        ))}
+    <div className="p-4 max-w-screen-lg mx-auto">
+      <div className={styles.container}>
+        <h1 className={styles.title}>공유된 다이어리</h1>
+        <div className={styles.diaryList}>
+          {diaries.map((diary) => (
+            <div key={diary.id} className={styles.diaryCard}>
+              <h2 className={styles.diaryTitle}>{diary.title}</h2>
+              <p className={styles.diaryContent}>{diary.content}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

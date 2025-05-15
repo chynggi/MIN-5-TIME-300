@@ -77,7 +77,7 @@ export default function WriteDiaryPage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 max-w-screen-lg mx-auto">
       <h1 className="text-3xl font-bold mb-6">일기 작성</h1>
       <div className="mb-4">
         <Input

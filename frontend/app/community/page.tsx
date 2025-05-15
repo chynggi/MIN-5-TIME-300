@@ -125,7 +125,7 @@ export default function CommunityPage() {
 		: communityEntries
 
 	return (
-		<div className="p-8 max-w-6xl mx-auto">
+		<div className="p-4 max-w-screen-lg mx-auto">
 			<h1 className="text-3xl font-bold mb-6">커뮤니티 일기</h1>
 			<div className="flex items-center mb-4">
 				<Input

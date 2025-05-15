@@ -41,80 +41,82 @@ export default function NewDiaryPage() {
   };
 
   return (
-    <div className={styles.container}>
-      <h1 className={styles.title}>새 다이어리 작성</h1>
-      {error && <div className={styles.error}>{error}</div>}
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.formGroup}>
-          <label htmlFor="title">제목</label>
-          <input
-            type="text"
-            id="title"
-            name="title"
-            value={formData.title}
-            onChange={handleChange}
-            className={styles.input}
-            placeholder="다이어리 제목을 입력하세요"
-          />
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="content">내용</label>
-          <textarea
-            id="content"
-            name="content"
-            value={formData.content}
-            onChange={handleChange}
-            className={styles.textarea}
-            placeholder="다이어리 내용을 입력하세요"
-          />
-        </div>
-
-        <div className={styles.formGroup}>
-          <label htmlFor="mood">기분</label>
-          <select
-            id="mood"
-            name="mood"
-            value={formData.mood}
-            onChange={handleChange}
-            className={styles.select}
-          >
-            <option value="happy">행복함 😊</option>
-            <option value="sad">슬픔 😢</option>
-            <option value="neutral">보통 😐</option>
-          </select>
-        </div>
-
-        <div className={styles.formGroup}>
-          <label>공개 범위</label>
-          <div className={styles.radioGroup}>
-            <label>
-              <input
-                type="radio"
-                name="isPrivate"
-                value="true"
-                checked={formData.isPrivate === true}
-                onChange={() => setFormData((prev) => ({ ...prev, isPrivate: true }))}
-              />
-              비공개
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="isPrivate"
-                value="false"
-                checked={formData.isPrivate === false}
-                onChange={() => setFormData((prev) => ({ ...prev, isPrivate: false }))}
-              />
-              공개
-            </label>
+    <div className="p-4 max-w-screen-lg mx-auto">
+      <div className={styles.container}>
+        <h1 className={styles.title}>새 다이어리 작성</h1>
+        {error && <div className={styles.error}>{error}</div>}
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.formGroup}>
+            <label htmlFor="title">제목</label>
+            <input
+              type="text"
+              id="title"
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              className={styles.input}
+              placeholder="다이어리 제목을 입력하세요"
+            />
           </div>
-        </div>
 
-        <button type="submit" className={styles.submitButton} disabled={loading}>
-          {loading ? "저장 중..." : "저장하기"}
-        </button>
-      </form>
+          <div className={styles.formGroup}>
+            <label htmlFor="content">내용</label>
+            <textarea
+              id="content"
+              name="content"
+              value={formData.content}
+              onChange={handleChange}
+              className={styles.textarea}
+              placeholder="다이어리 내용을 입력하세요"
+            />
+          </div>
+
+          <div className={styles.formGroup}>
+            <label htmlFor="mood">기분</label>
+            <select
+              id="mood"
+              name="mood"
+              value={formData.mood}
+              onChange={handleChange}
+              className={styles.select}
+            >
+              <option value="happy">행복함 😊</option>
+              <option value="sad">슬픔 😢</option>
+              <option value="neutral">보통 😐</option>
+            </select>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label>공개 범위</label>
+            <div className={styles.radioGroup}>
+              <label>
+                <input
+                  type="radio"
+                  name="isPrivate"
+                  value="true"
+                  checked={formData.isPrivate === true}
+                  onChange={() => setFormData((prev) => ({ ...prev, isPrivate: true }))}
+                />
+                비공개
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="isPrivate"
+                  value="false"
+                  checked={formData.isPrivate === false}
+                  onChange={() => setFormData((prev) => ({ ...prev, isPrivate: false }))}
+                />
+                공개
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" className={styles.submitButton} disabled={loading}>
+            {loading ? "저장 중..." : "저장하기"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

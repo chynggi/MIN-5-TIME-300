@@ -33,7 +33,7 @@ export default function DiaryListPage() {
   if (error) return <div className={styles.error}>{error}</div>;
 
   return (
-    <div className={styles.container}>
+    <div className="p-4 max-w-screen-lg mx-auto">
       <h1 className={styles.title}>다이어리 목록</h1>
       <div className={styles.filters}>
         <button onClick={() => setFilter("all")}>전체</button>

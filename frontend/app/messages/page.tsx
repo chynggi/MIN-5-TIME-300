@@ -77,7 +77,7 @@ export default function MessagesPage() {
   };
 
   return (
-    <div className={styles.container}>
+    <div className="p-4 max-w-screen-lg mx-auto">
       <h1 className={styles.title}>메시지</h1>
 
       {error && <div className={styles.error}>{error}</div>}

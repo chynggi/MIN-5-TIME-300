@@ -41,7 +41,7 @@ const friends = [
 ]
 
 // Sample messages
-const sampleMessages = {
+const sampleMessages: Record<string, { id: number; sender: string; text: string; time: string }[]> = {
   "1": [
     { id: 1, sender: "friend", text: "Hey there! How are you today?", time: "10:30 AM" },
     { id: 2, sender: "user", text: "I'm good! Just finished writing in my diary.", time: "10:32 AM" },
@@ -77,7 +77,7 @@ const sampleMessages = {
 export default function ChatPage() {
   const router = useRouter()
   const params = useParams()
-  const friendId = params.id as string
+  const friendId = params.id as keyof typeof sampleMessages
 
   const friend = friends.find((f) => f.id === friendId)
   const initialMessages = sampleMessages[friendId] || []
@@ -135,7 +135,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen p-4 max-w-screen-lg mx-auto">
       {/* Chat header */}
       <div className="flex items-center p-4 border-b">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
