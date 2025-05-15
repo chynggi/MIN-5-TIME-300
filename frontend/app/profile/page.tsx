@@ -370,7 +370,7 @@ export default function ProfilePage() {
                   <Switch
                     id="friend-requests"
                     checked={notifications.friendRequests}
-                    onCheckedChange={(value) => handleNotificationChange("friendRequests", value)}
+                    onCheckedChange={(value: boolean) => handleNotificationChange("friendRequests", value)}
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -380,17 +380,17 @@ export default function ProfilePage() {
                   <Switch
                     id="diary-reminders"
                     checked={notifications.diaryReminders}
-                    onCheckedChange={(value) => handleNotificationChange("diaryReminders", value)}
+                    onCheckedChange={(value: boolean) => handleNotificationChange("diaryReminders", value)}
                   />
                 </div>
                 <div className="flex items-center justify-between">
                   <Label htmlFor="new-messages" className="flex-1">
-                    New Messages
+                  New Messages
                   </Label>
                   <Switch
-                    id="new-messages"
-                    checked={notifications.newMessages}
-                    onCheckedChange={(value) => handleNotificationChange("newMessages", value)}
+                  id="new-messages"
+                  checked={notifications.newMessages}
+                  onCheckedChange={(value: boolean) => handleNotificationChange("newMessages", value)}
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -400,7 +400,7 @@ export default function ProfilePage() {
                   <Switch
                     id="friend-diaries"
                     checked={notifications.friendDiaries}
-                    onCheckedChange={(value) => handleNotificationChange("friendDiaries", value)}
+                    onCheckedChange={(value: boolean) => handleNotificationChange("friendDiaries", value)}
                   />
                 </div>
               </div>

@@ -125,146 +125,34 @@ export default function CommunityPage() {
 		: communityEntries
 
 	return (
-		<div className="p-4">
-			<h1 className="text-2xl font-bold mb-4">Community</h1>
-
-			<div className="relative mb-6">
+		<div className="p-8 max-w-6xl mx-auto">
+			<h1 className="text-3xl font-bold mb-6">커뮤니티 일기</h1>
+			<div className="flex items-center mb-4">
 				<Input
-					placeholder="Search by location..."
+					placeholder="검색어를 입력하세요..."
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
-					className="pl-10"
+					className="flex-grow mr-4"
 				/>
-				<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+				<Button className="bg-blue-500 hover:bg-blue-600 text-white">
+					<Search className="h-5 w-5" />
+				</Button>
 			</div>
-
-			<div className="relative w-full h-[500px] bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden mb-4">
-				{/* Map placeholder */}
-				<div className="absolute inset-0 bg-[url('/placeholder.svg?height=500&width=400')] bg-cover bg-center">
-					{/* Map pins */}
-					{filteredEntries.map((entry) => (
-						<button
-							key={entry.id}
-							className="absolute"
-							style={{ top: entry.position.top, left: entry.position.left }}
-							onClick={() => setSelectedDiary(entry)}
+			<div className="grid grid-cols-2 gap-6">
+				{/* Community entries rendering */}
+				{communityEntries.map((entry) => (
+					<div key={entry.id} className="p-4 border rounded-lg">
+						<h2 className="text-xl font-semibold mb-2">{entry.title}</h2>
+						<p className="text-gray-700 mb-4">{entry.content}</p>
+						<Button
+							className="bg-green-500 hover:bg-green-600 text-white"
+							onClick={() => handleLike(entry.id)}
 						>
-							<div className={cn("relative", entry.user.updatedToday && `animate-pulse`)}>
-								<Avatar className={`border-2 border-${entry.user.color}-400`}>
-									<AvatarImage src={entry.user.avatar || "/placeholder.svg"} alt={entry.user.name} />
-									<AvatarFallback>{entry.user.name[0]}</AvatarFallback>
-								</Avatar>
-								<div
-									className={`absolute -bottom-1 -right-1 bg-${entry.user.color}-400 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs`}
-								>
-									{entry.mood}
-								</div>
-							</div>
-						</button>
-					))}
-				</div>
-			</div>
-
-			<div className="flex gap-2 overflow-x-auto pb-2">
-				{["All", "New York", "Los Angeles", "Chicago", "Houston"].map((location) => (
-					<Button
-						key={location}
-						variant={searchQuery === location || (location === "All" && !searchQuery) ? "default" : "outline"}
-						size="sm"
-						onClick={() => setSearchQuery(location === "All" ? "" : location)}
-						className="flex-shrink-0"
-					>
-						{location}
-					</Button>
-				))}
-			</div>
-
-			<div className="mt-4">
-				{filteredEntries.map((entry) => (
-					<div key={entry.id} className="border p-4 mb-4 rounded">
-						<h2 className="text-xl font-bold">{entry.title}</h2>
-						<p>{entry.content}</p>
-						<div className="flex gap-2 mt-2">
-							<button
-								onClick={() => router.push(`/community/${entry.id}`)}
-								className="bg-blue-500 text-white px-4 py-2 rounded"
-							>
-								보기
-							</button>
-							<button
-								onClick={() => router.push(`/community/${entry.id}/edit`)}
-								className="bg-green-500 text-white px-4 py-2 rounded"
-							>
-								수정
-							</button>
-							<button
-								onClick={() => handleDelete(entry.id)}
-								className="bg-red-500 text-white px-4 py-2 rounded"
-							>
-								삭제
-							</button>
-						</div>
+							좋아요 ({likes[entry.id] || 0})
+						</Button>
 					</div>
 				))}
 			</div>
-
-			<Dialog open={!!selectedDiary} onOpenChange={(open) => !open && setSelectedDiary(null)}>
-				{selectedDiary && (
-					<DialogContent className="max-w-md">
-						<DialogHeader>
-							<div className="flex items-center gap-3">
-								<Avatar className={`border-2 border-${selectedDiary.user.color}-400`}>
-									<AvatarImage src={selectedDiary.user.avatar || "/placeholder.svg"} alt={selectedDiary.user.name} />
-									<AvatarFallback>{selectedDiary.user.name[0]}</AvatarFallback>
-								</Avatar>
-								<div>
-									<DialogTitle>{selectedDiary.title}</DialogTitle>
-									<div className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-										<MapPin className="h-3 w-3" />
-										<span>{selectedDiary.location.name}</span>
-										<span>•</span>
-										<span>{selectedDiary.mood}</span>
-										<span>•</span>
-										<span>{selectedDiary.weather}</span>
-									</div>
-								</div>
-							</div>
-						</DialogHeader>
-						<div>
-							<p>{selectedDiary.content}</p>
-							<div className="mt-4">
-								<button
-									onClick={() => handleLike(selectedDiary.id)}
-									className="bg-blue-500 text-white px-4 py-2 rounded"
-								>
-									좋아요 ({likes[selectedDiary.id] || 0})
-								</button>
-							</div>
-							<div className="mt-4">
-								<h3 className="text-lg font-bold">댓글</h3>
-								<ul className="list-disc pl-5">
-									{(comments[selectedDiary.id] || []).map((comment, index) => (
-										<li key={index}>{comment}</li>
-									))}
-								</ul>
-								<div className="mt-2">
-									<input
-										type="text"
-										placeholder="댓글을 입력하세요"
-										className="border p-2 w-full"
-										onKeyDown={(e) => {
-											if (e.key === "Enter" && e.currentTarget.value.trim()) {
-												handleAddComment(selectedDiary.id, e.currentTarget.value)
-												e.currentTarget.value = ""
-											}
-										}}
-									/>
-								</div>
-							</div>
-						</div>
-					</DialogContent>
-				)}
-			</Dialog>
 		</div>
 	)
 }
