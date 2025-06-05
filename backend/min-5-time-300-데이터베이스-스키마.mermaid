@@ -1,0 +1,132 @@
+erDiagram
+    users {
+        uuid id PK
+        string email
+        string password_hash
+        string username
+        string mbti
+        timestamp created_at
+        timestamp updated_at
+        boolean is_active
+        string profile_image_url
+    }
+    
+    user_interests {
+        uuid id PK
+        uuid user_id FK
+        string interest
+        int priority
+        timestamp created_at
+    }
+    
+    lifestyle_answers {
+        uuid id PK
+        uuid user_id FK
+        string question
+        string answer
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    journals {
+        uuid id PK
+        uuid user_id FK
+        text content
+        timestamp created_at
+        timestamp updated_at
+        boolean is_public
+        int emotion_score
+        string media_url
+        string media_type
+        int writing_duration
+    }
+    
+    journal_questions {
+        uuid id PK
+        uuid journal_id FK
+        string question
+        timestamp created_at
+    }
+    
+    journal_reactions {
+        uuid id PK
+        uuid journal_id FK
+        uuid user_id FK
+        string reaction_type
+        timestamp created_at
+    }
+    
+    record_scores {
+        uuid id PK
+        uuid user_id FK
+        int consistency_score
+        int emotion_variance
+        int writing_quality
+        timestamp period_start
+        timestamp period_end
+    }
+    
+    friends {
+        uuid id PK
+        uuid requester_id FK
+        uuid addressee_id FK
+        string status
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    chat_rooms {
+        uuid id PK
+        string name
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    chat_room_participants {
+        uuid id PK
+        uuid chat_room_id FK
+        uuid user_id FK
+        timestamp joined_at
+        timestamp last_read_at
+    }
+    
+    messages {
+        uuid id PK
+        uuid chat_room_id FK
+        uuid sender_id FK
+        text content
+        timestamp created_at
+        boolean is_read
+    }
+    
+    community_comments {
+        uuid id PK
+        uuid journal_id FK
+        uuid user_id FK
+        text content
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    ai_meta {
+        uuid id PK
+        string question_type
+        int usage_count
+        float effectiveness_score
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    users ||--o{ user_interests : "has"
+    users ||--o{ lifestyle_answers : "provides"
+    users ||--o{ journals : "writes"
+    journals ||--o{ journal_questions : "prompted_by"
+    journals ||--o{ journal_reactions : "receives"
+    users ||--o{ record_scores : "has"
+    users ||--o{ friends : "requests"
+    users ||--o{ friends : "receives"
+    chat_rooms ||--o{ chat_room_participants : "includes"
+    chat_rooms ||--o{ messages : "contains"
+    users ||--o{ messages : "sends"
+    journals ||--o{ community_comments : "has"
+    users ||--o{ community_comments : "writes"

@@ -1,156 +1,105 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateEntryDto } from './dto/create-entry.dto';
-import { Prisma } from '@prisma/client';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { CommunityDiaryListResponseDto } from './dto/community-diary.dto';
+import { FeedbackDto, FeedbackResponseDto } from './dto/feedback.dto';
+import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class CommunityService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async getEntries({ 
-    page, 
-    emotion, 
-    sortBy = 'latest',
-    search,
-  }: {
-    page: number;
-    emotion?: string[];
-    sortBy?: 'latest' | 'popular' | 'comments';
-    search?: string;
-  }) {
-    const take = 10;
-    const skip = (page - 1) * take;
-
-    const where: Prisma.CommunityEntryWhereInput = {
-      isPublic: true,
-      ...(emotion?.length && {
-        emotion: { in: emotion },
-      }),
-      ...(search && {
-        OR: [
-          { content: { contains: search, mode: 'insensitive' } },
-          { prompt: { contains: search, mode: 'insensitive' } },
-        ],
-      }),
-    };
-
-    const orderBy: Prisma.CommunityEntryOrderByWithRelationInput = 
-      sortBy === 'popular' ? { likes: 'desc' } :
-      sortBy === 'comments' ? { comments: { _count: 'desc' } } :
-      { createdAt: 'desc' };
-
-    const [entries, total] = await Promise.all([
-      this.prisma.communityEntry.findMany({
+  async getDiaries(req: any, query: any): Promise<CommunityDiaryListResponseDto> {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const where: any = { isPublic: true };
+    if (query.mbtiFilter) {
+      where.user = { mbti: query.mbtiFilter };
+    }
+    // Prisma.SortOrder 사용
+    const orderBy = query.sortBy === 'popular'
+      ? { emotionScore: 'desc' as const }
+      : { createdAt: 'desc' as const };
+    const [diaries, totalCount] = await Promise.all([
+      this.prisma.journal.findMany({
         where,
         orderBy,
-        take,
         skip,
+        take: limit,
         include: {
-          user: {
-            select: {
-              username: true,
-              profileImage: true, // profile_image -> profileImage
-            },
-          },
-          _count: {
-            select: {
-              comments: true,
-              likedBy: true,
-            },
-          },
+          user: true,
+          communityComments: true,
+          reactions: true,
         },
       }),
-      this.prisma.communityEntry.count({ where }),
+      this.prisma.journal.count({ where }),
     ]);
-
+    // 질문 연동: 각 일기별로 journalQuestion 조회
+    const questionMap: Record<string, string> = {};
+    const questionIds = diaries.map(d => d.id);
+    const questions = await this.prisma.journalQuestion.findMany({
+      where: { journalId: { in: questionIds } },
+    });
+    questions.forEach(q => { questionMap[q.journalId] = q.question; });
     return {
-      entries: entries.map(entry => ({
-        ...entry,
-        comments: entry._count.comments,
-        likes: entry._count.likedBy,
+      diaries: diaries.map(d => ({
+        id: d.id,
+        content: d.content,
+        createdAt: d.createdAt.toISOString(),
+        isPublic: d.isPublic,
+        emotionScore: d.emotionScore,
+        mediaUrl: d.mediaUrl ?? undefined,
+        mediaType: d.mediaType ?? undefined,
+        question: questionMap[d.id] || '',
+        user: d.user ? {
+          id: d.user.id,
+          username: d.user.username,
+          mbti: d.user.mbti ?? '',
+          profileImageUrl: d.user.profileImageUrl || undefined,
+        } : { id: '', username: '', mbti: '', profileImageUrl: undefined },
+        reactionCounts: {
+          like: d.reactions?.filter(r => r.reactionType === 'like').length ?? 0,
+          hug: d.reactions?.filter(r => r.reactionType === 'hug').length ?? 0,
+          support: d.reactions?.filter(r => r.reactionType === 'support').length ?? 0,
+        },
+        commentCount: d.communityComments?.length ?? 0,
       })),
-      hasMore: total > skip + take,
+      totalCount,
+      page,
+      limit,
     };
   }
 
-  async createEntry(userId: string, createEntryDto: CreateEntryDto) {
-    return this.prisma.communityEntry.create({
-      data: {
-        ...createEntryDto,
-        userId,
-      },
-      include: {
-        user: {
-          select: {
-            username: true,
-            profileImage: true, // profile_image -> profileImage
-          },
-        },
-      },
-    });
-  }
-
-  async toggleLike(userId: string, entryId: number) {
-    const existing = await this.prisma.like.findUnique({
-      where: {
-        userId_entryId: {
+  async feedback(req: any, id: string, dto: FeedbackDto): Promise<FeedbackResponseDto> {
+    const userId = req.user.userId;
+    const diary = await this.prisma.journal.findUnique({ where: { id } });
+    if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
+    let commentId: string | undefined;
+    let reactionId: string | undefined;
+    if (dto.content) {
+      const comment = await this.prisma.communityComment.create({
+        data: {
+          journalId: id,
           userId,
-          entryId,
-        },
-      },
-    });
-
-    if (existing) {
-      await this.prisma.like.delete({
-        where: {
-          userId_entryId: {
-            userId,
-            entryId,
-          },
+          content: dto.content,
         },
       });
-      return { liked: false };
+      commentId = comment.id;
     }
-
-    await this.prisma.like.create({
-      data: {
-        userId,
-        entryId,
-      },
-    });
-    return { liked: true };
-  }
-
-  async addComment(userId: string, entryId: number, content: string) {
-    return this.prisma.comment.create({
-      data: {
-        content,
-        userId,
-        entryId,
-      },
-      include: {
-        user: {
-          select: {
-            username: true,
-            profileImage: true, // profile_image -> profileImage
-          },
+    if (dto.reactionType) {
+      const reaction = await this.prisma.journalReaction.create({
+        data: {
+          journalId: id,
+          userId,
+          reactionType: dto.reactionType,
         },
-      },
-    });
-  }
-
-  async getComments(entryId: number) {
-    return this.prisma.comment.findMany({
-      where: { entryId },
-      include: {
-        user: {
-          select: {
-            username: true,
-            profileImage: true, // profile_image -> profileImage
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+      });
+      reactionId = reaction.id;
+    }
+    return {
+      success: true,
+      message: '피드백 등록 완료',
+      commentId,
+      reactionId,
+    };
   }
 }

@@ -1,42 +1,31 @@
-// File: backend/src/app.module.ts
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'path';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
-import { DiariesModule } from './diaries/diaries.module';
-import { QuestionsModule } from './questions/questions.module';
-import { AdminModule } from './admin/admin.module';
-import { RecommendationsModule } from './recommendations/recommendations.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { MessageModule } from './message/message.module';
+import { ProfileModule } from './profile/profile.module';
+import { DiaryModule } from './diary/diary.module';
+import { QuestionModule } from './question/question.module';
+import { CommunityModule } from './community/community.module';
+import { FriendModule } from './friend/friend.module';
+import { ChatModule } from './chat/chat.module';
+import { StatisticsModule } from './statistics/statistics.module';
+import { NotificationModule } from './notification/notification.module';
+import { PrismaModule } from './prisma.module';
 
 @Module({
   imports: [
-    // 환경변수 설정
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-    
-    // 정적 파일 서빙 설정
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'uploads'),
-      serveRoot: '/uploads',
-    }),
-    
-    // Prisma 모듈
     PrismaModule,
-    
-    // 기능별 모듈
-    UsersModule,
     AuthModule,
-    DiariesModule,
-    QuestionsModule,
-    AdminModule,
-    RecommendationsModule,
-    MessageModule,
+    ProfileModule,
+    DiaryModule,
+    QuestionModule,
+    CommunityModule,
+    FriendModule,
+    ChatModule,
+    StatisticsModule,
+    NotificationModule,
   ],
-  controllers: [],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

@@ -1,3 +1,6 @@
+// Prisma schema for MIN-5-TIME-300
+// PostgreSQL 사용
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,159 +11,161 @@ datasource db {
 }
 
 model User {
-  id               String    @id @default(uuid())
-  username         String    @unique
-  email            String?   @unique
-  googleId         String?   @unique
-  password         String?
-  profileImage     String?
+  id               String   @id @default(uuid())
+  email            String   @unique
+  passwordHash     String
+  username         String
   mbti             String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  loginAttempts    Int       @default(0)
-  lastLoginAttempt DateTime?
-  provider         String?   @default("local")
-  interests        String[]  @default([])
-
-  // 관계 정의
-  questions        Question[]
-  communityEntries CommunityEntry[]
-  comments         Comment[]
-  likes            Like[]
-  recommendations  Recommendation[]
-  diaries          Diary[] // 추가된 역방향 관계
-  sentMessages     Message[] @relation("SentMessages")
-  receivedMessages Message[] @relation("ReceivedMessages")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  isActive         Boolean  @default(true)
+  profileImageUrl  String?
+  interests        UserInterest[]
+  lifestyleAnswers LifestyleAnswer[]
+  journals         Journal[]
+  recordScores     RecordScore[]
+  sentMessages     Message[]        @relation("SentMessages")
+  friendsRequested Friend[]         @relation("FriendsRequested")
+  friendsReceived  Friend[]         @relation("FriendsReceived")
+  communityComments CommunityComment[]
+  journalReactions JournalReaction[]
+  chatRoomParticipants ChatRoomParticipant[]
+  notificationSettings NotificationSettings?
 }
 
-model Question {
+model UserInterest {
   id        String   @id @default(uuid())
-  title     String
-  content   String   @db.Text
-  authorId  String
-  category  Int
-  tags      String[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  author User @relation(fields: [authorId], references: [id])
-}
-
-model CommunityEntry {
-  id        Int      @id @default(autoincrement())
-  userId    String
-  prompt    String
-  content   String   @db.Text
-  emotion   String
-  isPublic  Boolean  @default(true)
-  likes     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user     User      @relation(fields: [userId], references: [id])
-  comments Comment[]
-  likedBy  Like[]
-
-  @@map("community_entries")
-}
-
-model Comment {
-  id        Int      @id @default(autoincrement())
-  content   String
-  userId    String
-  entryId   Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
-
-  user  User           @relation(fields: [userId], references: [id])
-  entry CommunityEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
-
-  @@map("comments")
-}
-
-model Like {
-  userId    String
-  entryId   Int
-  createdAt DateTime @default(now())
-
-  user  User           @relation(fields: [userId], references: [id])
-  entry CommunityEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
-
-  @@id([userId, entryId])
-  @@map("likes")
-}
-
-model Recommendation {
-  id        String   @id @default(uuid())
-  userId    String
-  itemId    String
-  score     Float
-  type      String?
-  isSeen    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-  @@index([type])
+  userId    String
+  interest  String
+  priority  Int
+  createdAt DateTime @default(now())
 }
 
-model Diary {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String   @db.Text
-  userId    String // User의 id와 타입 일치
-  isPrivate Boolean  @default(false)
-  mood      String? // 추가 필요
-  weather   String? // 추가 필요
+model LifestyleAnswer {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  question  String
+  answer    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  user User       @relation(fields: [userId], references: [id])
-  tags DiaryTag[]
 }
 
-model Tag {
-  id   Int    @id @default(autoincrement())
-  name String @unique
-
-  diaries DiaryTag[]
+model Journal {
+  id              String            @id @default(uuid())
+  user            User              @relation(fields: [userId], references: [id])
+  userId          String
+  content         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isPublic        Boolean  @default(false)
+  emotionScore    Int
+  mediaUrl        String?
+  mediaType       String?
+  writingDuration Int
+  question        JournalQuestion?
+  reactions       JournalReaction[]
+  communityComments CommunityComment[]
 }
 
-model DiaryTag {
-  id      Int @id @default(autoincrement())
-  diaryId Int
-  tagId   Int
-
-  diary Diary @relation(fields: [diaryId], references: [id], onDelete: Cascade)
-  tag   Tag   @relation(fields: [tagId], references: [id])
-
-  @@unique([diaryId, tagId])
+model JournalQuestion {
+  id         String   @id @default(uuid())
+  journal    Journal  @relation(fields: [journalId], references: [id])
+  journalId  String   @unique
+  question   String
+  createdAt  DateTime @default(now())
 }
 
-model Admin {
-  id               String    @id @default(uuid())
-  username         String    @unique
-  email            String    @unique
-  password         String
-  role             String    @default("admin") // 'admin', 'superadmin' 등 역할 구분
-  name             String?
-  profileImage     String?
-  isActive         Boolean   @default(true)
-  loginAttempts    Int       @default(0)
-  lastLoginAttempt DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+model JournalReaction {
+  id           String   @id @default(uuid())
+  journal      Journal  @relation(fields: [journalId], references: [id])
+  journalId    String
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String
+  // User.journalReactions와 연결
+  reactionType String
+  createdAt    DateTime @default(now())
+}
+
+model RecordScore {
+  id                String   @id @default(uuid())
+  user              User     @relation(fields: [userId], references: [id])
+  userId            String
+  consistencyScore  Int
+  emotionVariance   Int
+  writingQuality    Int
+  periodStart       DateTime
+  periodEnd         DateTime
+}
+
+model Friend {
+  id           String   @id @default(uuid())
+  requester    User     @relation("FriendsRequested", fields: [requesterId], references: [id])
+  requesterId  String
+  addressee    User     @relation("FriendsReceived", fields: [addresseeId], references: [id])
+  addresseeId  String
+  status       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ChatRoom {
+  id           String   @id @default(uuid())
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  participants ChatRoomParticipant[]
+  messages     Message[]
+}
+
+model ChatRoomParticipant {
+  id           String   @id @default(uuid())
+  chatRoom     ChatRoom @relation(fields: [chatRoomId], references: [id])
+  chatRoomId   String
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String
+  // User.chatRoomParticipants와 연결
+  joinedAt     DateTime @default(now())
+  lastReadAt   DateTime?
 }
 
 model Message {
-  id          String   @id @default(uuid())
-  senderId    String
-  recipientId String
-  content     String
-  isRead      Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(uuid())
+  chatRoom     ChatRoom @relation(fields: [chatRoomId], references: [id])
+  chatRoomId   String
+  sender       User     @relation("SentMessages", fields: [senderId], references: [id])
+  senderId     String
+  content      String
+  createdAt    DateTime @default(now())
+  isRead       Boolean  @default(false)
+}
 
-  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
-  recipient   User     @relation("ReceivedMessages", fields: [recipientId], references: [id])
+model CommunityComment {
+  id           String   @id @default(uuid())
+  journal      Journal  @relation(fields: [journalId], references: [id])
+  journalId    String
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String
+  content      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+
+model NotificationSettings {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+  email                     Boolean  @default(true)
+  push                      Boolean  @default(true)
+  sms                       Boolean  @default(false)
+  reminderEnabled           Boolean  @default(true)
+  reminderTime              String?
+  friendRequestNotification Boolean  @default(true)
+  commentNotification       Boolean  @default(true)
+  reactionNotification      Boolean  @default(true)
+  messageNotification       Boolean  @default(true)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 }

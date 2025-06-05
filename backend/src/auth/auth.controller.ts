@@ -1,39 +1,27 @@
-import { Controller, Post, Body, Get, Req, Res, Param } from '@nestjs/common';
+import { Body, Controller, Post, Req } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { GoogleAuthDto } from './dto/google-auth.dto';
-import { Response } from 'express';
+import { SignupDto } from './dto/signup.dto';
+import { LoginDto } from './dto/login.dto';
+import { AuthResponseDto } from './dto/auth-response.dto';
+import { LogoutResponseDto } from './dto/logout-response.dto';
 
-@Controller('auth')
+@Controller('api/v1')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Get('google')
-  async googleAuth(@Req() req, @Res() res: Response) {
-    // Google OAuth URL로 리디렉션
-    const url = this.authService.getGoogleAuthURL();
-    return res.redirect(url);
+  @Post('signup')
+  async signup(@Body() dto: SignupDto): Promise<AuthResponseDto> {
+    return this.authService.signup(dto);
   }
 
-  @Get('google/callback')
-  async googleAuthCallback(@Req() req) {
-    const { code } = req.query;
-    return this.authService.googleAuth(code);
+  @Post('login')
+  async login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
+    return this.authService.login(dto);
   }
 
-  @Post('google')
-  async authenticateGoogle(@Body() googleAuthDto: GoogleAuthDto) {
-    return this.authService.authenticateWithGoogle(googleAuthDto);
-  }
-
-  @Get(':service/callback')
-  async serviceAuthCallback(@Param('service') service: string, @Req() req) {
-    const { code } = req.query;
-    return this.authService.handleServiceAuthCallback(service, code);
-  }
-
-  @Get(':service')
-  async serviceAuth(@Param('service') service: string, @Req() req, @Res() res: Response) {
-    const url = this.authService.getServiceAuthURL(service);
-    return res.redirect(url);
+  @Post('logout')
+  async logout(@Req() req): Promise<LogoutResponseDto> {
+    // 실제 구현에서는 JWT 토큰 블랙리스트 처리 등 필요
+    return this.authService.logout(req);
   }
 }
