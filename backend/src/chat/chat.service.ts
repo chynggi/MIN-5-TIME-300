@@ -132,4 +132,36 @@ export class ChatService {
       })),
     };
   }
+
+  async inviteToRoom(req: any, roomId: string, userId: string) {
+    const myUserId = req.user.userId;
+    // 채팅방 존재 및 권한 확인
+    const room = await this.prisma.chatRoom.findUnique({
+      where: { id: roomId },
+      include: { participants: true },
+    });
+    if (!room) throw new NotFoundException('채팅방을 찾을 수 없습니다.');
+    if (!room.participants.some(p => p.userId === myUserId)) throw new ForbiddenException('참여자만 초대 가능');
+    if (room.participants.some(p => p.userId === userId)) throw new ForbiddenException('이미 참여 중인 유저입니다.');
+    // 초대(참가자 추가)
+    await this.prisma.chatRoomParticipant.create({
+      data: {
+        chatRoomId: roomId,
+        userId,
+      },
+    });
+    return { success: true };
+  }
+  
+
+  async leaveRoom(req: any, roomId: string) {
+    const userId = req.user.userId;
+    // 참가자 레코드 삭제
+    const participant = await this.prisma.chatRoomParticipant.findFirst({
+      where: { chatRoomId: roomId, userId },
+    });
+    if (!participant) throw new NotFoundException('참여 중인 채팅방이 아닙니다.');
+    await this.prisma.chatRoomParticipant.delete({ where: { id: participant.id } });
+    return { success: true };
+  }
 }

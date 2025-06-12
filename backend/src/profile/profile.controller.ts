@@ -5,11 +5,15 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateInterestsDto, InterestResponseDto } from './dto/update-interests.dto';
 import { LifestyleAnswerDto } from './dto/lifestyle-answer.dto';
+import { PersonaService } from './persona.service';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/profile')
 export class ProfileController {
-  constructor(private readonly profileService: ProfileService) {}
+  constructor(
+    private readonly profileService: ProfileService,
+    private readonly personaService: PersonaService,
+  ) {}
 
   @Get()
   async getProfile(@Req() req): Promise<ProfileResponseDto> {
@@ -29,5 +33,23 @@ export class ProfileController {
   @Post('lifestyle')
   async answerLifestyle(@Req() req, @Body() dto: LifestyleAnswerDto): Promise<{ success: boolean; message: string }> {
     return this.profileService.answerLifestyle(req, dto);
+  }
+
+  /**
+   * 페르소나/목표 추출 (AI 기반)
+   */
+  @Post('persona')
+  async generatePersona(@Req() req) {
+    const userId = req.user.userId;
+    return this.personaService.generatePersonaAndGoals(userId);
+  }
+
+  /**
+   * 페르소나/목표 조회(캐싱, AI 자동 생성)
+   */
+  @Get('persona')
+  async getPersona(@Req() req) {
+    const userId = req.user.userId;
+    return this.profileService.getPersonaAndGoals(userId);
   }
 }

@@ -4,10 +4,14 @@ import { ProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateInterestsDto, InterestResponseDto } from './dto/update-interests.dto';
 import { LifestyleAnswerDto } from './dto/lifestyle-answer.dto';
 import { PrismaService } from '../prisma.service';
+import { PersonaService } from './persona.service';
 
 @Injectable()
 export class ProfileService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly personaService: PersonaService,
+  ) {}
 
   async getProfile(req: any): Promise<ProfileResponseDto> {
     const userId = req.user.userId;
@@ -40,6 +44,22 @@ export class ProfileService {
       },
       include: { interests: true },
     });
+    // 프로필 변경 시 페르소나/목표 자동 추출 및 DB 저장
+    try {
+      const personaAndGoals = await this.personaService.generatePersonaAndGoals(userId);
+      await this.prisma.userPersona.upsert({
+        where: { userId },
+        update: {
+          persona: personaAndGoals.persona || '',
+          goals: JSON.stringify(personaAndGoals.goals || []),
+        },
+        create: {
+          userId,
+          persona: personaAndGoals.persona || '',
+          goals: JSON.stringify(personaAndGoals.goals || []),
+        },
+      });
+    } catch (e) {}
     return {
       id: user.id,
       email: user.email,
@@ -60,6 +80,22 @@ export class ProfileService {
       skipDuplicates: true,
     });
     const interests = await this.prisma.userInterest.findMany({ where: { userId } });
+    // 관심사 변경 시 페르소나/목표 자동 추출 및 DB 저장
+    try {
+      const personaAndGoals = await this.personaService.generatePersonaAndGoals(userId);
+      await this.prisma.userPersona.upsert({
+        where: { userId },
+        update: {
+          persona: personaAndGoals.persona || '',
+          goals: JSON.stringify(personaAndGoals.goals || []),
+        },
+        create: {
+          userId,
+          persona: personaAndGoals.persona || '',
+          goals: JSON.stringify(personaAndGoals.goals || []),
+        },
+      });
+    } catch (e) {}
     return {
       success: true,
       interests: interests.map(i => ({ id: i.id, interest: i.interest, priority: i.priority })),
@@ -78,5 +114,28 @@ export class ProfileService {
       success: true,
       message: '라이프스타일 답변 저장 완료',
     };
+  }
+
+  /**
+   * DB에서 페르소나/목표 조회, 없으면 AI로 생성 후 저장(캐싱)
+   */
+  async getPersonaAndGoals(userId: string): Promise<{ persona: string; goals: string[] }> {
+    const cached = await this.prisma.userPersona.findUnique({ where: { userId } });
+    if (cached) {
+      return {
+        persona: cached.persona,
+        goals: JSON.parse(cached.goals || '[]'),
+      };
+    }
+    // 없으면 AI로 생성 후 저장
+    const personaAndGoals = await this.personaService.generatePersonaAndGoals(userId);
+    await this.prisma.userPersona.create({
+      data: {
+        userId,
+        persona: personaAndGoals.persona || '',
+        goals: JSON.stringify(personaAndGoals.goals || []),
+      },
+    });
+    return personaAndGoals;
   }
 }

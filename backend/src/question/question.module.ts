@@ -2,12 +2,13 @@ import { Module } from '@nestjs/common';
 import { QuestionController } from './question.controller';
 import { QuestionService } from './question.service';
 import { PrismaModule } from '../prisma.module';
+import { VectorDbModule } from '../vector-db/vector-db.module';
+import { ProfileModule } from '../profile/profile.module';
+import { DiaryModule } from '../diary/diary.module';
 
-import { ProfileService } from '../profile/profile.service';
-import { DiaryService } from '../diary/diary.service';
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, VectorDbModule, ProfileModule, DiaryModule],
   controllers: [QuestionController],
-  providers: [QuestionService, ProfileService, DiaryService]
+  providers: [QuestionService],
 })
 export class QuestionModule {}

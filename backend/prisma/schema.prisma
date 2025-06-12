@@ -31,7 +31,22 @@ model User {
   journalReactions JournalReaction[]
   chatRoomParticipants ChatRoomParticipant[]
   notificationSettings NotificationSettings?
+  persona          UserPersona?
+  feedbackLogs     FeedbackLog[]
+  publicDiaries   PublicDiary[]
 }
+
+
+model UserPersona {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+  persona   String
+  goals     String   // JSON 문자열(목표 배열)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 
 model UserInterest {
   id        String   @id @default(uuid())
@@ -67,6 +82,7 @@ model Journal {
   question        JournalQuestion?
   reactions       JournalReaction[]
   communityComments CommunityComment[]
+  feedbackLogs    FeedbackLog[]
 }
 
 model JournalQuestion {
@@ -97,6 +113,18 @@ model RecordScore {
   writingQuality    Int
   periodStart       DateTime
   periodEnd         DateTime
+}
+
+model FeedbackLog {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  journal   Journal  @relation(fields: [journalId], references: [id])
+  journalId String
+  comment   CommunityComment? @relation(fields: [commentId], references: [id])
+  commentId String?
+  content   String
+  createdAt DateTime @default(now())
 }
 
 model Friend {
@@ -150,6 +178,7 @@ model CommunityComment {
   content      String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  feedbackLogs FeedbackLog[]
 }
 
 
@@ -168,4 +197,15 @@ model NotificationSettings {
   messageNotification       Boolean  @default(true)
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
+}
+
+model PublicDiary {
+  id              String   @id @default(uuid())
+  user            User     @relation(fields: [userId], references: [id])
+  userId          String
+  content         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isPublic        Boolean  @default(true)
+  writingDuration Int
 }

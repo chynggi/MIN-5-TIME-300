@@ -11,6 +11,8 @@ import { ChatModule } from './chat/chat.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { NotificationModule } from './notification/notification.module';
 import { PrismaModule } from './prisma.module';
+import { Community2Module } from './community2/community2.module';
+import { ChatGateway } from './chat/chat.gateway';
 
 @Module({
   imports: [
@@ -24,8 +26,9 @@ import { PrismaModule } from './prisma.module';
     ChatModule,
     StatisticsModule,
     NotificationModule,
+    Community2Module,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, ChatGateway],
 })
 export class AppModule {}

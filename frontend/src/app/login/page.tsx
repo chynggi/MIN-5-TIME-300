@@ -27,9 +27,8 @@ const LoginPage = () => {
         body: JSON.stringify(form),
       });
       if (!res.ok) throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
-      // 로그인 성공 시 토큰 저장 및 리다이렉트 (예시)
-      // const { accessToken } = await res.json();
-      // localStorage.setItem("accessToken", accessToken);
+      const { accessToken } = await res.json();
+      localStorage.setItem("token", accessToken);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "로그인 중 오류가 발생했습니다.");

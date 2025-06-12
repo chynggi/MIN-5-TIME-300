@@ -1,15 +1,21 @@
-import { Body, Controller, Get, Post, Put, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Param, Query, Req, UseGuards, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Multer } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { DiaryService } from './diary.service';
 import { CreateDiaryDto } from './dto/create-diary.dto';
 import { RateDiaryDto } from './dto/rate-diary.dto';
 import { DiaryListResponseDto, DiaryDetailResponseDto } from './dto/diary-response.dto';
 import { TodayQuestionResponseDto } from './dto/today-question-response.dto';
+import { VectorDbService } from '../vector-db/vector-db.service';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/diaries')
 export class DiaryController {
-  constructor(private readonly diaryService: DiaryService) {}
+  constructor(
+    private readonly diaryService: DiaryService,
+    private readonly vectorDbService: VectorDbService,
+  ) {}
 
   @Get('today-question')
   async getTodayQuestion(@Req() req): Promise<TodayQuestionResponseDto> {
@@ -27,8 +33,13 @@ export class DiaryController {
   }
 
   @Post()
-  async createDiary(@Req() req, @Body() dto: CreateDiaryDto): Promise<{ id: string; content: string; createdAt: string; isPublic: boolean; question: string }> {
-    return this.diaryService.createDiary(req, dto);
+  @UseInterceptors(FileInterceptor('file'))
+  async createDiary(
+    @Req() req,
+    @Body() dto: CreateDiaryDto,
+    @UploadedFile() file?: Multer.File,
+  ): Promise<{ id: string; content: string; createdAt: string; isPublic: boolean; question: string; mediaUrl?: string; mediaType?: string }> {
+    return this.diaryService.createDiary(req, dto, file);
   }
 
   @Post(':id/rate')
@@ -39,5 +50,13 @@ export class DiaryController {
   @Put(':id/share')
   async shareDiary(@Req() req, @Param('id') id: string, @Body('isPublic') isPublic: boolean): Promise<{ id: string; isPublic: boolean; updatedAt: string }> {
     return this.diaryService.shareDiary(req, id, isPublic);
+  }
+
+  /**
+   * 입력 텍스트(또는 최근 일기) 기반 유사 일기 추천
+   */
+  @Post('search-similar')
+  async searchSimilarDiaries(@Req() req, @Body('text') text?: string, @Body('limit') limit = 5) {
+    return this.diaryService.searchSimilarDiaries(req, text, limit);
   }
 }

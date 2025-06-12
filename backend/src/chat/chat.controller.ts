@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Post, Param, Query, Req, UseGuards } from '@nestjs/common';
+
 import { AuthGuard } from '@nestjs/passport';
+import { Controller, UseGuards, Get, Post, Req, Param, Query, Body } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { ChatRoomListResponseDto, ChatMessageListResponseDto, SendMessageDto, SendMessageResponseDto, CreateChatRoomDto, CreateChatRoomResponseDto } from './dto/chat.dto';
 
@@ -26,5 +27,16 @@ export class ChatController {
   @Post()
   async createChatRoom(@Req() req, @Body() dto: CreateChatRoomDto): Promise<CreateChatRoomResponseDto> {
     return this.chatService.createChatRoom(req, dto);
+  }
+
+  @Post(':id/invite')
+
+  async inviteToRoom(@Req() req, @Param('id') id: string, @Body('userId') userId: string) {
+    return this.chatService.inviteToRoom(req, id, userId);
+  }
+
+  @Post(':id/leave')
+  async leaveRoom(@Req() req, @Param('id') id: string) {
+    return this.chatService.leaveRoom(req, id);
   }
 }

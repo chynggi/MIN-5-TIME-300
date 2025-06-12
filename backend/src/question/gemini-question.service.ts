@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { VectorDbService } from '../vector-db/vector-db.service';
 
 export interface UserProfile {
   mbti: string;
@@ -23,6 +24,12 @@ export interface MetaInfo {
     mostReactedQuestionTypes: string[];
     leastReactedQuestionTypes: string[];
   };
+}
+
+// 페르소나/목표 정보 타입
+export interface PersonaAndGoals {
+  persona?: string;
+  goals?: string[];
 }
 
 const SYSTEM_INSTRUCTIONS = `당신은 사용자의 일기 작성을 돕는 질문 생성 전문가입니다.
@@ -50,12 +57,20 @@ const SYSTEM_INSTRUCTIONS = `당신은 사용자의 일기 작성을 돕는 질�
 최근 일기 내용과 중복되지 않도록 주의하세요.
 요일과 시간대를 고려하여 적절한 질문을 생성하세요.`;
 
+// userId를 받아 벡터 DB 기반 트렌드 토픽을 프롬프트에 포함
 export async function generateDailyQuestion(
   userProfile: UserProfile,
   recentJournals: RecentJournal[],
-  metaInfo: MetaInfo
+  metaInfo: MetaInfo,
+  userId?: string,
+  vectorDbService?: VectorDbService,
+  personaAndGoals?: PersonaAndGoals // 추가: 페르소나/목표 정보
 ): Promise<string> {
-  const userPrompt = createPromptTemplate(userProfile, recentJournals, metaInfo);
+  let trendTopics: string[] = [];
+  if (userId && vectorDbService) {
+    trendTopics = await vectorDbService.getWeeklyTrendTopics(userId, 2);
+  }
+  const userPrompt = createPromptTemplate(userProfile, recentJournals, metaInfo, trendTopics, personaAndGoals);
   const fullPrompt = `${SYSTEM_INSTRUCTIONS}\n\n${userPrompt}`;
 
   const apiKey = process.env.GEMINI_API_KEY || '';
@@ -83,8 +98,12 @@ export async function generateDailyQuestion(
       result.candidates[0].content.parts &&
       result.candidates[0].content.parts.length > 0
     ) {
-      const text = result.candidates[0].content.parts[0].text;
-      return text.trim();
+      const text = result.candidates[0].content.parts[0].text.trim();
+      // 자동 품질 필터 적용
+      if (!autoQualityFilter(text)) {
+        throw new Error('자동 품질 필터에 의해 차단된 질문');
+      }
+      return text;
     } else {
       throw new Error('Gemini API에서 유효한 응답을 받지 못했습니다.');
     }
@@ -96,7 +115,9 @@ export async function generateDailyQuestion(
 function createPromptTemplate(
   userProfile: UserProfile,
   recentJournals: RecentJournal[],
-  metaInfo: MetaInfo
+  metaInfo: MetaInfo,
+  trendTopics: string[] = [],
+  personaAndGoals?: PersonaAndGoals
 ): string {
   const mbtiInfo = `사용자의 MBTI는 ${userProfile.mbti}입니다.`;
   const interestsInfo = `사용자의 주요 관심사: ${userProfile.interests.join(', ')}`;
@@ -113,17 +134,23 @@ function createPromptTemplate(
   const reactionInfo =
     `사용자가 가장 많이 반응한 질문 유형: ${metaInfo.reactionStats.mostReactedQuestionTypes.join(', ')}\n` +
     `사용자가 가장 적게 반응한 질문 유형: ${metaInfo.reactionStats.leastReactedQuestionTypes.join(', ')}`;
+  const trendInfo = trendTopics.length > 0 ? `\n# 주간 트렌드\n${trendTopics.join(', ')}` : '';
+  const personaInfo = personaAndGoals?.persona ? `\n# 페르소나\n${personaAndGoals.persona}` : '';
+  const goalsInfo = personaAndGoals?.goals && personaAndGoals.goals.length > 0 ? `\n# 올해 목표\n${personaAndGoals.goals.join(', ')}` : '';
 
   return `
 # 사용자 정보
 ${mbtiInfo}
 ${interestsInfo}
+${personaInfo}
+${goalsInfo}
 
 # 사용자 라이프스타일
 ${lifestyleInfo}
 
 # 최근 일기 (${recentJournals.length}개)
 ${recentJournalsInfo}
+${trendInfo}
 
 # 현재 메타 정보
 ${dayInfo}
@@ -133,6 +160,20 @@ ${reactionInfo}
 질문은 사용자가 5분 동안 깊이 생각하고 감정을 표현할 수 있도록 설계되어야 합니다.
 최근 질문과 중복되지 않도록 주의하세요.
 `;
+}
+
+/**
+ * 자동 품질 필터: 금칙어, 부적절/비속어, 반복/무의미 등
+ */
+function autoQualityFilter(question: string): boolean {
+  const bannedWords = ['욕설', '비속어', '금칙어']; // 실제 금칙어 리스트로 확장
+  if (!question || question.length < 3) return false;
+  for (const word of bannedWords) {
+    if (question.includes(word)) return false;
+  }
+  // 반복/무의미(예: 같은 글자 반복 등) 필터 예시
+  if (/^(.)\1{2,}$/.test(question)) return false;
+  return true;
 }
 
 function getDefaultQuestion(dayOfWeek: string): string {

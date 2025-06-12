@@ -5,6 +5,7 @@ import { generateDailyQuestion, UserProfile, RecentJournal, MetaInfo } from './g
 import { PrismaService } from '../prisma.service';
 import { ProfileService } from '../profile/profile.service';
 import { DiaryService } from '../diary/diary.service';
+import { VectorDbService } from '../vector-db/vector-db.service';
 
 @Injectable()
 export class QuestionService {
@@ -12,6 +13,7 @@ export class QuestionService {
     private readonly prisma: PrismaService,
     private readonly profileService: ProfileService,
     private readonly diaryService: DiaryService,
+    private readonly vectorDbService: VectorDbService, // 추가
   ) {}
 
   async getToday(req: any): Promise<TodayQuestionDto> {
@@ -80,8 +82,14 @@ export class QuestionService {
       },
     };
 
-    // 4. Gemini API 호출
-    const questionText = await generateDailyQuestion(userProfile, recentJournals, metaInfo);
+    // 4. Gemini API 호출 (벡터 DB 기반 트렌드 포함)
+    const questionText = await generateDailyQuestion(
+      userProfile,
+      recentJournals,
+      metaInfo,
+      userId,
+      this.vectorDbService
+    );
     return {
       id: 'gemini-q-' + Date.now(),
       question: questionText,
