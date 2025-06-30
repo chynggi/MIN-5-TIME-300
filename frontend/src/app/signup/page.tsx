@@ -1,5 +1,7 @@
 "use client";
 import React, { useState } from "react";
+import { useApi } from "@/lib/useApi";
+import { useRouter } from "next/navigation";
 
 const SignupPage = () => {
   // 관심사 카테고리 및 항목 프리셋
@@ -83,6 +85,7 @@ const SignupPage = () => {
   const [form, setForm] = useState({
     email: "",
     password: "",
+    passwordConfirm: "",
     username: "",
     birth: "",
     height: "",
@@ -134,6 +137,8 @@ const SignupPage = () => {
     }
   };
 
+  const signupApi = useApi("post", "/signup");
+  const router = useRouter();
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -158,13 +163,12 @@ const SignupPage = () => {
         interests,
         lifestyle,
       };
-      const res = await fetch("/api/v1/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("회원가입에 실패했습니다.");
+      const data = await signupApi.request(payload);
+      if (data && data.token) {
+        localStorage.setItem("token", data.token);
+      }
       setSuccess(true);
+      router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "오류가 발생했습니다.");
     } finally {
@@ -229,6 +233,24 @@ const SignupPage = () => {
                 name="username"
                 placeholder="닉네임"
                 value={form.username}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              />
+              <input
+                type="password"
+                name="password"
+                placeholder="비밀번호"
+                value={form.password}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+              />
+              <input
+                type="password"
+                name="passwordConfirm"
+                placeholder="비밀번호 확인"
+                value={form.passwordConfirm}
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"

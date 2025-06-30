@@ -13,9 +13,13 @@ import { NotificationModule } from './notification/notification.module';
 import { PrismaModule } from './prisma.module';
 import { Community2Module } from './community2/community2.module';
 import { ChatGateway } from './chat/chat.gateway';
-
+import { JwtModule } from '@nestjs/jwt';
 @Module({
   imports: [
+    JwtModule.register({
+      secret: process.env.JWT_SECRET, // .env에 JWT_SECRET=your_secret_key
+      signOptions: { expiresIn: '1d' },
+    }),
     PrismaModule,
     AuthModule,
     ProfileModule,

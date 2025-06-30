@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import { useApi } from "@/lib/useApi";
 import { useRouter } from "next/navigation";
 import AuthLayout from "@/components/AuthLayout";
 
@@ -16,19 +17,15 @@ const LoginPage = () => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const loginApi = useApi("post", "/login");
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
-      const { accessToken } = await res.json();
-      localStorage.setItem("token", accessToken);
+      const data = await loginApi.request(form);
+      if (!data || !data.token) throw new Error("이메일 또는 비밀번호가 올바르지 않습니다.");
+      localStorage.setItem("token", data.token);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "로그인 중 오류가 발생했습니다.");

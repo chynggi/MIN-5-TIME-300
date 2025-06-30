@@ -31,6 +31,15 @@ export default function Navigation() {
             </li>
           ))}
         </ul>
+        <button
+          onClick={() => {
+            localStorage.removeItem("token");
+            window.location.href = "/login";
+          }}
+          className="ml-4 px-3 py-2 rounded-md text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200"
+        >
+          로그아웃
+        </button>
       </div>
     </nav>
   );

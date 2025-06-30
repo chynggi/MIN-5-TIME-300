@@ -38,15 +38,20 @@ export class AuthService {
   async login(dto: LoginDto): Promise<AuthResponseDto> {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (!user) throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
+    console.log('로그인 시도:', dto.email); // 디버깅용 로그
+    console.log('DB에서 조회된 사용자:', user); // 디버깅용 로그
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
+    console.log('비밀번호 검증 결과:', valid); // 디버깅용 로그
     if (!valid) throw new UnauthorizedException('이메일 또는 비밀번호가 올바르지 않습니다.');
     const token = this.jwtService.sign({ sub: user.id, email: user.email });
-    return {
+    const result = {
       id: user.id,
       email: user.email,
       username: user.username,
       token,
     };
+    console.log('로그인 반환값:', result);
+    return result;
   }
 
   async logout(req: any): Promise<LogoutResponseDto> {
