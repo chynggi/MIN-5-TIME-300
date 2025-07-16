@@ -66,6 +66,8 @@ export class CommunityService {
           support: d.reactions?.filter(r => r.reactionType === 'support').length ?? 0,
         },
         commentCount: d.communityComments?.length ?? 0,
+        lat: d.lat ?? undefined,
+        lng: d.lng ?? undefined,
       })),
       totalCount,
       page,
@@ -193,6 +195,8 @@ export class CommunityService {
         support: diary.reactions?.filter(r => r.reactionType === 'support').length ?? 0,
       },
       commentCount: diary.communityComments?.length ?? 0,
+      lat: diary.lat,
+      lng: diary.lng,
     };
   }
 

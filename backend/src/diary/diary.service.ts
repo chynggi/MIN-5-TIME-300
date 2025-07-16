@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { generateDailyQuestion } from '../question/gemini-question.service';
 import type { Multer } from 'multer';
 import { CreateDiaryDto } from './dto/create-diary.dto';
 import { RateDiaryDto } from './dto/rate-diary.dto';
@@ -15,14 +16,70 @@ export class DiaryService {
   ) {}
 
   async getTodayQuestion(req: any): Promise<TodayQuestionResponseDto> {
-    // 예시: 가장 최근 질문 반환
-    const question = await this.prisma.journalQuestion.findFirst({ orderBy: { createdAt: 'desc' } });
-    if (!question) throw new NotFoundException('오늘의 질문이 없습니다.');
-    return {
-      question: question.question,
-      questionId: question.id,
-      createdAt: question.createdAt.toISOString(),
+    // 동적 Gemini 질문 생성
+    const userId = req.user.userId;
+    // 1. 사용자(User) 및 페르소나(UserPersona) 정보 조회
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        persona: true,
+        interests: true,
+        lifestyleAnswers: true,
+      },
+    });
+    // 2. 최근 일기 3개 조회 및 RecentJournal 타입 변환
+    const recentJournalsRaw = await this.prisma.journal.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+      include: { question: true },
+    });
+    const recentJournals = recentJournalsRaw.map(j => ({
+      id: j.id,
+      content: j.content,
+      date: j.createdAt.toISOString(),
+      question: j.question?.question ?? '',
+      emotionScore: j.emotionScore,
+    }));
+    // 3. 메타 정보 (MetaInfo 타입에 맞게 모든 필드 포함)
+    const metaInfo = {
+      dayOfWeek: new Date().getDay().toString(),
+      timeOfDay: 'morning', // 실제 시간대 로직 필요시 변경
+      reactionStats: {
+        mostReactedQuestionTypes: [],
+        leastReactedQuestionTypes: [],
+      },
     };
+    // 4. 페르소나/목표 정보 (UserPersona)
+    const personaAndGoals = {
+      persona: user?.persona?.persona ?? '',
+      goals: user?.persona?.goals ? JSON.parse(user.persona.goals) : [],
+    };
+    // 5. userProfile: UserProfile 타입에 맞게 변환 (null 체크)
+    if (!user) throw new NotFoundException('사용자 정보를 찾을 수 없습니다.');
+    const userProfile = {
+      ...user,
+      mbti: user.mbti ?? '',
+      interests: (user.interests ?? []).map(i => i.interest),
+      lifestyleAnswers: user.lifestyleAnswers ?? [],
+    };
+    try {
+      const question = await generateDailyQuestion(
+        userProfile,
+        recentJournals,
+        metaInfo,
+        userId,
+        this.vectorDbService,
+        personaAndGoals
+      );
+      return {
+        question,
+        questionId: '', // Gemini 질문에는 id가 없으므로 필요시 생성
+        createdAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      throw new NotFoundException('오늘의 질문을 생성하지 못했습니다.');
+    }
   }
 
   async getDiaries(req: any, query: any): Promise<DiaryListResponseDto> {

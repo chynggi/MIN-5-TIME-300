@@ -22,4 +22,10 @@ export class CreateDiaryDto {
   @IsInt()
   @Min(1)
   writingDuration: number;
+  
+  @IsOptional()
+  lat?: number;
+
+  @IsOptional()
+  lng?: number;
 }

@@ -8,6 +8,8 @@ export class DiaryListItemDto {
   mediaUrl?: string;
   mediaType?: string;
   question: string;
+  lat?: number;
+  lng?: number;
 }
 
 export class DiaryListResponseDto {
@@ -35,4 +37,6 @@ export class DiaryDetailResponseDto {
   question: string;
   writingDuration: number;
   reactions: DiaryDetailReactionDto[];
+  lat?: number;
+  lng?: number;
 }

@@ -10,8 +10,7 @@ export class CommunityDiaryReactionCountsDto {
   hug: number;
   support: number;
 }
-
-export class CommunityDiaryListItemDto {
+export interface CommunityDiaryListItemDto {
   id: string;
   content: string;
   createdAt: string;
@@ -23,6 +22,8 @@ export class CommunityDiaryListItemDto {
   user: CommunityDiaryUserDto;
   reactionCounts: CommunityDiaryReactionCountsDto;
   commentCount: number;
+  lat?: number;
+  lng?: number;
 }
 
 export class CommunityDiaryListResponseDto {
