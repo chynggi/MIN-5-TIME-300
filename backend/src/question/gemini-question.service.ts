@@ -20,6 +20,7 @@ export interface RecentJournal {
 export interface MetaInfo {
   dayOfWeek: string;
   timeOfDay: string;
+  weather?: string; // 날씨 정보 추가
   reactionStats: {
     mostReactedQuestionTypes: string[];
     leastReactedQuestionTypes: string[];
@@ -131,6 +132,7 @@ function createPromptTemplate(
     )
     .join('\n\n');
   const dayInfo = `오늘은 ${metaInfo.dayOfWeek}이고, 현재 시간대는 ${metaInfo.timeOfDay}입니다.`;
+  const weatherInfo = metaInfo.weather ? `오늘의 날씨는 ${metaInfo.weather}입니다.` : '';
   const reactionInfo =
     `사용자가 가장 많이 반응한 질문 유형: ${metaInfo.reactionStats.mostReactedQuestionTypes.join(', ')}\n` +
     `사용자가 가장 적게 반응한 질문 유형: ${metaInfo.reactionStats.leastReactedQuestionTypes.join(', ')}`;
@@ -153,7 +155,9 @@ ${recentJournalsInfo}
 ${trendInfo}
 
 # 현재 메타 정보
+
 ${dayInfo}
+${weatherInfo}
 ${reactionInfo}
 
 위 정보를 바탕으로 사용자에게 적합한 짧은 일기 질문(25자 내외)을 1개만 생성해주세요.

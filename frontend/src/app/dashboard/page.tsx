@@ -306,13 +306,13 @@ export default function DashboardPage() {
         <section className="bg-white rounded-xl shadow p-4 border">
           <div className="flex justify-between items-center mb-2">
             <h2 className="font-bold text-lg">최근 커뮤니티</h2>
-            <Link href="/community" className="text-blue-600 text-sm">더보기</Link>
+            <Link href="/community2" className="text-blue-600 text-sm">더보기</Link>
           </div>
           {loading ? <div>로딩 중...</div> : error ? <div className="text-red-500">{error}</div> : (
             <ul className="space-y-2">
               {communities.length === 0 ? <li>추천된 질문이 없습니다.</li> : communities.map(c => (
                 <li key={c.id} className="border rounded p-2 hover:bg-gray-50">
-                  <Link href={`/community/${c.id}`}>{c.question || c.content.slice(0, 20)} <span className="text-xs text-gray-400">- {c.user?.username}</span></Link>
+                  <Link href={`/community2/${c.id}`}>{c.question || c.content.slice(0, 20)} <span className="text-xs text-gray-400">- {c.user?.username}</span></Link>
                 </li>
               ))}
             </ul>
@@ -352,7 +352,7 @@ export default function DashboardPage() {
           <span className="text-lg">📦</span>
           <span className="text-xs">Diary</span>
         </Link>
-        <Link href="/community" className="flex flex-col items-center">
+  <Link href="/community2" className="flex flex-col items-center">
           <span className="text-lg">💬</span>
           <span className="text-xs">Community</span>
         </Link>

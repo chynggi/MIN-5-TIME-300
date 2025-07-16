@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 const sidebarItems = [
   { href: "/dashboard", label: "대시보드" },
   { href: "/diary", label: "일기" },
-  { href: "/community", label: "커뮤니티" },
+  { href: "/community2", label: "커뮤니티" },
   { href: "/chat", label: "채팅" },
   { href: "/statistics", label: "통계" },
   { href: "/notifications", label: "알림" },
