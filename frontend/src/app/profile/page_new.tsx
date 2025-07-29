@@ -159,15 +159,6 @@ export default function ProfilePage() {
     }
   };
 
-  // 위치별 하트 이모지 반환 (이미지 디자인에 맞춤)
-  const getHeartForPosition = (index: number): string => {
-    const hearts = [
-      '💛', '🧡', '❤️', '💜', '💙', '💚', 
-      '💛', '🧡', '❤️', '💜', '💙', '💚'
-    ];
-    return hearts[index] || '🤍';
-  };
-
   // 등급별 하트 색상 반환
   const getHeartColor = (level: number): string => {
     const colors = [
@@ -179,45 +170,34 @@ export default function ProfilePage() {
     return colors[Math.min(level - 1, 11)] || '#8B4513';
   };
 
-  // 등급별 하트 이모지 반환
-  const getHeartEmoji = (level: number): string => {
-    const hearts = [
-      '🖤', '🖤', '🖤', // Bronze - 검은 하트
-      '🤍', '🤍', '🤍', // Silver - 흰 하트  
-      '💛', '🧡', '❤️', // Gold - 노랑, 주황, 빨강
-      '💜', '💙', '💖'  // Platinum, Diamond - 보라, 파랑, 핑크
-    ];
-    return hearts[Math.min(level - 1, 11)] || '🖤';
-  };
-
-  // LPG 이모지 원형 배치 (이미지 참고)
-  const getLPGEmojis = () => {
-    // 12개 위치, 각도 30도씩, 0도(12시)부터 시계방향
-    const emojis = [
-      { emoji: '📚', angle: -90 },
-      { emoji: '🔥', angle: -60 },
-      { emoji: '💖', angle: -30 },
-      { emoji: '💖', angle: 0 },
-      { emoji: '💖', angle: 30 },
-      { emoji: '❤️', angle: 60 },
-      { emoji: '🧡', angle: 90 },
-      { emoji: '💛', angle: 120 },
-      { emoji: '💚', angle: 150 },
-      { emoji: '💙', angle: 180 },
-      { emoji: '🖤', angle: 210 },
-      { emoji: '⛽', angle: 240 },
-    ];
-    return emojis.map(({emoji, angle}) => {
-      const r = 75;
-      const x = 100 + r * Math.cos((angle * Math.PI) / 180);
-      const y = 100 + r * Math.sin((angle * Math.PI) / 180) + 8;
-      return { emoji, x, y };
-    });
+  // 하트 렌더링 (12개, 각 등급별로 채워짐)
+  const renderHearts = () => {
+    const hearts = [];
+    for (let i = 1; i <= 12; i++) {
+      const isFilled = i <= profile.gradeLevel;
+      const isCurrentGrade = i === profile.gradeLevel;
+      const fillPercentage = isCurrentGrade ? profile.heartProgress : (isFilled ? 100 : 0);
+      
+      hearts.push(
+        <div 
+          key={i} 
+          className={styles.heart}
+          style={{
+            background: isFilled 
+              ? `linear-gradient(90deg, ${getHeartColor(i)} ${fillPercentage}%, #ddd ${fillPercentage}%)`
+              : '#ddd'
+          }}
+        >
+          💖
+        </div>
+      );
+    }
+    return hearts;
   };
 
   if (loading) {
     return (
-      <div className={styles.container}>
+      <div className={styles.profileContainer}>
         <div className={styles.loading}>프로필을 불러오는 중...</div>
       </div>
     );
@@ -225,14 +205,17 @@ export default function ProfilePage() {
 
   if (error) {
     return (
-      <div className={styles.container}>
+      <div className={styles.profileContainer}>
         <div className={styles.error}>
           <p>{error}</p>
-          <div className={styles.devActions}>
+          <div className={styles.errorActions}>
+            <button onClick={setTempToken} className={styles.devButton}>
+              개발용 토큰 설정
+            </button>
             <button onClick={quickLogin} className={styles.devButton}>
               빠른 로그인 (test@example.com)
             </button>
-            <button onClick={() => window.location.reload()} className={styles.devButton}>
+            <button onClick={() => window.location.reload()} className={styles.retryButton}>
               다시 시도
             </button>
           </div>
@@ -242,89 +225,113 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className={styles.container}>
-      {/* 상단: 프로필 이미지/MBTI + 통계 */}
-      <div className={styles.topRow}>
-        <div className={styles.avatarBox}>
-          <div className={styles.avatarWrap}>
-            <img
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=ececec&color=bbb`}
+    <div className={styles.profileContainer}>
+      {/* 프로필 헤더 */}
+      <div className={styles.profileHeader}>
+        <div className={styles.profileImageContainer}>
+          <div className={styles.profileImage}>
+            <img 
+              src="/api/placeholder/100/100" 
               alt="프로필 이미지"
-              className={styles.avatarImg}
+              onError={(e) => {
+                e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=6366f1&color=fff`;
+              }}
             />
-            <span className={styles.mbtiBadge}>{profile.mbti}</span>
+          </div>
+          
+          {/* LPG 점수 원형 표시 */}
+          <div className={styles.lpgCircle}>
+            <div className={styles.lpgText}>
+              <span className={styles.lpgScore}>{profile.lpgScore.toFixed(1)}%</span>
+              <span className={styles.lpgGrade}>{profile.lpgGrade}</span>
+            </div>
           </div>
         </div>
-        <div className={styles.statsBox}>
-          <div className={styles.statsRow}>
-            <span className={styles.statNum}>{profile.diaryCount}</span>
-            <span className={styles.statNum}>{profile.followerCount}</span>
-            <span className={styles.statNum}>{profile.followingCount}</span>
+
+        <div className={styles.profileInfo}>
+          <div className={styles.profileName}>{profile.name}</div>
+          <div className={styles.profileMsg}>{profile.message}</div>
+          
+          {/* 하트 진행률 표시 */}
+          <div className={styles.heartsContainer}>
+            {renderHearts()}
           </div>
-          <div className={styles.statsLabelRow}>
-            <span className={styles.statLabel}>일기</span>
-            <span className={styles.statLabel}>팔로워</span>
-            <span className={styles.statLabel}>팔로잉</span>
+          
+          <div className={styles.profileStats}>
+            <div className={styles.statItem}>
+              <span className={styles.statNumber}>{profile.diaryCount}</span>
+              <span className={styles.statLabel}>일기</span>
+            </div>
+            <div 
+              className={styles.statItem} 
+              onClick={() => handleStatsClick('followers')}
+            >
+              <span className={styles.statNumber}>{profile.followerCount}</span>
+              <span className={styles.statLabel}>팔로워</span>
+            </div>
+            <div 
+              className={styles.statItem}
+              onClick={() => handleStatsClick('following')}
+            >
+              <span className={styles.statNumber}>{profile.followingCount}</span>
+              <span className={styles.statLabel}>팔로잉</span>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* 이름/메시지 */}
-      <div className={styles.profileTextBox}>
-        <div className={styles.nickname}><span role="img" aria-label="heart">💖</span>{profile.name}</div>
-        <div className={styles.bio}>{profile.message} <span role="img" aria-label="smile">😊</span></div>
-      </div>
-
-      {/* 버튼 */}
-      <div className={styles.buttonRow}>
-        <button onClick={handleEditProfile} className={styles.pinkButton}>프로필 편집</button>
-        <button onClick={handleTogglePublic} className={styles.pinkButton}>프로필 공개</button>
-      </div>
-
-      {/* LPG 점수 섹션 */}
-      <div className={styles.lpgSection}>
-        <div className={styles.lpgContainer}>
-          <div className={styles.lpgRing}>
-            <svg className={styles.lpgSvg} viewBox="0 0 200 200">
-              {/* 외부 원 */}
-              <circle
-                cx="100" cy="100" r="85"
-                fill="none"
-                stroke="#111"
-                strokeWidth="4"
-              />
-              {/* 내부 원 */}
-              <circle
-                cx="100" cy="100" r="55"
-                fill="none"
-                stroke="#111"
-                strokeWidth="4"
-              />
-              {/* 하트/이모지 배치 */}
-              {getLPGEmojis().map(({emoji, x, y}, i) => (
-                <text key={i} x={x} y={y} textAnchor="middle" fontSize="24">{emoji}</text>
-              ))}
-              {/* 중앙 LPG 점수 */}
-              <text x="100" y="110" textAnchor="middle" fontSize="28" fontWeight="bold">LPG 💖{profile.lpgScore.toFixed(1)}%</text>
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      {/* 개발용 섹션 */}
-      {error && (
-        <div className={styles.devSection}>
-          <div className={styles.errorMessage}>{error}</div>
-          <div className={styles.devActions}>
-            <button onClick={quickLogin} className={styles.devButton}>
-              빠른 로그인
+          <div className={styles.profileActions}>
+            <button 
+              onClick={handleEditProfile}
+              className={styles.editButton}
+            >
+              프로필 편집
             </button>
-            <button onClick={() => window.location.reload()} className={styles.devButton}>
-              새로고침
+            <button 
+              onClick={handleTogglePublic}
+              className={`${styles.toggleButton} ${profile.isPublic ? styles.public : styles.private}`}
+            >
+              {profile.isPublic ? '공개' : '비공개'}
             </button>
           </div>
         </div>
-      )}
+      </div>
+
+      {/* 하이라이트 섹션 */}
+      <div className={styles.highlights}>
+        <div className={styles.highlight}>
+          <div className={styles.highlightImage}>📝</div>
+          <span>일기 하이라이트</span>
+        </div>
+        <div className={styles.highlight}>
+          <div className={styles.highlightImage}>💭</div>
+          <span>감정 기록</span>
+        </div>
+        <div className={styles.highlight}>
+          <div className={styles.highlightImage}>📊</div>
+          <span>통계</span>
+        </div>
+      </div>
+
+      {/* 일기 그리드 */}
+      <div className={styles.diaryGrid}>
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div key={index} className={styles.diaryItem}>
+            <div className={styles.diaryThumbnail}>
+              <span>📔</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 개발용 - 다른 사용자 프로필 테스트 */}
+      <div className={styles.devSection}>
+        <h3>개발용 테스트</h3>
+        <button 
+          onClick={() => goToUserProfile('user123')} 
+          className={styles.devButton}
+        >
+          다른 사용자 프로필 보기
+        </button>
+      </div>
     </div>
   );
 }

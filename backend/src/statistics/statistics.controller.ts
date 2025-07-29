@@ -12,4 +12,9 @@ export class StatisticsController {
   async getDashboard(@Req() req, @Query('period') period?: 'week' | 'month' | 'year'): Promise<DashboardStatisticsDto> {
     return this.statisticsService.getDashboard(req, period);
   }
+
+  @Get('lpg-score')
+  async getLPGScore(@Req() req) {
+    return this.statisticsService.getLPGScore(req);
+  }
 }
