@@ -1,3 +1,4 @@
+
 import { Injectable } from '@nestjs/common';
 import { DashboardStatisticsDto } from './dto/dashboard.dto';
 import { PrismaService } from '../prisma.service';
@@ -5,6 +6,43 @@ import { PrismaService } from '../prisma.service';
 @Injectable()
 export class StatisticsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * LPG 점수, 등급, 레벨, 하트 진행률 반환
+   * 프론트 profile page.tsx 참고
+   */
+  async getLPGScore(req: any) {
+    const userId = req.user.userId;
+    // 예시: 일기 수, 감정 점수 등으로 LPG 점수 산출 (실제 로직은 필요에 따라 수정)
+    const diaries = await this.prisma.journal.findMany({
+      where: { userId },
+    });
+    const diaryCount = diaries.length;
+    const avgEmotion = diaryCount ? diaries.reduce((a, b) => a + (b.emotionScore || 0), 0) / diaryCount : 0;
+    // LPG 점수 산정 예시 (0~100)
+    const lpgScore = Math.min(100, (diaryCount * 5) + avgEmotion * 10);
+    // 등급/레벨 산정 예시
+    let grade = 'Bronze I';
+    let gradeLevel = 1;
+    if (lpgScore >= 90) { grade = 'Diamond'; gradeLevel = 12; }
+    else if (lpgScore >= 80) { grade = 'Platinum'; gradeLevel = 10; }
+    else if (lpgScore >= 70) { grade = 'Gold III'; gradeLevel = 9; }
+    else if (lpgScore >= 60) { grade = 'Gold II'; gradeLevel = 8; }
+    else if (lpgScore >= 50) { grade = 'Gold I'; gradeLevel = 7; }
+    else if (lpgScore >= 40) { grade = 'Silver III'; gradeLevel = 6; }
+    else if (lpgScore >= 30) { grade = 'Silver II'; gradeLevel = 5; }
+    else if (lpgScore >= 20) { grade = 'Silver I'; gradeLevel = 4; }
+    else if (lpgScore >= 15) { grade = 'Bronze III'; gradeLevel = 3; }
+    else if (lpgScore >= 10) { grade = 'Bronze II'; gradeLevel = 2; }
+    // 하트 진행률 (0~100)
+    const heartProgress = Math.round((lpgScore % 10) * 10);
+    return {
+      lpgScore: Number(lpgScore.toFixed(1)),
+      grade,
+      gradeLevel,
+      heartProgress,
+    };
+  }
 
   async getDashboard(req: any, period?: 'week' | 'month' | 'year'): Promise<DashboardStatisticsDto & { feedbackStats: any }> {
     const userId = req.user.userId;

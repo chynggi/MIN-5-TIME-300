@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, Put, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FriendService } from './friend.service';
-import { FriendListResponseDto, FriendRequestDto, FriendRequestResponseDto, FriendRespondDto, FriendRespondResponseDto } from './dto/friend.dto';
+import { FriendListResponseDto, FriendRequestDto, FriendRequestResponseDto, FriendRespondDto, FriendRespondResponseDto, RecommendFriendsResponseDto } from './dto/friend.dto';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/friends')
@@ -21,5 +21,10 @@ export class FriendController {
   @Put(':id/respond')
   async respondFriend(@Req() req, @Param('id') id: string, @Body() dto: FriendRespondDto): Promise<FriendRespondResponseDto> {
     return this.friendService.respondFriend(req, id, dto);
+  }
+  
+  @Get('recommend')
+  async recommendUsers(@Req() req): Promise<RecommendFriendsResponseDto> {
+    return this.friendService.recommendUsers(req);
   }
 }

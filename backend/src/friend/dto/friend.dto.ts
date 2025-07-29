@@ -41,3 +41,14 @@ export class FriendRespondResponseDto {
   message: string;
   status: 'accepted' | 'rejected';
 }
+// 추천 친구 응답용 DTO
+export class RecommendUserDto {
+  id: string;
+  username: string;
+  mbti: string;
+  profileImageUrl?: string;
+}
+
+export class RecommendFriendsResponseDto {
+  recommendations: RecommendUserDto[];
+}

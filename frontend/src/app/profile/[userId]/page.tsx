@@ -3,6 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import styles from '../profile.module.css';
+import api from '@/lib/axios';
 
 interface UserProfile {
   id: string;
@@ -20,49 +21,60 @@ interface UserProfile {
 export default function UserProfilePage() {
   const params = useParams();
   const router = useRouter();
-  const userId = params.userId as string;
+  const username = params.userId as string; // 실제로 username을 나타냅니다
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: 실제 API 호출로 대체
-    // 임시 데이터
-    const mockProfile: UserProfile = {
-      id: userId,
-      name: userId === 'user1' ? 'Alice' : userId === 'user2' ? 'Bob' : 'Unknown User',
-      message: userId === 'user1' ? '오늘도 좋은 하루! ✨' : userId === 'user2' ? '힘내자! 💪' : 'Hello World!',
-      diaryCount: userId === 'user1' ? 89 : userId === 'user2' ? 156 : 42,
-      followerCount: userId === 'user1' ? 245 : userId === 'user2' ? 187 : 73,
-      followingCount: userId === 'user1' ? 198 : userId === 'user2' ? 234 : 91,
-      lpgScore: userId === 'user1' ? 87.2 : userId === 'user2' ? 92.8 : 76.5,
-      isFollowing: false,
-      isPublic: true,
-      mbti: userId === 'user1' ? 'ENFP' : userId === 'user2' ? 'ISTJ' : 'INFJ'
+    setLoading(true);
+    const fetchProfile = async () => {
+      try {
+        const res = await api.get(`/profile/${username}`);
+        const data = res.data;
+        setProfile({
+          id: data.id,
+          name: data.username,
+          message: data.bio || data.introduction || '',
+          diaryCount: data.diaryCount,
+          followerCount: data.followerCount,
+          followingCount: data.followingCount,
+          lpgScore: data.lpgScore,
+          isFollowing: data.isFollowing,
+          isPublic: data.isPublic,
+          mbti: data.mbti,
+        });
+      } catch (e) {
+        console.error('프로필 조회 실패', e);
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
     };
-    
-    setTimeout(() => {
-      setProfile(mockProfile);
-      setLoading(false);
-    }, 500);
-  }, [userId]);
+    fetchProfile();
+  }, [/*userId*/ username]);
 
   const handleStatsClick = (type: 'followers' | 'following') => {
     // 공개 프로필일 때만 팔로워/팔로잉 목록 보기 가능
     if (profile?.isPublic) {
-      router.push(`/profile/follow-list?tab=${type}&userId=${userId}`);
+  router.push(`/profile/follow-list?tab=${type}&username=${username}`);
     }
   };
 
   const handleFollowToggle = () => {
-    if (profile) {
-      setProfile({
-        ...profile,
-        isFollowing: !profile.isFollowing,
-        followerCount: profile.isFollowing 
-          ? profile.followerCount - 1 
-          : profile.followerCount + 1
-      });
-    }
+    if (!profile) return;
+    const toggle = async () => {
+      try {
+        if (profile.isFollowing) {
+          await api.post(`/friends/${profile.id}/respond`, { accept: false });
+        } else {
+          await api.post('/friends/request', { userId: profile.id });
+        }
+        setProfile(prev => prev ? { ...prev, isFollowing: !prev.isFollowing, followerCount: prev.isFollowing ? prev.followerCount - 1 : prev.followerCount + 1 } : prev);
+      } catch (err) {
+        console.error('팔로우 토글 에러', err);
+      }
+    };
+    toggle();
   };
 
   if (loading) {

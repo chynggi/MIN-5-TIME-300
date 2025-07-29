@@ -101,7 +101,7 @@ const SignupPage = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
@@ -281,22 +281,42 @@ const SignupPage = () => {
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
                 />
               </div>
-              <input
-                type="text"
+              <select
                 name="job"
-                placeholder="직업"
                 value={form.job}
                 onChange={handleChange}
+                required
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-              />
-              <input
-                type="text"
+              >
+                <option value="">직업 선택</option>
+                <option value="학생">학생</option>
+                <option value="회사원">회사원</option>
+                <option value="프리랜서">프리랜서</option>
+                <option value="공무원">공무원</option>
+                <option value="자영업">자영업</option>
+                <option value="전문직">전문직(의사/변호사 등)</option>
+                <option value="교사/강사">교사/강사</option>
+                <option value="연구원">연구원</option>
+                <option value="무직">무직</option>
+                <option value="기타">기타</option>
+              </select>
+              <select
                 name="education"
-                placeholder="학력"
                 value={form.education}
                 onChange={handleChange}
+                required
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-              />
+              >
+                <option value="">학력 선택</option>
+                <option value="고등학교 졸업">고등학교 졸업</option>
+                <option value="전문대 졸업">전문대 졸업</option>
+                <option value="대학교 재학">대학교 재학</option>
+                <option value="대학교 졸업">대학교 졸업</option>
+                <option value="대학원 재학">대학원 재학</option>
+                <option value="대학원 졸업">대학원 졸업</option>
+                <option value="박사과정">박사과정</option>
+                <option value="기타">기타</option>
+              </select>
             </div>
           )}
           {step === 1 && (

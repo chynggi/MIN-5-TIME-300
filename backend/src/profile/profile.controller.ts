@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Put, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Put, Post, Req, UseGuards, Param } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { ProfileResponseDto } from './dto/profile-response.dto';
+import { ProfileResponseDto, OtherProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateInterestsDto, InterestResponseDto } from './dto/update-interests.dto';
 import { LifestyleAnswerDto } from './dto/lifestyle-answer.dto';
 import { PersonaService } from './persona.service';
@@ -51,5 +51,13 @@ export class ProfileController {
   async getPersona(@Req() req) {
     const userId = req.user.userId;
     return this.profileService.getPersonaAndGoals(userId);
+  }
+  
+  /**
+   * 타인 프로필 조회 (username으로 조회)
+   */
+  @Get(':username')
+  async getOtherProfile(@Req() req, @Param('username') username: string): Promise<OtherProfileResponseDto> {
+    return this.profileService.getOtherProfile(req, username);
   }
 }

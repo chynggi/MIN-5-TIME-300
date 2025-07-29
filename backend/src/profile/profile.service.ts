@@ -1,16 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { ProfileResponseDto } from './dto/profile-response.dto';
+import { ProfileResponseDto, OtherProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateInterestsDto, InterestResponseDto } from './dto/update-interests.dto';
 import { LifestyleAnswerDto } from './dto/lifestyle-answer.dto';
 import { PrismaService } from '../prisma.service';
 import { PersonaService } from './persona.service';
+import { StatisticsService } from '../statistics/statistics.service';
 
 @Injectable()
 export class ProfileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly personaService: PersonaService,
+  private readonly statisticsService: StatisticsService,
   ) {}
 
   async getProfile(req: any): Promise<ProfileResponseDto> {
@@ -30,6 +32,37 @@ export class ProfileService {
       profileImageUrl: user.profileImageUrl || '',
       interests: user.interests.map(i => ({ id: i.id, interest: i.interest, priority: i.priority })),
       createdAt: user.createdAt.toISOString(),
+    };
+  }
+  /**
+   * 타인 프로필 조회
+   */
+  async getOtherProfile(req: any, otherUsername: string): Promise<OtherProfileResponseDto> {
+    const currentUserId = req.user.userId;
+    // username 기반 조회
+  const otherUser = await this.prisma.user.findFirst({ where: { username: otherUsername } });
+    if (!otherUser) throw new NotFoundException('유저를 찾을 수 없습니다.');
+    const otherUserId = otherUser.id;
+    // 공개 일기 수
+    const diaryCount = await this.prisma.journal.count({ where: { userId: otherUserId, isPublic: true } });
+    // 팔로워/팔로잉 카운트
+    const followerCount = await this.prisma.friend.count({ where: { addresseeId: otherUserId, status: 'accepted' } });
+    const followingCount = await this.prisma.friend.count({ where: { requesterId: otherUserId, status: 'accepted' } });
+    // 현재 사용자 팔로우 상태
+  const isFollowing = !!(await this.prisma.friend.findFirst({ where: { requesterId: currentUserId, addresseeId: otherUserId, status: 'accepted' } }));
+    // LPG 점수 조회 (StatisticsService 이용)
+    const lpgData = await this.statisticsService.getLPGScore({ user: { userId: otherUserId } });
+    return {
+      id: otherUser.id,
+      username: otherUser.username,
+      bio: otherUser.username,
+      diaryCount,
+      followerCount,
+      followingCount,
+      lpgScore: lpgData.lpgScore,
+      isFollowing,
+      isPublic: true,
+  mbti: otherUser.mbti || '',
     };
   }
 

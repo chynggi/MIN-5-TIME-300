@@ -5,7 +5,7 @@ import { ChatService } from './chat.service';
 import { ChatRoomListResponseDto, ChatMessageListResponseDto, SendMessageDto, SendMessageResponseDto, CreateChatRoomDto, CreateChatRoomResponseDto } from './dto/chat.dto';
 
 @UseGuards(AuthGuard('jwt'))
-@Controller('api/v1/chat_rooms')
+@Controller('api/v1/chatRooms')
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
@@ -37,6 +37,12 @@ export class ChatController {
 
   @Post(':id/leave')
   async leaveRoom(@Req() req, @Param('id') id: string) {
+    return this.chatService.leaveRoom(req, id);
+  }
+  
+  // alias for exit
+  @Post(':id/exit')
+  async exitRoom(@Req() req, @Param('id') id: string) {
     return this.chatService.leaveRoom(req, id);
   }
 }

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
-import { FriendListResponseDto, FriendRequestDto, FriendRequestResponseDto, FriendRespondDto, FriendRespondResponseDto } from './dto/friend.dto';
+import { FriendListResponseDto, FriendRequestDto, FriendRequestResponseDto, FriendRespondDto, FriendRespondResponseDto, RecommendFriendsResponseDto } from './dto/friend.dto';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
@@ -83,5 +83,39 @@ export class FriendService {
       message: dto.accept ? '친구 요청 수락' : '친구 요청 거절',
       status: dto.accept ? 'accepted' : 'rejected',
     };
+  }
+  /**
+   * 관심사 및 라이프스타일이 비슷한 사용자 추천
+   */
+  async recommendUsers(req: any): Promise<RecommendFriendsResponseDto> {
+    const userId = req.user.userId;
+    // 현재 유저의 interests와 lifestyleAnswers 가져오기
+    const userInterests = await this.prisma.userInterest.findMany({ where: { userId } });
+    const userLifestyle = await this.prisma.lifestyleAnswer.findMany({ where: { userId } });
+    const interestSet = new Set(userInterests.map(ui => ui.interest));
+    const lifestyleSet = new Set(userLifestyle.map(ua => ua.answer));
+    // 다른 사용자들의 interests 및 lifestyle 조회
+    const otherInterests = await this.prisma.userInterest.findMany({ where: { interest: { in: Array.from(interestSet) } }, include: { user: true } });
+    const otherLifestyle = await this.prisma.lifestyleAnswer.findMany({ where: { answer: { in: Array.from(lifestyleSet) } }, include: { user: true } });
+    // 매칭 점수 계산
+    const scoreMap: Record<string, number> = {};
+    otherInterests.forEach(item => {
+      if (item.userId === userId) return;
+      scoreMap[item.userId] = (scoreMap[item.userId] || 0) + 1;
+    });
+    otherLifestyle.forEach(item => {
+      if (item.userId === userId) return;
+      scoreMap[item.userId] = (scoreMap[item.userId] || 0) + 1;
+    });
+    // 점수 높은 순 정렬
+    const sortedUserIds = Object.entries(scoreMap)
+      .sort(([, a], [, b]) => b - a)
+      .map(([uid]) => uid)
+      .slice(0, 10);
+    // 사용자 정보 조회
+    const users = await this.prisma.user.findMany({ where: { id: { in: sortedUserIds } } });
+    // DTO 반환
+    const recommendations = users.map(u => ({ id: u.id, username: u.username, mbti: u.mbti || '', profileImageUrl: u.profileImageUrl || undefined }));
+    return { recommendations };
   }
 }

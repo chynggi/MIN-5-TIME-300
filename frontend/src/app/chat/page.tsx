@@ -3,10 +3,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/axios";
 
+// 서버 응답에 맞춘 ChatRoom 인터페이스
 interface ChatRoom {
   id: string;
   name: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export default function ChatListPage() {
@@ -16,8 +18,8 @@ export default function ChatListPage() {
 
   useEffect(() => {
     api
-      .get("/chat/rooms")
-      .then((res) => setRooms(res.data.rooms))
+      .get("/chatRooms")
+      .then((res) => setRooms(res.data.chatRooms))
       .catch(() => setError("채팅방 목록을 불러오지 못했습니다."))
       .finally(() => setLoading(false));
   }, []);

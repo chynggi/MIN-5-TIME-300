@@ -18,7 +18,7 @@ export default function FollowListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab = searchParams.get('tab') || 'followers';
-  const userId = searchParams.get('userId'); // 타인 프로필에서 온 경우
+   const username = searchParams.get('username'); // 실제로는 username
   
   const [followers, setFollowers] = useState<User[]>([]);
   const [following, setFollowing] = useState<User[]>([]);
@@ -31,7 +31,7 @@ export default function FollowListPage() {
   const loadFriendData = async () => {
     setLoading(true);
     try {
-      if (userId) {
+  if (username) {
         // 타인의 팔로워/팔로잉 목록 (별도 API 필요)
         // TODO: 타인의 친구 목록 조회 API 구현 필요
         setFollowers([]);
@@ -64,8 +64,8 @@ export default function FollowListPage() {
     router.push(`/profile/follow-list?${params.toString()}`);
   };
 
-  const handleUserClick = (userId: string) => {
-    router.push(`/profile/${userId}`);
+  const handleUserClick = (username: string) => {
+    router.push(`/profile/${username}`);
   };
 
   const handleFollowToggle = async (targetUserId: string, currentlyFollowing: boolean) => {
@@ -129,11 +129,11 @@ export default function FollowListPage() {
           ← 뒤로
         </button>
         <h1 className={styles.editTitle}>
-          {userId ? '친구 목록' : (tab === 'followers' ? '팔로워' : '팔로잉')}
+           {username ? '친구 목록' : (tab === 'followers' ? '팔로워' : '팔로잉')}
         </h1>
       </div>
 
-      {!userId && (
+  {!username && (
         <div className={styles.tabContainer}>
           <button 
             className={`${styles.tab} ${tab === 'followers' ? styles.tabActive : ''}`}
@@ -153,7 +153,7 @@ export default function FollowListPage() {
       <div className={styles.userList}>
         {currentList.length === 0 ? (
           <div className={styles.emptyState}>
-            {userId 
+             {username 
               ? '친구 목록이 비공개입니다.' 
               : (tab === 'followers' ? '팔로워가 없습니다' : '팔로잉한 사용자가 없습니다')
             }
@@ -163,7 +163,7 @@ export default function FollowListPage() {
             <div key={user.id} className={styles.userItem}>
               <div 
                 className={styles.userInfo}
-                onClick={() => handleUserClick(user.id)}
+                  onClick={() => handleUserClick(user.name)}
               >
                 <div className={styles.userAvatar}>
                   {user.mbti || '👤'}
@@ -175,7 +175,7 @@ export default function FollowListPage() {
                   )}
                 </div>
               </div>
-              {!userId && user.status === 'accepted' && (
+               {!username && user.status === 'accepted' && (
                 <button 
                   className={`${styles.followBtn} ${
                     tab === 'followers' 
