@@ -22,6 +22,11 @@ export class FriendController {
   async respondFriend(@Req() req, @Param('id') id: string, @Body() dto: FriendRespondDto): Promise<FriendRespondResponseDto> {
     return this.friendService.respondFriend(req, id, dto);
   }
+
+  @Post(':id/respond')
+  async respondFriendPost(@Req() req, @Param('id') id: string, @Body() dto: FriendRespondDto): Promise<FriendRespondResponseDto> {
+    return this.friendService.respondFriend(req, id, dto);
+  }
   
   @Get('recommend')
   async recommendUsers(@Req() req): Promise<RecommendFriendsResponseDto> {

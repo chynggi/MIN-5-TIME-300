@@ -45,6 +45,28 @@ export class ChatService {
           : undefined,
         unreadCount: 0, // 추후 구현
       })),
+      rooms: rooms.map(r => ({
+        id: r.id,
+        name: r.name,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+        participants: r.participants.map(p => ({
+          id: p.user.id,
+          username: p.user.username,
+          profileImageUrl: p.user.profileImageUrl || undefined,
+        })),
+        lastMessage: r.messages[0]
+          ? {
+              content: r.messages[0].content,
+              createdAt: r.messages[0].createdAt.toISOString(),
+              sender: {
+                id: r.messages[0].sender.id,
+                username: r.messages[0].sender.username,
+              },
+            }
+          : undefined,
+        unreadCount: 0, // 추후 구현
+      })),
     };
   }
 

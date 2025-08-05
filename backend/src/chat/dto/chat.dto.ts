@@ -27,6 +27,7 @@ export class ChatRoomListItemDto {
 
 export class ChatRoomListResponseDto {
   chatRooms: ChatRoomListItemDto[];
+  rooms?: ChatRoomListItemDto[]; // 호환성을 위한 추가 프로퍼티
 }
 
 export class ChatMessageDto {

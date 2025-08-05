@@ -39,7 +39,7 @@ export class FriendRespondDto {
 export class FriendRespondResponseDto {
   success: boolean;
   message: string;
-  status: 'accepted' | 'rejected';
+  status: 'accepted' | 'rejected' | 'removed';
 }
 // 추천 친구 응답용 DTO
 export class RecommendUserDto {

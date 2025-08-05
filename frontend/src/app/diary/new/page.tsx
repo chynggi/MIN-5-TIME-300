@@ -3,56 +3,111 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
 import Link from "next/link";
+import { SpotifyTrack as SpotifyTrackType, DiarySettings as DiarySettingsType } from "@/types/diary";
+
+// Import new components
+import ImageUpload from "@/components/diary/ImageUpload";
+import EmotionVoice from "@/components/diary/EmotionVoice";
+import MusicSetting from "@/components/diary/MusicSetting";
+import WritingMode from "@/components/diary/WritingMode";
+import DiarySettings from "@/components/diary/DiarySettings";
+import AIQuestionWriter from "@/components/diary/AIQuestionWriter";
+import FreeWriter from "@/components/diary/FreeWriter";
+
+interface SpotifyTrack {
+  id: string;
+  name: string;
+  artists: { name: string }[];
+  preview_url: string | null;
+  external_urls: { spotify: string };
+  album: {
+    images: { url: string }[];
+  };
+}
 
 export default function NewDiaryPage() {
   const router = useRouter();
-  const [todayQuestion, setTodayQuestion] = useState<string>("");
-  const [questionId, setQuestionId] = useState<string>("");
-  const [content, setContent] = useState("");
-  const [emotion, setEmotion] = useState("😊");
-  const [isPublic, setIsPublic] = useState(true);
+  
+  // Current view state
+  const [currentView, setCurrentView] = useState<"main" | "ai-question" | "free-write">("main");
+  
+  // Main form data
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [emotion, setEmotion] = useState("😊");
+  const [voiceRecord, setVoiceRecord] = useState<Blob | null>(null);
+  const [selectedMusic, setSelectedMusic] = useState<SpotifyTrack | null>(null);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [questionId, setQuestionId] = useState("");
+  
+  // Settings
+  const [diarySettings, setDiarySettings] = useState({
+    postVisibility: "public" as "private" | "public" | "friends",
+    contentVisibility: "public" as "public" | "private",
+    weather: "sunny" as "sunny" | "cloudy" | "rainy" | "snowy"
+  });
+  
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    api.get("/diaries/today-question")
-      .then(res => {
-        setTodayQuestion(res.data.question);
-        setQuestionId(res.data.questionId);
-      })
-      .catch(() => {
-        setTodayQuestion("오늘의 질문을 불러오지 못했습니다.");
-      });
-  }, []);
-
-  const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setImage(e.target.files[0]);
-      setPreview(URL.createObjectURL(e.target.files[0]));
+  const handleImageSelect = (file: File | null) => {
+    setImage(file);
+    if (file) {
+      setPreview(URL.createObjectURL(file));
+    } else {
+      setPreview(null);
     }
   };
-  const handleRemoveImage = () => {
-    setImage(null);
-    setPreview(null);
+
+  const handleWritingModeSelect = (mode: "question" | "free") => {
+    if (mode === "question") {
+      setCurrentView("ai-question");
+    } else {
+      setCurrentView("free-write");
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string }) => {
+    setTitle(data.title);
+    setContent(data.content);
+    setQuestionId(data.questionId);
+    setCurrentView("main");
+  };
+
+  const handleFreeWriteComplete = (data: { title: string; content: string }) => {
+    setTitle(data.title);
+    setContent(data.content);
+    setCurrentView("main");
+  };
+
+  const handleSubmit = async () => {
+    if (!title.trim() || !content.trim()) {
+      setError("제목과 내용을 모두 입력해주세요.");
+      return;
+    }
+
     setLoading(true);
     setError("");
+    
     try {
       const formData = new FormData();
+      formData.append("title", title);
       formData.append("content", content);
-      formData.append("questionId", questionId);
-      formData.append("isPublic", String(isPublic));
       formData.append("emotion", emotion);
+      formData.append("postVisibility", diarySettings.postVisibility);
+      formData.append("contentVisibility", diarySettings.contentVisibility);
+      formData.append("weather", diarySettings.weather);
+      
+      if (questionId) formData.append("questionId", questionId);
       if (image) formData.append("image", image);
-      // writingDuration 등 추가 가능
+      if (voiceRecord) formData.append("voice", voiceRecord);
+      if (selectedMusic) formData.append("musicData", JSON.stringify(selectedMusic));
+
       await api.post("/diaries", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      
       router.push("/diary");
     } catch (err: any) {
       setError("일기 저장에 실패했습니다.");
@@ -61,55 +116,124 @@ export default function NewDiaryPage() {
     }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col items-center bg-gradient-to-br from-blue-50 to-pink-50 py-6">
-      <div className="w-full max-w-md md:max-w-lg bg-white rounded-xl shadow p-4">
-        <h2 className="text-xl font-bold mb-2">오늘의 일기</h2>
-        <div className="mb-2">
-          <span className="font-semibold">오늘의 질문:</span> <span className="text-blue-600">{todayQuestion}</span>
-        </div>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <textarea
-            className="border rounded p-2 w-full min-h-[100px]"
-            placeholder="오늘의 감정, 경험, 생각을 자유롭게 적어보세요."
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            maxLength={500}
-            required
+  // Main composition view
+  if (currentView === "main") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
+        <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-xl font-bold text-gray-800">오늘의 일기</h1>
+            <span className="text-sm text-gray-500">{new Date().toLocaleDateString('ko-KR')}</span>
+          </div>
+
+          {/* Image Upload Component */}
+          <ImageUpload onImageSelect={handleImageSelect} preview={preview} />
+
+          {/* Emotion & Voice Component */}
+          <EmotionVoice 
+            emotion={emotion}
+            onEmotionChange={setEmotion}
+            onVoiceRecord={setVoiceRecord}
           />
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-1">
-              <span>감정</span>
-              <select value={emotion} onChange={e => setEmotion(e.target.value)} className="rounded border px-2 py-1">
-                <option value="😊">😊</option>
-                <option value="😢">😢</option>
-                <option value="😡">😡</option>
-                <option value="😎">😎</option>
-                <option value="😐">😐</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-1">
-              <span>공개</span>
-              <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} className="accent-blue-600" />
-            </label>
+
+          {/* Music Setting Component */}
+          <MusicSetting 
+            onMusicSelect={setSelectedMusic}
+            selectedTrack={selectedMusic}
+          />
+
+          {/* Writing Mode Selection */}
+          <WritingMode onModeSelect={handleWritingModeSelect} />
+
+          {/* Diary Settings */}
+          <DiarySettings 
+            settings={diarySettings}
+            onSettingsChange={setDiarySettings}
+          />
+
+          {/* Content Preview (if written) */}
+          {(title || content) && (
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">작성된 일기</h3>
+              {title && (
+                <div className="mb-2">
+                  <div className="text-xs text-gray-600">제목:</div>
+                  <div className="font-semibold">{title}</div>
+                </div>
+              )}
+              {content && (
+                <div>
+                  <div className="text-xs text-gray-600">내용:</div>
+                  <div className="text-sm text-gray-700 line-clamp-3">{content}</div>
+                </div>
+              )}
+              <button
+                onClick={() => {
+                  if (questionId) {
+                    setCurrentView("ai-question");
+                  } else {
+                    setCurrentView("free-write");
+                  }
+                }}
+                className="text-xs text-blue-600 underline mt-2"
+              >
+                수정하기
+              </button>
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <div className="flex gap-2">
+            <Link 
+              href="/diary" 
+              className="flex-1 bg-gray-400 text-white py-3 rounded-lg text-center hover:bg-gray-500"
+            >
+              취소
+            </Link>
+            <button
+              onClick={handleSubmit}
+              disabled={loading || !title.trim() || !content.trim()}
+              className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "저장 중..." : "일기 저장"}
+            </button>
           </div>
-          <div>
-            <label className="block mb-1 font-semibold">사진 첨부</label>
-            <input type="file" accept="image/*" onChange={handleImage} />
-            {preview && (
-              <div className="relative mt-2">
-                <img src={preview} alt="미리보기" className="w-32 h-32 object-cover rounded" />
-                <button type="button" onClick={handleRemoveImage} className="absolute top-1 right-1 bg-white rounded-full px-2 py-1 text-xs border">삭제</button>
-              </div>
-            )}
-          </div>
-          <div className="flex gap-2 mt-2">
-            <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded font-bold" disabled={loading}>{loading ? "저장 중..." : "작성 완료"}</button>
-            <Link href="/dashboard" className="flex-1 bg-gray-200 text-gray-700 py-2 rounded text-center">취소</Link>
-          </div>
-          {error && <div className="text-red-500 text-sm">{error}</div>}
-        </form>
+
+          {error && (
+            <div className="mt-3 text-red-500 text-sm text-center">{error}</div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // AI Question Writing view
+  if (currentView === "ai-question") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
+        <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
+          <AIQuestionWriter 
+            onComplete={handleAIQuestionComplete}
+            onBack={() => setCurrentView("main")}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Free Writing view
+  if (currentView === "free-write") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
+        <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
+          <FreeWriter 
+            onComplete={handleFreeWriteComplete}
+            onBack={() => setCurrentView("main")}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 }

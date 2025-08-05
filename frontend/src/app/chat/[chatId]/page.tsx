@@ -34,7 +34,7 @@ export default function ChatPage() {
 
   const fetchMessages = async () => {
     try {
-      const res = await api.get(`/api/v1/chatRooms/${chatId}/messages`);
+      const res = await api.get(`/chat/rooms/${chatId}/messages`);
       setMessages(res.data.messages || []);
     } catch (e) {
       console.error(e);
@@ -44,10 +44,10 @@ export default function ChatPage() {
   // 채팅방 참여자 정보 조회
   const fetchRoomInfo = async () => {
     try {
-      const res = await api.get('/api/v1/chatRooms');
-      const room = res.data.chatRooms.find((r: any) => r.id === chatId);
+      const res = await api.get('/chat/rooms');
+      const room = res.data.rooms?.find((r: any) => r.id === chatId) || res.data.chatRooms?.find((r: any) => r.id === chatId);
       if (room) {
-        const other = room.participants.find((p: any) => p.id !== currentUserId);
+        const other = room.participants?.find((p: any) => p.id !== currentUserId);
         if (other) setFriend(other);
       }
     } catch (e) {
@@ -69,7 +69,7 @@ export default function ChatPage() {
   const handleSend = async () => {
     if (!input.trim()) return;
     try {
-      await api.post(`/api/v1/chatRooms/${chatId}/messages`, { content: input });
+      await api.post(`/chat/rooms/${chatId}/messages`, { content: input });
       setInput('');
       fetchMessages();
     } catch (e) {
@@ -78,13 +78,13 @@ export default function ChatPage() {
   };
 
   const handleExit = async () => {
-    await api.post(`/api/v1/chatRooms/${chatId}/exit`);
+    await api.post(`/chat/rooms/${chatId}/exit`);
     router.push('/friends');
   };
 
   const handleBlock = async () => {
     if (!friend.id) return;
-    await api.post(`/api/v1/users/${friend.id}/block`);
+    await api.post(`/users/${friend.id}/block`);
     router.push('/friends');
   };
 

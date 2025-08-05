@@ -18,8 +18,8 @@ export default function ChatListPage() {
 
   useEffect(() => {
     api
-      .get("/chatRooms")
-      .then((res) => setRooms(res.data.chatRooms))
+      .get("/chat/rooms")
+      .then((res) => setRooms(res.data.rooms || res.data.chatRooms || []))
       .catch(() => setError("채팅방 목록을 불러오지 못했습니다."))
       .finally(() => setLoading(false));
   }, []);

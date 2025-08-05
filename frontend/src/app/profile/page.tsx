@@ -25,6 +25,12 @@ interface MyProfile {
   mbti: string;
 }
 
+interface CalendarDay {
+  date: number;
+  emotion?: string;
+  hasEntry: boolean;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<MyProfile>({
@@ -42,6 +48,100 @@ export default function ProfilePage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [calendarData, setCalendarData] = useState<CalendarDay[]>([]);
+
+  // 감정 이모지 매핑
+  const emotionEmojis: { [key: string]: string } = {
+    happy: "😊",
+    sad: "😢",
+    angry: "😠",
+    excited: "🤩",
+    calm: "😌",
+    tired: "😴",
+    stressed: "😰",
+    grateful: "🙏"
+  };
+
+  // 캘린더 데이터 생성 (본인의 일기 기준)
+  const generateCalendarData = async () => {
+    try {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const firstDayOfWeek = new Date(year, month, 1).getDay();
+      
+      const today = new Date();
+      const todayYear = today.getFullYear();
+      const todayMonth = today.getMonth();
+      const todayDate = today.getDate();
+      
+      const calendar: CalendarDay[] = [];
+      
+      // 빈 칸 추가 (이전 달 마지막 날들)
+      for (let i = 0; i < firstDayOfWeek; i++) {
+        calendar.push({ date: 0, emotion: "", hasEntry: false });
+      }
+      
+      // 본인의 일기 데이터 조회
+      const startDate = new Date(year, month, 1).toISOString().split('T')[0];
+      const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+      
+      let myDiaries: any[] = [];
+      try {
+        const res = await diaryApi.getDiaries({ 
+          limit: 100,
+          startDate,
+          endDate
+        });
+        myDiaries = res.diaries || [];
+      } catch (error) {
+        console.error('본인 일기 조회 실패:', error);
+      }
+      
+      // 현재 달의 날짜들 추가
+      for (let date = 1; date <= daysInMonth; date++) {
+        const currentDateObj = new Date(year, month, date);
+        const todayObj = new Date(todayYear, todayMonth, todayDate);
+        const dateString = currentDateObj.toISOString().split('T')[0];
+        
+        let emotion = "";
+        let hasEntry = false;
+        
+        // 오늘 이전 날짜들
+        if (currentDateObj < todayObj) {
+          const diary = myDiaries.find(d => d.createdAt.split('T')[0] === dateString);
+          if (diary) {
+            emotion = diary.emotion || "happy";
+            hasEntry = true;
+          }
+        } 
+        // 오늘 날짜
+        else if (currentDateObj.getTime() === todayObj.getTime()) {
+          const diary = myDiaries.find(d => d.createdAt.split('T')[0] === dateString);
+          if (diary) {
+            emotion = diary.emotion || "happy";
+            hasEntry = true;
+          }
+        }
+        // 미래 날짜들 - 자물쇠 표시
+        else {
+          emotion = "🔒";
+          hasEntry = false;
+        }
+        
+        calendar.push({
+          date,
+          emotion,
+          hasEntry
+        });
+      }
+      
+      setCalendarData(calendar);
+    } catch (error) {
+      console.error('캘린더 데이터 생성 실패:', error);
+    }
+  };
 
   useEffect(() => {
     checkConnection();
@@ -50,6 +150,10 @@ export default function ProfilePage() {
     loadDiaryStats();
     loadLPGScore();
   }, []);
+
+  useEffect(() => {
+    generateCalendarData();
+  }, [currentDate]);
 
   const checkConnection = async () => {
     const isConnected = await testConnection();
@@ -159,62 +263,6 @@ export default function ProfilePage() {
     }
   };
 
-  // 위치별 하트 이모지 반환 (이미지 디자인에 맞춤)
-  const getHeartForPosition = (index: number): string => {
-    const hearts = [
-      '💛', '🧡', '❤️', '💜', '💙', '💚', 
-      '💛', '🧡', '❤️', '💜', '💙', '💚'
-    ];
-    return hearts[index] || '🤍';
-  };
-
-  // 등급별 하트 색상 반환
-  const getHeartColor = (level: number): string => {
-    const colors = [
-      '#8B4513', '#A0522D', '#CD853F', // Bronze
-      '#C0C0C0', '#D3D3D3', '#E5E5E5', // Silver  
-      '#FFD700', '#FFA500', '#FF8C00', // Gold
-      '#E5E4E2', '#F0F0F0', '#FFFFFF'  // Platinum, Diamond
-    ];
-    return colors[Math.min(level - 1, 11)] || '#8B4513';
-  };
-
-  // 등급별 하트 이모지 반환
-  const getHeartEmoji = (level: number): string => {
-    const hearts = [
-      '🖤', '🖤', '🖤', // Bronze - 검은 하트
-      '🤍', '🤍', '🤍', // Silver - 흰 하트  
-      '💛', '🧡', '❤️', // Gold - 노랑, 주황, 빨강
-      '💜', '💙', '💖'  // Platinum, Diamond - 보라, 파랑, 핑크
-    ];
-    return hearts[Math.min(level - 1, 11)] || '🖤';
-  };
-
-  // LPG 이모지 원형 배치 (이미지 참고)
-  const getLPGEmojis = () => {
-    // 12개 위치, 각도 30도씩, 0도(12시)부터 시계방향
-    const emojis = [
-      { emoji: '📚', angle: -90 },
-      { emoji: '🔥', angle: -60 },
-      { emoji: '💖', angle: -30 },
-      { emoji: '💖', angle: 0 },
-      { emoji: '💖', angle: 30 },
-      { emoji: '❤️', angle: 60 },
-      { emoji: '🧡', angle: 90 },
-      { emoji: '💛', angle: 120 },
-      { emoji: '💚', angle: 150 },
-      { emoji: '💙', angle: 180 },
-      { emoji: '🖤', angle: 210 },
-      { emoji: '⛽', angle: 240 },
-    ];
-    return emojis.map(({emoji, angle}) => {
-      const r = 75;
-      const x = 100 + r * Math.cos((angle * Math.PI) / 180);
-      const y = 100 + r * Math.sin((angle * Math.PI) / 180) + 8;
-      return { emoji, x, y };
-    });
-  };
-
   if (loading) {
     return (
       <div className={styles.container}>
@@ -281,35 +329,126 @@ export default function ProfilePage() {
         <button onClick={handleTogglePublic} className={styles.pinkButton}>프로필 공개</button>
       </div>
 
-      {/* LPG 점수 섹션 */}
-      <div className={styles.lpgSection}>
-        <div className={styles.lpgContainer}>
-          <div className={styles.lpgRing}>
-            <svg className={styles.lpgSvg} viewBox="0 0 200 200">
-              {/* 외부 원 */}
-              <circle
-                cx="100" cy="100" r="85"
-                fill="none"
-                stroke="#111"
-                strokeWidth="4"
-              />
-              {/* 내부 원 */}
-              <circle
-                cx="100" cy="100" r="55"
-                fill="none"
-                stroke="#111"
-                strokeWidth="4"
-              />
-              {/* 하트/이모지 배치 */}
-              {getLPGEmojis().map(({emoji, x, y}, i) => (
-                <text key={i} x={x} y={y} textAnchor="middle" fontSize="24">{emoji}</text>
-              ))}
-              {/* 중앙 LPG 점수 */}
-              <text x="100" y="110" textAnchor="middle" fontSize="28" fontWeight="bold">LPG 💖{profile.lpgScore.toFixed(1)}%</text>
-            </svg>
-          </div>
+      {/* 캘린더 섹션 */}
+      <section style={{
+        background: 'linear-gradient(135deg, #fef3c7, #fcd34d)',
+        borderRadius: '12px',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        padding: '16px',
+        margin: '16px 0'
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px'
+        }}>
+          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}>
+            ◀
+          </button>
+          <h2 style={{ fontWeight: 'bold', fontSize: '18px' }}>
+            {currentDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })}
+          </h2>
+          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}>
+            ▶
+          </button>
         </div>
-      </div>
+        
+        {/* 요일 헤더 */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: '4px',
+          marginBottom: '8px'
+        }}>
+          {['일', '월', '화', '수', '목', '금', '토'].map(day => (
+            <div key={day} style={{
+              textAlign: 'center',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              padding: '8px'
+            }}>
+              {day}
+            </div>
+          ))}
+        </div>
+        
+        {/* 캘린더 날짜들 */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gap: '4px'
+        }}>
+          {calendarData.map((day, index) => {
+            if (day.date === 0) {
+              return <div key={index} style={{ aspectRatio: '1' }}></div>;
+            }
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const currentDateObj = new Date(year, month, day.date);
+            const today = new Date();
+            const todayObj = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            
+            const isPast = currentDateObj < todayObj;
+            const isToday = currentDateObj.getTime() === todayObj.getTime();
+            const isFuture = currentDateObj > todayObj;
+            
+            return (
+              <div key={index} style={{ aspectRatio: '1' }}>
+                <button
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '12px',
+                    transition: 'all 0.2s',
+                    border: 'none',
+                    cursor: isFuture ? 'not-allowed' : (isToday ? 'pointer' : (day.hasEntry ? 'pointer' : 'default')),
+                    backgroundColor: isFuture 
+                      ? '#f3f4f6'
+                      : isToday 
+                        ? '#dbeafe'
+                        : day.hasEntry 
+                          ? '#ffffff'
+                          : '#fef3c7',
+                    opacity: isFuture ? 0.6 : 1,
+                    boxShadow: day.hasEntry ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
+                    ...(isToday && { border: '2px solid #3b82f6' })
+                  }}
+                  disabled={isFuture}
+                  onClick={() => {
+                    if (isToday) {
+                      router.push('/diary/new');
+                    } else if (isPast && day.hasEntry) {
+                      console.log(`View my diary for ${day.date}`);
+                    }
+                  }}
+                >
+                  <span style={{ 
+                    fontWeight: isToday ? 'bold' : 'normal',
+                    color: isToday ? '#2563eb' : 'inherit'
+                  }}>
+                    {day.date}
+                  </span>
+                  {day.emotion && (
+                    <span style={{ fontSize: '18px', lineHeight: 'none' }}>
+                      {day.emotion === "🔒" ? day.emotion : emotionEmojis[day.emotion] || '😊'}
+                    </span>
+                  )}
+                  {isToday && !day.hasEntry && (
+                    <span style={{ fontSize: '10px', color: '#2563eb', marginTop: '4px' }}>오늘</span>
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* 개발용 섹션 */}
       {error && (

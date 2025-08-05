@@ -5,43 +5,42 @@ import { ChatService } from './chat.service';
 import { ChatRoomListResponseDto, ChatMessageListResponseDto, SendMessageDto, SendMessageResponseDto, CreateChatRoomDto, CreateChatRoomResponseDto } from './dto/chat.dto';
 
 @UseGuards(AuthGuard('jwt'))
-@Controller('api/v1/chatRooms')
+@Controller('api/v1/chat')
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
-  @Get()
+  @Get('rooms')
   async getChatRooms(@Req() req): Promise<ChatRoomListResponseDto> {
     return this.chatService.getChatRooms(req);
   }
 
-  @Get(':id/messages')
+  @Get('rooms/:id/messages')
   async getMessages(@Req() req, @Param('id') id: string, @Query() query): Promise<ChatMessageListResponseDto> {
     return this.chatService.getMessages(req, id, query);
   }
 
-  @Post(':id/messages')
+  @Post('rooms/:id/messages')
   async sendMessage(@Req() req, @Param('id') id: string, @Body() dto: SendMessageDto): Promise<SendMessageResponseDto> {
     return this.chatService.sendMessage(req, id, dto);
   }
 
-  @Post()
+  @Post('rooms')
   async createChatRoom(@Req() req, @Body() dto: CreateChatRoomDto): Promise<CreateChatRoomResponseDto> {
     return this.chatService.createChatRoom(req, dto);
   }
 
-  @Post(':id/invite')
-
+  @Post('rooms/:id/invite')
   async inviteToRoom(@Req() req, @Param('id') id: string, @Body('userId') userId: string) {
     return this.chatService.inviteToRoom(req, id, userId);
   }
 
-  @Post(':id/leave')
+  @Post('rooms/:id/leave')
   async leaveRoom(@Req() req, @Param('id') id: string) {
     return this.chatService.leaveRoom(req, id);
   }
   
   // alias for exit
-  @Post(':id/exit')
+  @Post('rooms/:id/exit')
   async exitRoom(@Req() req, @Param('id') id: string) {
     return this.chatService.leaveRoom(req, id);
   }

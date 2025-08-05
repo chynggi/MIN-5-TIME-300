@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/axios";
 import Map from "@/components/Map";
+import FriendSearch from "@/components/FriendSearch";
 // DiaryPin 타입을 이 파일에서 정의하여 lat/lng를 number | undefined로 허용
 export interface DiaryPin {
   id: string;
@@ -55,6 +56,20 @@ export default function Community2ListPage() {
 
   return (
     <>
+      {/* 헤더 추가 */}
+      <div className="bg-white shadow-sm p-4">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+              <span className="text-sm">⏰</span>
+            </div>
+            <h1 className="text-xl font-bold">5MIN Community</h1>
+          </div>
+          {/* 검색 기능 추가 */}
+          <FriendSearch />
+        </div>
+      </div>
+
       <div className="max-w-2xl mx-auto">
         <Map pins={diaryPins} />
       </div>

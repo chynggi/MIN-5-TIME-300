@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
+import FriendSearch from "@/components/FriendSearch";
 
 interface FriendUser {
   id: string;
@@ -171,37 +172,57 @@ export default function FriendsPage() {
   // 친구가 없을 때: 추천 친구 목록 렌더링
   if (friends.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
-        <h2 className="text-2xl font-bold mb-4">추천 친구</h2>
-        {loadingRecommend ? (
-          <div>추천 목록 로딩 중...</div>
-        ) : errorRecommend ? (
-          <div className="text-red-500">{errorRecommend}</div>
-        ) : (
-          <ul className="space-y-3">
-            {recommendations.map(rec => (
-              <li key={rec.id} className="flex items-center justify-between p-3 bg-white rounded shadow">
-                <div className="flex items-center gap-3">
-                  <img src={rec.profileImageUrl || '/default-avatar.png'} alt="프로필" className="w-10 h-10 rounded-full" />
-                  <div>
-                    <div className="font-semibold">{rec.username}</div>
-                    <div className="text-xs text-gray-500">{rec.mbti}</div>
+      <div className="min-h-screen bg-gray-50">
+        {/* 헤더 (추천 친구 페이지용) */}
+        <div className="bg-white shadow-sm p-4">
+          <div className="max-w-md mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                <span className="text-sm">⏰</span>
+              </div>
+              <h1 className="text-xl font-bold">5MIN</h1>
+            </div>
+            {/* 검색 기능 추가 */}
+            <FriendSearch />
+          </div>
+        </div>
+        
+        <div className="p-4">
+          <h2 className="text-2xl font-bold mb-4">추천 친구</h2>
+          {loadingRecommend ? (
+            <div>추천 목록 로딩 중...</div>
+          ) : errorRecommend ? (
+            <div className="text-red-500">{errorRecommend}</div>
+          ) : (
+            <ul className="space-y-3">
+              {recommendations.map(rec => (
+                <li key={rec.id} className="flex items-center justify-between p-3 bg-white rounded shadow">
+                  <div className="flex items-center gap-3">
+                    <img src={rec.profileImageUrl || '/default-avatar.png'} alt="프로필" className="w-10 h-10 rounded-full" />
+                    <div>
+                      <div className="font-semibold">{rec.username}</div>
+                      <div className="text-xs text-gray-500">{rec.mbti}</div>
+                    </div>
                   </div>
-                </div>
-                <button
-                  onClick={async () => {
-                    await api.post('/api/v1/friends/request', { userId: rec.id });
-                    // 요청 후 버튼 비활성화
-                    setRecommendations(rs => rs.filter(r => r.id !== rec.id));
-                  }}
-                  className="px-3 py-1 bg-blue-600 text-white rounded"
-                >
-                  친구 요청
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.post('/friends/request', { userId: rec.id });
+                        // 요청 후 버튼 비활성화
+                        setRecommendations(rs => rs.filter(r => r.id !== rec.id));
+                      } catch (error) {
+                        console.error('친구 요청 실패:', error);
+                      }
+                    }}
+                    className="px-3 py-1 bg-blue-600 text-white rounded"
+                  >
+                    친구 요청
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     );
   }
@@ -211,13 +232,15 @@ export default function FriendsPage() {
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
       <div className="bg-white shadow-sm p-4">
-        <div className="max-w-md mx-auto flex items-center justify-center">
+        <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
               <span className="text-sm">⏰</span>
             </div>
             <h1 className="text-xl font-bold">5MIN</h1>
           </div>
+          {/* 검색 기능 추가 */}
+          <FriendSearch />
         </div>
       </div>
 
