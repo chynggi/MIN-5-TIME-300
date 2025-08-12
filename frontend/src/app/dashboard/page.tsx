@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
 
 interface DiaryPreview { id: string; content: string; createdAt: string; question: string; emotion?: string; }
@@ -19,6 +20,7 @@ export default function DashboardPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarData, setCalendarData] = useState<CalendarDay[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const router = useRouter();
 
   // 감정 이모지 매핑
   const emotionEmojis: { [key: string]: string } = {
@@ -130,7 +132,16 @@ export default function DashboardPage() {
           </div>
           <h1 className="text-xl font-bold">5MIN</h1>
         </div>
-        <button className="text-yellow-500 text-xl">🔔</button>
+        <button 
+          onClick={() => {
+            window.location.href = '/notifications';
+          }}
+          className="text-yellow-500 text-xl hover:text-yellow-600 transition-colors cursor-pointer"
+          aria-label="알림 목록 보기"
+          type="button"
+        >
+          🔔
+        </button>
       </header>
 
       <div className="flex-1 p-4 space-y-6">

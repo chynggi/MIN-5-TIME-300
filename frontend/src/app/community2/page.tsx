@@ -65,8 +65,20 @@ export default function Community2ListPage() {
             </div>
             <h1 className="text-xl font-bold">5MIN Community</h1>
           </div>
-          {/* 검색 기능 추가 */}
-          <FriendSearch />
+          <div className="flex items-center gap-3">
+            {/* 검색 기능 */}
+            <FriendSearch />
+            {/* 채팅 아이콘 추가 */}
+            <Link
+              href="/chat"
+              className="p-2 rounded-full bg-green-100 hover:bg-green-200 transition-colors"
+              aria-label="채팅"
+            >
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.955 8.955 0 01-4.126-.977L3 20l1.977-5.874A8.955 8.955 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
+              </svg>
+            </Link>
+          </div>
         </div>
       </div>
 

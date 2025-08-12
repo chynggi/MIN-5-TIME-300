@@ -118,7 +118,7 @@ export class FriendService {
     };
   }
   /**
-   * 관심사 및 라이프스타일이 비슷한 사용자 추천
+   * 관심사 및 라이프스타일이 비슷한 사용자 추천 (임시: 랜덤 사용자)
    */
   async recommendUsers(req: any): Promise<RecommendFriendsResponseDto> {
     const userId = req.user.userId;
@@ -148,99 +148,73 @@ export class FriendService {
     });
     friendIds.add(userId); // 본인도 제외
 
-    // 현재 유저의 interests와 lifestyleAnswers 가져오기
-    const userInterests = await this.prisma.userInterest.findMany({ where: { userId } });
-    const userLifestyle = await this.prisma.lifestyleAnswer.findMany({ where: { userId } });
-    const interestSet = new Set(userInterests.map(ui => ui.interest));
-    const lifestyleSet = new Set(userLifestyle.map(ua => ua.answer));
-    
-    let recommendations: any[] = [];
+    // 디버깅: 전체 사용자 수 확인
+    const totalUsers = await this.prisma.user.count();
+    console.log(`[DEBUG] Total users in database: ${totalUsers}`);
 
-    // 1단계: 관심사/라이프스타일 기반 추천
-    if (interestSet.size > 0 || lifestyleSet.size > 0) {
-      // 다른 사용자들의 interests 및 lifestyle 조회
-      const otherInterests = await this.prisma.userInterest.findMany({ 
-        where: { 
-          interest: { in: Array.from(interestSet) },
-          userId: { notIn: Array.from(friendIds) }
-        }, 
-        include: { user: true } 
-      });
-      const otherLifestyle = await this.prisma.lifestyleAnswer.findMany({ 
-        where: { 
-          answer: { in: Array.from(lifestyleSet) },
-          userId: { notIn: Array.from(friendIds) }
-        }, 
-        include: { user: true } 
-      });
-      
-      // 매칭 점수 계산
-      const scoreMap: Record<string, number> = {};
-      otherInterests.forEach(item => {
-        scoreMap[item.userId] = (scoreMap[item.userId] || 0) + 1;
-      });
-      otherLifestyle.forEach(item => {
-        scoreMap[item.userId] = (scoreMap[item.userId] || 0) + 1;
-      });
-      
-      // 점수 높은 순 정렬
-      const sortedUserIds = Object.entries(scoreMap)
-        .sort(([, a], [, b]) => b - a)
-        .map(([uid]) => uid)
-        .slice(0, 5); // 일단 5명만
-      
-      if (sortedUserIds.length > 0) {
-        const users = await this.prisma.user.findMany({ 
-          where: { id: { in: sortedUserIds } },
-          select: {
-            id: true,
-            username: true,
-            mbti: true,
-            profileImageUrl: true,
-          }
-        });
-        
-        recommendations = users.map(u => ({ 
-          id: u.id, 
-          username: u.username, 
-          mbti: u.mbti || '', 
-          profileImageUrl: u.profileImageUrl || undefined 
-        }));
-      }
-    }
+    // 임시: 랜덤 사용자 추천 (복잡한 로직 대신 단순하게)
+    const randomUsers = await this.prisma.user.findMany({
+      where: {
+        id: { notIn: Array.from(friendIds) },
+        // isActive 조건 제거 - 모든 사용자 포함
+      },
+      select: {
+        id: true,
+        username: true,
+        mbti: true,
+        profileImageUrl: true,
+      },
+      take: 20, // 더 많이 가져와서 랜덤 선택
+    });
 
-    // 2단계: 추천 친구가 부족하면 랜덤 사용자 추가
-    if (recommendations.length < 5) {
-      const remainingCount = 5 - recommendations.length;
-      const existingIds = new Set([...Array.from(friendIds), ...recommendations.map(r => r.id)]);
-      
-      const randomUsers = await this.prisma.user.findMany({
-        where: {
-          id: { notIn: Array.from(existingIds) },
-          isActive: true,
-        },
+    // 만약 위 쿼리에서 결과가 없다면, 조건 없이 모든 사용자 조회 (테스트용)
+    if (randomUsers.length === 0) {
+      console.log('[DEBUG] No users found with exclusion, trying without exclusion...');
+      const allUsers = await this.prisma.user.findMany({
         select: {
           id: true,
           username: true,
           mbti: true,
           profileImageUrl: true,
         },
-        take: remainingCount * 2, // 더 많이 가져와서 랜덤 선택
+        take: 10,
       });
+      console.log(`[DEBUG] All users (first 10):`, allUsers);
       
-      // 랜덤 셔플
-      const shuffled = randomUsers.sort(() => Math.random() - 0.5);
-      const randomRecommendations = shuffled
-        .slice(0, remainingCount)
+      // 본인만 제외하고 추천
+      const filteredUsers = allUsers.filter(u => u.id !== userId);
+      console.log(`[DEBUG] Filtered users (excluding self):`, filteredUsers);
+      
+      const recommendations = filteredUsers
+        .slice(0, 8)
         .map(u => ({ 
           id: u.id, 
           username: u.username, 
           mbti: u.mbti || '', 
           profileImageUrl: u.profileImageUrl || undefined 
         }));
-      
-      recommendations = [...recommendations, ...randomRecommendations];
+
+      console.log(`[DEBUG] Final recommendations:`, recommendations);
+      return { recommendations };
     }
+    
+    // 랜덤 셔플 후 최대 8명 선택
+    const shuffled = randomUsers.sort(() => Math.random() - 0.5);
+    const recommendations = shuffled
+      .slice(0, 8)
+      .map(u => ({ 
+        id: u.id, 
+        username: u.username, 
+        mbti: u.mbti || '', 
+        profileImageUrl: u.profileImageUrl || undefined 
+      }));
+
+    // 디버깅용 로그
+    console.log(`[DEBUG] userId: ${userId}`);
+    console.log(`[DEBUG] friendIds: ${Array.from(friendIds)}`);
+    console.log(`[DEBUG] randomUsers count: ${randomUsers.length}`);
+    console.log(`[DEBUG] recommendations count: ${recommendations.length}`);
+    console.log(`[DEBUG] recommendations:`, recommendations);
 
     return { recommendations };
   }
