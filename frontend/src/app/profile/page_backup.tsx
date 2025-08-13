@@ -40,16 +40,6 @@ export default function ProfilePage() {
     isPublic: true,
     mbti: 'INFJ',
   });
-  const [profile, setProfile] = useState<MyProfile>({
-    name: 'Unknown',
-    message: 'Happy Day!! 😊',
-    diaryCount: 0,
-    followerCount: 0,
-    followingCount: 0,
-    lpgScore: 0,
-    isPublic: true,
-    mbti: 'INFJ'
-  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

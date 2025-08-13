@@ -31,7 +31,7 @@ export default function PhotoEditPage() {
       const profile = await profileApi.getProfile();
       setPhotoData(prev => ({
         ...prev,
-        currentPhoto: profile.profileImage || null
+        currentPhoto: profile.profileImageUrl || null
       }));
       setLoading(false);
     } catch (err) {

@@ -56,4 +56,19 @@ export const profileApi = {
       method: 'POST',
     });
   },
+
+  // 프로필 이미지 업로드
+  uploadProfileImage: (formData: FormData): Promise<{ success: boolean; profileImageUrl: string }> => {
+    return apiRequest('/profile/image', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+
+  // 프로필 이미지 삭제
+  deleteProfileImage: (): Promise<{ success: boolean }> => {
+    return apiRequest('/profile/image', {
+      method: 'DELETE',
+    });
+  },
 };

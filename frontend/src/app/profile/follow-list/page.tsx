@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import styles from '../profile.module.css';
 import { friendApi } from '../../../services/friend-api';
@@ -14,11 +14,11 @@ interface User {
   status?: 'pending' | 'accepted';
 }
 
-export default function FollowListPage() {
+function FollowListContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tab = searchParams.get('tab') || 'followers';
-   const username = searchParams.get('username'); // 실제로는 username
+  const username = searchParams.get('username'); // 실제로는 username
   
   const [followers, setFollowers] = useState<User[]>([]);
   const [following, setFollowing] = useState<User[]>([]);
@@ -198,5 +198,13 @@ export default function FollowListPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function FollowListPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <FollowListContent />
+    </Suspense>
   );
 }

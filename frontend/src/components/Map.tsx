@@ -66,8 +66,8 @@ export default function Map({ pins }: MapProps) {
           position={{ lat: pin.lat, lng: pin.lng }}
           icon={pin.profileImageUrl ? {
             url: pin.profileImageUrl,
-            scaledSize: new window.google.maps.Size(40, 40),
-          } as google.maps.Icon : undefined}
+            scaledSize: new (window as any).google.maps.Size(40, 40),
+          } : undefined}
         />
       ))}
     </GoogleMap>
