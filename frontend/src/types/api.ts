@@ -13,6 +13,7 @@ export interface ProfileResponse {
   profileImageUrl: string;
   interests: ProfileInterest[];
   createdAt: string;
+  lifestyle: LifestyleAnswer[];
 }
 
 export interface UpdateProfileData {

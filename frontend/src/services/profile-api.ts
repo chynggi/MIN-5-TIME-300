@@ -29,6 +29,14 @@ export const profileApi = {
     });
   },
 
+  // 라이프스타일 업데이트
+  updateLifestyle: (data: LifestyleAnswerData): Promise<{ success: boolean; message: string }> => {
+    return apiRequest('/profile/lifestyle', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
   // 라이프스타일 답변
   answerLifestyle: (data: LifestyleAnswerData): Promise<{ success: boolean; message: string }> => {
     return apiRequest('/profile/lifestyle', {

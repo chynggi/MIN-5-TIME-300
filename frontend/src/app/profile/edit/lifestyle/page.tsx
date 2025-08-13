@@ -88,7 +88,7 @@ export default function LifestyleEditPage() {
       }));
 
       await profileApi.updateLifestyle({
-        lifestyle: lifestyleData
+        answers: lifestyleData
       });
       
       router.back();
