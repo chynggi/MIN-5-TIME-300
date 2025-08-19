@@ -3,14 +3,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
+import { diaryApi } from "@/services/diary-api";
 
 interface DiaryPreview { id: string; content: string; createdAt: string; question: string; emotion?: string; likes?: number; username?: string; }
-interface FriendPrevi        </div>
-      </div>
-    </div>
-  );
-}sername: string; avatar?: string; isOnline?: boolean; hasTodayDiary?: boolean; }
-interface CalendarDay { date: number; emotion?: string; hasEntry: boolean; }
+interface FriendPreview { id: string; username: string; avatar?: string; isOnline?: boolean; hasTodayDiary?: boolean; }
+interface CalendarDay { date: number; emotion?: string; hasEntry: boolean; isLocked?: boolean; diaryId?: string; emotionScore?: number; }
 
 export default function DashboardPage() {
   const [diaries, setDiaries] = useState<DiaryPreview[]>([]);
@@ -34,8 +31,8 @@ export default function DashboardPage() {
     grateful: "🙏"
   };
 
-  // 캘린더 데이터 생성
-  const generateCalendarData = () => {
+  // 캘린더 데이터 생성 (실제 DB 연동)
+  const generateCalendarData = async () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -53,6 +50,32 @@ export default function DashboardPage() {
       calendar.push({ date: 0, emotion: "", hasEntry: false });
     }
     
+    // 해당 월의 일기 데이터 조회
+    const startDate = new Date(year, month, 1).toISOString().split('T')[0];
+    const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    
+    let diaries: any[] = [];
+    try {
+      const res = await diaryApi.getDiaries({ 
+        limit: 100,
+        startDate,
+        endDate
+      });
+      diaries = res.diaries || [];
+    } catch (error) {
+      console.error('일기 조회 실패:', error);
+    }
+    
+    // 날짜별 일기 맵 생성
+    const diaryMap = new Map();
+    diaries.forEach(diary => {
+      const diaryDate = new Date(diary.createdAt);
+      const dayKey = diaryDate.getDate();
+      if (diaryDate.getFullYear() === year && diaryDate.getMonth() === month) {
+        diaryMap.set(dayKey, diary);
+      }
+    });
+    
     // 현재 달의 날짜들 추가
     for (let date = 1; date <= daysInMonth; date++) {
       const currentDateObj = new Date(year, month, date);
@@ -60,29 +83,37 @@ export default function DashboardPage() {
       
       let emotion = "";
       let hasEntry = false;
+      let isLocked = false;
+      let diaryId = "";
+      let emotionScore = 0;
       
-      // 과거 날짜들 - 일부만 감정 데이터가 있다고 가정 (실제 일기가 작성된 날짜만)
-      if (currentDateObj < todayObj) {
-        // 과거 날짜 중 일부만 일기를 작성했다고 가정 (20% 확률로 줄임)
-        if (Math.random() > 0.8) {
-          const emotions = ["happy", "sad", "excited", "calm", "tired"];
-          emotion = emotions[Math.floor(Math.random() * emotions.length)];
-          hasEntry = true;
-        }
-      } 
-      // 오늘 날짜 - 활성화 (일기 작성 가능)
-      else if (currentDateObj.getTime() === todayObj.getTime()) {
-        hasEntry = false; // 기본적으로 미작성 상태
+      // 해당 날짜에 일기가 있는지 확인
+      const diaryForDate = diaryMap.get(date);
+      if (diaryForDate) {
+        hasEntry = true;
+        diaryId = diaryForDate.id;
+        emotionScore = diaryForDate.emotionScore || 0;
+        
+        // emotionScore를 기반으로 감정 결정
+        if (emotionScore >= 8) emotion = "happy";
+        else if (emotionScore >= 6) emotion = "excited";
+        else if (emotionScore >= 4) emotion = "calm";
+        else if (emotionScore >= 2) emotion = "sad";
+        else emotion = "angry";
       }
-      // 미래 날짜들 - 이제 일기 작성 가능 (잠금 해제)
-      else {
-        hasEntry = false; // 미래 날짜도 일기 작성 가능
+      
+      // 미래 날짜는 잠금 처리
+      if (currentDateObj > todayObj) {
+        isLocked = true;
       }
       
       calendar.push({
         date,
         emotion,
-        hasEntry
+        hasEntry,
+        isLocked,
+        diaryId,
+        emotionScore
       });
     }
     
@@ -111,7 +142,6 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-pink-50">
       {/* 메인 콘텐츠 */}
       <div className="flex-1 p-4 space-y-6">
@@ -209,31 +239,39 @@ export default function DashboardPage() {
                         ? 'bg-blue-100 border-2 border-blue-400 cursor-pointer hover:bg-blue-200'
                         : day.hasEntry 
                           ? 'bg-white shadow-sm cursor-pointer hover:bg-gray-50' 
-                          : isFuture
-                            ? 'bg-yellow-100 cursor-pointer hover:bg-yellow-200'
+                          : day.isLocked
+                            ? 'bg-gray-200 cursor-not-allowed opacity-70'
                             : 'bg-yellow-100 cursor-pointer hover:bg-yellow-200'
                     }`}
                     onClick={() => {
-                      if (isToday || isFuture) {
-                        // 오늘 또는 미래 날짜 클릭 시 일기 작성 페이지로 이동
-                        window.location.href = '/diary/new';
-                      } else if (isPast && day.hasEntry) {
-                        // 과거 작성된 일기 클릭 시 해당 일기 보기
-                        console.log(`View diary for ${day.date}`);
-                      } else if (isPast && !day.hasEntry) {
-                        // 과거 미작성 날짜도 일기 작성 가능
+                      if (day.isLocked) {
+                        // 미래 날짜는 클릭 불가
+                        return;
+                      }
+                      
+                      if (day.hasEntry && day.diaryId) {
+                        // 작성된 일기가 있으면 해당 일기 상세 페이지로 이동
+                        window.location.href = `/diary/${day.diaryId}`;
+                      } else {
+                        // 일기가 없으면 새 일기 작성 페이지로 이동
                         window.location.href = '/diary/new';
                       }
                     }}
+                    disabled={day.isLocked}
                   >
-                    <span className={`font-medium ${isToday ? 'text-blue-600 font-bold' : ''}`}>
+                    <span className={`font-medium ${isToday ? 'text-blue-600 font-bold' : day.isLocked ? 'text-gray-400' : ''}`}>
                       {day.date}
                     </span>
-                    {day.emotion && day.hasEntry && (
+                    
+                    {/* 이모티콘 또는 자물쇠 아이콘 표시 */}
+                    {day.emotion && day.hasEntry ? (
                       <span className="text-lg leading-none">
                         {emotionEmojis[day.emotion] || '😊'}
                       </span>
-                    )}
+                    ) : day.isLocked ? (
+                      <span className="text-sm text-gray-500">🔒</span>
+                    ) : null}
+                    
                     {isToday && !day.hasEntry && (
                       <span className="text-xs text-blue-600 mt-1">오늘</span>
                     )}
@@ -247,7 +285,7 @@ export default function DashboardPage() {
         {/* 가장 인기 있는 일기 배너 */}
         <section className="bg-gradient-to-r from-pink-200 to-pink-300 rounded-xl shadow p-4">
           <h2 className="font-bold text-lg mb-3 text-gray-800">🔥 가장 인기 있는 일기</h2>
-          {popularDiary ? (
+          {popularDiary && (
             <div className="bg-white rounded-lg p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -291,7 +329,9 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
-          ) : (
+          )}
+          
+          {!popularDiary && (
             <div className="bg-white rounded-lg p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -333,26 +373,6 @@ export default function DashboardPage() {
           )}
         </section>
       </div>
-
-      {/* 하단 네비게이션 */}
-      <nav className="fixed bottom-0 left-0 w-full bg-white border-t flex justify-around py-2 z-10 md:max-w-2xl md:left-1/2 md:-translate-x-1/2 md:rounded-t-xl md:shadow">
-        <Link href="/dashboard" className="flex flex-col items-center text-blue-600 font-bold">
-          <span className="text-lg">📦</span>
-          <span className="text-xs">Diary</span>
-        </Link>
-  <Link href="/community2" className="flex flex-col items-center">
-          <span className="text-lg">💬</span>
-          <span className="text-xs">Community</span>
-        </Link>
-        <Link href="/friends" className="flex flex-col items-center">
-          <span className="text-lg">�</span>
-          <span className="text-xs">Friends</span>
-        </Link>
-        <Link href="/profile" className="flex flex-col items-center">
-          <span className="text-lg">👤</span>
-          <span className="text-xs">Profile</span>
-        </Link>
-      </nav>
     </div>
   );
 }

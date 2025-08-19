@@ -9,8 +9,8 @@ interface ClientLayoutProps {
   children: ReactNode;
 }
 
-// 네비게이션을 표시하지 않을 페이지들 (로그인/회원가입만)
-const noNavPages = ["/login", "/signup"];
+// 네비게이션을 표시하지 않을 페이지들 (메인페이지, 로그인, 회원가입)
+const noNavPages = ["/", "/login", "/signup"];
 
 export default function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname();

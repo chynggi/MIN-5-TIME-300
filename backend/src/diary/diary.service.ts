@@ -166,14 +166,21 @@ export class DiaryService {
       mediaUrl = `/uploads/${filename}`;
       mediaType = file.mimetype;
     }
+    
+    // FormData로 전달된 문자열 값들을 올바른 타입으로 변환
+    const isPublic = (dto.isPublic as any) === true || (dto.isPublic as any) === 'true';
+    const writingDuration = typeof (dto.writingDuration as any) === 'string' 
+      ? parseInt((dto.writingDuration as any), 10) 
+      : dto.writingDuration;
+    
     const diary = await this.prisma.journal.create({
       data: {
         userId,
         content: dto.content,
-        isPublic: dto.isPublic ?? false,
+        isPublic,
         mediaUrl,
         mediaType,
-        writingDuration: dto.writingDuration,
+        writingDuration,
         emotionScore: 0,
       },
     });

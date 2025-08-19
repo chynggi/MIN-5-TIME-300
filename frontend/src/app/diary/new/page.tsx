@@ -40,6 +40,7 @@ export default function NewDiaryPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [questionId, setQuestionId] = useState("");
+  const [startTime, setStartTime] = useState<number>(Date.now());
   
   // Settings
   const [diarySettings, setDiarySettings] = useState({
@@ -91,16 +92,19 @@ export default function NewDiaryPage() {
     setError("");
     
     try {
+      // 작성 시간 계산 (초 단위)
+      const writingDuration = Math.floor((Date.now() - startTime) / 1000);
+      
       const formData = new FormData();
-      formData.append("title", title);
       formData.append("content", content);
-      formData.append("emotion", emotion);
-      formData.append("postVisibility", diarySettings.postVisibility);
-      formData.append("contentVisibility", diarySettings.contentVisibility);
-      formData.append("weather", diarySettings.weather);
+      formData.append("writingDuration", writingDuration.toString());
+      
+      // isPublic 설정 (postVisibility가 "private"가 아니면 public으로 설정)
+      const isPublic = diarySettings.postVisibility !== "private";
+      formData.append("isPublic", isPublic.toString());
       
       if (questionId) formData.append("questionId", questionId);
-      if (image) formData.append("image", image);
+      if (image) formData.append("file", image); // 백엔드에서 'file'로 받음
       if (voiceRecord) formData.append("voice", voiceRecord);
       if (selectedMusic) formData.append("musicData", JSON.stringify(selectedMusic));
 
