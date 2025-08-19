@@ -1,5 +1,5 @@
 // API 기본 설정
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL+ "/api/v1") || 'http://localhost:3001';
 
 // JWT 토큰 가져오기
 const getAuthToken = (): string | null => {

@@ -11,7 +11,7 @@ interface DiarySettingsProps {
 }
 
 export default function DiarySettings({ settings, onSettingsChange }: DiarySettingsProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
 
   const handlePostVisibilityChange = (visibility: "private" | "public" | "friends") => {
     const newSettings = {

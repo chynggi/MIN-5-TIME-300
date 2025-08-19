@@ -9,15 +9,8 @@ export default function Navigation() {
         <Link href="/" className="font-bold text-lg text-blue-600">
           MIN-5-TIME
         </Link>
-        <button
-          onClick={() => {
-            localStorage.removeItem("token");
-            window.location.href = "/login";
-          }}
-          className="px-3 py-2 rounded-md text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200"
-        >
-          로그아웃
-        </button>
+  {/* 로그아웃 버튼은 레이아웃/상단바에서 중복되어 제거함 */}
+  <div />
       </div>
     </nav>
   );

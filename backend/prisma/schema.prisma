@@ -16,10 +16,26 @@ model User {
   passwordHash     String
   username         String
   mbti             String?
+  bio              String?
+  location         String?
+  birthDate        String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   isActive         Boolean  @default(true)
   profileImageUrl  String?
+  // 개인정보 공개 설정
+  isProfilePublic      Boolean @default(true)
+  showMbti            Boolean @default(true)
+  showLocation        Boolean @default(true)
+  showBirthDate       Boolean @default(false)
+  allowFollowRequests Boolean @default(true)
+  showDiariesToFriends Boolean @default(true)
+  showDiariesToPublic Boolean @default(false)
+  // 라이프스타일 정보
+  workStyle           String?
+  exerciseFrequency   String?
+  sleepPattern        String?
+  socialActivity      String?
   interests        UserInterest[]
   lifestyleAnswers LifestyleAnswer[]
   journals         Journal[]
@@ -34,6 +50,9 @@ model User {
   persona          UserPersona?
   feedbackLogs     FeedbackLog[]
   publicDiaries   PublicDiary[]
+  privacySettings PrivacySettings?
+  blockedUsers    UserBlock[]      @relation("BlockedUsers")
+  blockedByUsers  UserBlock[]      @relation("BlockedByUsers")
 }
 
 
@@ -213,4 +232,34 @@ model PublicDiary {
   writingDuration Int
   lat        Float?   // 위도
   lng        Float?   // 경도
+}
+
+model PrivacySettings {
+  id                      String   @id @default(uuid())
+  user                    User     @relation(fields: [userId], references: [id])
+  userId                  String   @unique
+  profileVisibility       String   @default("FRIENDS")    // PUBLIC, FRIENDS, PRIVATE
+  mbtiVisibility          String   @default("FRIENDS")
+  locationVisibility      String   @default("FRIENDS")
+  birthDateVisibility     String   @default("PRIVATE")
+  interestsVisibility     String   @default("FRIENDS")
+  lifestyleVisibility     String   @default("FRIENDS")
+  diaryDefaultVisibility  String   @default("PRIVATE")
+  allowFollowRequests     Boolean  @default(true)
+  showOnlineStatus        Boolean  @default(true)
+  allowDirectMessages     Boolean  @default(true)
+  showInRecommendations   Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model UserBlock {
+  id          String   @id @default(uuid())
+  blocker     User     @relation("BlockedUsers", fields: [blockerId], references: [id])
+  blockerId   String
+  blocked     User     @relation("BlockedByUsers", fields: [blockedId], references: [id])
+  blockedId   String
+  createdAt   DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
 }

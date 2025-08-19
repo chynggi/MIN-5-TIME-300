@@ -42,11 +42,6 @@ export default function FriendsPage() {
   const [friends, setFriends] = useState<FriendWithDiary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // 추천 친구 상태
-  const [recommendations, setRecommendations] = useState<RecommendUser[]>([]);
-  const [loadingRecommend, setLoadingRecommend] = useState(false);
-  const [errorRecommend, setErrorRecommend] = useState<string | null>(null);
-  const [showAllRecommendations, setShowAllRecommendations] = useState(false);
   const router = useRouter();
 
   const fetchFriends = async () => {
@@ -101,35 +96,9 @@ export default function FriendsPage() {
     }
   };
 
-  // 추천 친구 목록 조회
-  const fetchRecommend = async () => {
-    setLoadingRecommend(true);
-    setErrorRecommend(null);
-    try {
-      console.log('[FRONTEND] Fetching recommendations...');
-      const res = await api.get("/friends/recommend");
-      console.log('[FRONTEND] API response:', res.data);
-      const recommendationsData = res.data.recommendations || [];
-      console.log('[FRONTEND] Recommendations:', recommendationsData);
-      setRecommendations(recommendationsData);
-    } catch (e: any) {
-      console.error('[FRONTEND] Error fetching recommendations:', e);
-      setErrorRecommend("추천 친구를 불러오지 못했습니다.");
-    } finally {
-      setLoadingRecommend(false);
-    }
-  };
-
   useEffect(() => {
     fetchFriends();
-    fetchRecommend(); // 항상 추천 친구 목록을 가져옴
   }, []);
-
-  // 추천 친구 상태 변화 로그
-  useEffect(() => {
-    console.log('[FRONTEND] Recommendations state changed:', recommendations);
-    console.log('[FRONTEND] Loading state:', loadingRecommend);
-  }, [recommendations, loadingRecommend]);
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -156,22 +125,9 @@ export default function FriendsPage() {
     router.push(`/profile/${username}`);
   };
 
-  // 친구 요청을 보내는 함수
+  // 일기 클릭 핸들러
   const handleDiaryClick = (diaryId: string) => {
     router.push(`/diary/${diaryId}`);
-  };
-
-  // 친구 요청을 보내는 함수
-  const handleFriendRequest = async (userId: string) => {
-    try {
-      await api.post('/friends/request', { userId });
-      // 요청 후 해당 사용자를 추천 목록에서 제거
-      setRecommendations(prev => prev.filter(rec => rec.id !== userId));
-      alert('친구 요청을 보냈습니다!');
-    } catch (error: any) {
-      console.error('친구 요청 실패:', error);
-      alert(error.response?.data?.message || '친구 요청에 실패했습니다.');
-    }
   };
 
   if (loading) {
@@ -205,71 +161,7 @@ export default function FriendsPage() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto p-4 space-y-6">
-        {/* 추천 친구 섹션 */}
-        {(recommendations.length > 0 || loadingRecommend) && (
-          <div className="bg-white rounded-lg p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-gray-800">추천 친구</h2>
-              {!loadingRecommend && (
-                <span className="text-sm text-gray-500">{recommendations.length}명</span>
-              )}
-            </div>
-            {loadingRecommend ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="text-gray-500">추천 친구를 찾고 있습니다...</div>
-              </div>
-            ) : errorRecommend ? (
-              <div className="text-center text-red-500 py-4">
-                {errorRecommend}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {(showAllRecommendations ? recommendations : recommendations.slice(0, 3)).map(rec => (
-                <div key={rec.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                      {rec.profileImageUrl ? (
-                        <img 
-                          src={rec.profileImageUrl} 
-                          alt={rec.username}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-gray-400 text-sm">👤</span>
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-800">{rec.username}</div>
-                      <div className="text-xs text-gray-500">{rec.mbti}</div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleFriendRequest(rec.id)}
-                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
-                  >
-                    친구 요청
-                  </button>
-                </div>
-              ))}
-              {recommendations.length > 3 && (
-                <button
-                  onClick={() => setShowAllRecommendations(!showAllRecommendations)}
-                  className="w-full py-2 text-blue-600 text-sm font-medium hover:bg-blue-50 rounded-lg transition-colors"
-                >
-                  {showAllRecommendations 
-                    ? '접기' 
-                    : `추천 친구 ${recommendations.length - 3}명 더 보기`
-                  }
-                </button>
-              )}
-            </div>
-            )}
-          </div>
-        )}
-
+      <div className="max-w-md mx-auto p-4">
         {/* 내 친구 섹션 */}
         <div className="bg-white rounded-lg shadow-sm">
           <div className="p-4 border-b border-gray-100">
@@ -287,76 +179,81 @@ export default function FriendsPage() {
                 <div className="text-xs text-gray-400 mt-1">위의 추천 친구에게 친구 요청을 보내보세요!</div>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {friends.map((friend) => (
-                  <div key={friend.id} className="flex items-center gap-3">
-                    {/* 프로필 이미지 */}
-                    <div className="relative">
+                  <div key={friend.id} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                    {/* 프로필 섹션 */}
+                    <div className="flex-shrink-0">
                       <button
                         onClick={() => handleProfileClick(friend.user.username)}
-                        className="w-12 h-12 rounded-lg overflow-hidden border-2 transition-transform hover:scale-105"
-                        style={{ borderColor: getProfileColor(friend.user.id) }}
+                        className="relative group"
                       >
-                        {friend.user.profileImageUrl ? (
-                          <img 
-                            src={friend.user.profileImageUrl} 
-                            alt={friend.user.username}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                            <span className="text-gray-400 text-xs">👤</span>
-                          </div>
-                        )}
+                        <div className="w-16 h-16 rounded-full overflow-hidden border-3 transition-all group-hover:scale-105"
+                             style={{ borderColor: getProfileColor(friend.user.id) }}>
+                          {friend.user.profileImageUrl ? (
+                            <img 
+                              src={friend.user.profileImageUrl} 
+                              alt={friend.user.username}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                              <span className="text-gray-500 text-2xl">👤</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* 온라인 상태 표시 */}
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-2 border-white rounded-full"></div>
                       </button>
-                      
-                      {/* 하트 아이콘 */}
-                      <div className="absolute -bottom-1 -left-1 text-red-500">
-                        💖
-                      </div>
-                      
-                      {/* 사용자명 */}
-                      <div className="absolute -bottom-6 left-0 text-xs font-medium text-gray-700 whitespace-nowrap">
-                        {friend.user.username}
-                      </div>
                     </div>
 
-                    {/* 말풍선 */}
-                    {friend.lastDiary ? (
-                      <button
-                        onClick={() => handleDiaryClick(friend.lastDiary!.id)}
-                        className="flex-1 rounded-2xl px-4 py-3 flex items-center justify-between text-white font-medium shadow-lg transition-transform hover:scale-105"
-                        style={{ backgroundColor: getProfileColor(friend.user.id) }}
-                      >
-                        {/* 시간 */}
-                        <span className="text-sm font-medium">
-                          {formatTime(friend.lastDiary.createdAt)}
+                    {/* 사용자 정보 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-gray-800 truncate">{friend.user.username}</h3>
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-600 rounded-full font-medium">
+                          {friend.user.mbti}
                         </span>
-                        
-                        {/* 아이콘들 */}
-                        <div className="flex items-center gap-2">
-                          <span 
-                            className={`text-lg ${friend.lastDiary.hasPhoto ? "filter-none" : "opacity-50"}`}
-                          >
-                            📷
-                          </span>
-                          <span 
-                            className={`text-lg ${friend.lastDiary.hasAudio ? "filter-none" : "opacity-50"}`}
-                          >
-                            🔊
-                          </span>
-                          <span 
-                            className={`text-lg ${friend.lastDiary.hasMusic ? "filter-none" : "opacity-50"}`}
-                          >
-                            🎧
-                          </span>
-                        </div>
-                      </button>
-                    ) : (
-                      <div className="flex-1 rounded-2xl px-4 py-3 bg-gray-100 text-gray-500 text-sm text-center">
-                        아직 일기가 없습니다
                       </div>
-                    )}
+                      
+                      {/* 최근 활동 */}
+                      {friend.lastDiary ? (
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <span>📝 최근 일기:</span>
+                          <span className="font-medium">
+                            {formatTime(friend.lastDiary.createdAt)}
+                          </span>
+                          <div className="flex items-center gap-1 ml-2">
+                            {friend.lastDiary.hasPhoto && <span className="text-blue-500">📷</span>}
+                            {friend.lastDiary.hasAudio && <span className="text-green-500">🎤</span>}
+                            {friend.lastDiary.hasMusic && <span className="text-purple-500">🎵</span>}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-400">아직 일기가 없습니다</div>
+                      )}
+                    </div>
+
+                    {/* 액션 버튼들 */}
+                    <div className="flex-shrink-0 flex items-center gap-2">
+                      {friend.lastDiary && (
+                        <button
+                          onClick={() => handleDiaryClick(friend.lastDiary!.id)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="최근 일기 보기"
+                        >
+                          📖
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleProfileClick(friend.user.username)}
+                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="프로필 보기"
+                      >
+                        👤
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

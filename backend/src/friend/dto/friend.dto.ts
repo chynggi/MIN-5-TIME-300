@@ -52,3 +52,15 @@ export class RecommendUserDto {
 export class RecommendFriendsResponseDto {
   recommendations: RecommendUserDto[];
 }
+
+// 팔로우 관련 DTO 추가
+export class FollowDto {
+  @IsString()
+  targetUserId: string;
+}
+
+export class FollowResponseDto {
+  success: boolean;
+  message: string;
+  isFollowing?: boolean;
+}

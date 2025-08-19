@@ -1,0 +1,15 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "allowFollowRequests" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "bio" TEXT,
+ADD COLUMN     "birthDate" TEXT,
+ADD COLUMN     "exerciseFrequency" TEXT,
+ADD COLUMN     "isProfilePublic" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "location" TEXT,
+ADD COLUMN     "showBirthDate" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "showDiariesToFriends" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showDiariesToPublic" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "showLocation" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "showMbti" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "sleepPattern" TEXT,
+ADD COLUMN     "socialActivity" TEXT,
+ADD COLUMN     "workStyle" TEXT;

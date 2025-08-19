@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
-import { FriendListResponseDto, FriendRequestDto, FriendRequestResponseDto, FriendRespondDto, FriendRespondResponseDto, RecommendFriendsResponseDto } from './dto/friend.dto';
+import { FriendListResponseDto, FriendRequestDto, FriendRequestResponseDto, FriendRespondDto, FriendRespondResponseDto, RecommendFriendsResponseDto, FollowDto, FollowResponseDto } from './dto/friend.dto';
 import { PrismaService } from '../prisma.service';
 
 @Injectable()
@@ -117,6 +117,7 @@ export class FriendService {
       status: 'accepted',
     };
   }
+
   /**
    * 관심사 및 라이프스타일이 비슷한 사용자 추천 (임시: 랜덤 사용자)
    */
@@ -148,15 +149,10 @@ export class FriendService {
     });
     friendIds.add(userId); // 본인도 제외
 
-    // 디버깅: 전체 사용자 수 확인
-    const totalUsers = await this.prisma.user.count();
-    console.log(`[DEBUG] Total users in database: ${totalUsers}`);
-
     // 임시: 랜덤 사용자 추천 (복잡한 로직 대신 단순하게)
     const randomUsers = await this.prisma.user.findMany({
       where: {
         id: { notIn: Array.from(friendIds) },
-        // isActive 조건 제거 - 모든 사용자 포함
       },
       select: {
         id: true,
@@ -169,7 +165,6 @@ export class FriendService {
 
     // 만약 위 쿼리에서 결과가 없다면, 조건 없이 모든 사용자 조회 (테스트용)
     if (randomUsers.length === 0) {
-      console.log('[DEBUG] No users found with exclusion, trying without exclusion...');
       const allUsers = await this.prisma.user.findMany({
         select: {
           id: true,
@@ -179,11 +174,9 @@ export class FriendService {
         },
         take: 10,
       });
-      console.log(`[DEBUG] All users (first 10):`, allUsers);
       
       // 본인만 제외하고 추천
       const filteredUsers = allUsers.filter(u => u.id !== userId);
-      console.log(`[DEBUG] Filtered users (excluding self):`, filteredUsers);
       
       const recommendations = filteredUsers
         .slice(0, 8)
@@ -194,7 +187,6 @@ export class FriendService {
           profileImageUrl: u.profileImageUrl || undefined 
         }));
 
-      console.log(`[DEBUG] Final recommendations:`, recommendations);
       return { recommendations };
     }
     
@@ -209,13 +201,180 @@ export class FriendService {
         profileImageUrl: u.profileImageUrl || undefined 
       }));
 
-    // 디버깅용 로그
-    console.log(`[DEBUG] userId: ${userId}`);
-    console.log(`[DEBUG] friendIds: ${Array.from(friendIds)}`);
-    console.log(`[DEBUG] randomUsers count: ${randomUsers.length}`);
-    console.log(`[DEBUG] recommendations count: ${recommendations.length}`);
-    console.log(`[DEBUG] recommendations:`, recommendations);
-
     return { recommendations };
+  }
+
+  // 팔로우 기능들 추가
+  async followUser(req: any, dto: FollowDto): Promise<FollowResponseDto> {
+    const userId = req.user.userId;
+    const { targetUserId } = dto;
+
+    if (userId === targetUserId) {
+      throw new ForbiddenException('자기 자신을 팔로우할 수 없습니다.');
+    }
+
+    // 이미 팔로우 중인지 확인
+    const existingFollow = await this.prisma.friend.findFirst({
+      where: {
+        requesterId: userId,
+        addresseeId: targetUserId,
+        status: 'accepted'
+      }
+    });
+
+    if (existingFollow) {
+      throw new ConflictException('이미 팔로우 중입니다.');
+    }
+
+    // 팔로우 관계 생성 (자동 수락)
+    await this.prisma.friend.create({
+      data: {
+        requesterId: userId,
+        addresseeId: targetUserId,
+        status: 'accepted'
+      }
+    });
+
+    return {
+      success: true,
+      message: '팔로우 완료',
+      isFollowing: true
+    };
+  }
+
+  async unfollowUser(req: any, targetUserId: string): Promise<FollowResponseDto> {
+    const userId = req.user.userId;
+
+    const follow = await this.prisma.friend.findFirst({
+      where: {
+        requesterId: userId,
+        addresseeId: targetUserId,
+        status: 'accepted'
+      }
+    });
+
+    if (!follow) {
+      throw new NotFoundException('팔로우 관계를 찾을 수 없습니다.');
+    }
+
+    await this.prisma.friend.delete({
+      where: { id: follow.id }
+    });
+
+    return {
+      success: true,
+      message: '언팔로우 완료',
+      isFollowing: false
+    };
+  }
+
+  async getFollowers(req: any): Promise<FriendListResponseDto> {
+    const userId = req.user.userId;
+    
+    const followers = await this.prisma.friend.findMany({
+      where: {
+        addresseeId: userId,
+        status: 'accepted'
+      },
+      include: {
+        requester: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return {
+      friends: followers.map(f => ({
+        id: f.id,
+        user: {
+          id: f.requester.id,
+          username: f.requester.username,
+          mbti: f.requester.mbti ?? '',
+          profileImageUrl: f.requester.profileImageUrl || undefined,
+        },
+        status: 'accepted' as const,
+        createdAt: f.createdAt.toISOString(),
+        updatedAt: f.updatedAt.toISOString(),
+      }))
+    };
+  }
+
+  async getFollowing(req: any): Promise<FriendListResponseDto> {
+    const userId = req.user.userId;
+    
+    const following = await this.prisma.friend.findMany({
+      where: {
+        requesterId: userId,
+        status: 'accepted'
+      },
+      include: {
+        addressee: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return {
+      friends: following.map(f => ({
+        id: f.id,
+        user: {
+          id: f.addressee.id,
+          username: f.addressee.username,
+          mbti: f.addressee.mbti ?? '',
+          profileImageUrl: f.addressee.profileImageUrl || undefined,
+        },
+        status: 'accepted' as const,
+        createdAt: f.createdAt.toISOString(),
+        updatedAt: f.updatedAt.toISOString(),
+      }))
+    };
+  }
+
+  async searchUsers(req: any, query: string): Promise<{ users: any[] }> {
+    const userId = req.user.userId;
+    
+    if (!query || query.trim().length < 2) {
+      return { users: [] };
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        AND: [
+          { id: { not: userId } }, // 본인 제외
+          {
+            OR: [
+              { username: { contains: query, mode: 'insensitive' } },
+              { email: { contains: query, mode: 'insensitive' } }
+            ]
+          }
+        ]
+      },
+      select: {
+        id: true,
+        username: true,
+        mbti: true,
+        profileImageUrl: true
+      },
+      take: 20
+    });
+
+    // 각 사용자에 대해 팔로우 상태 확인
+    const usersWithFollowStatus = await Promise.all(
+      users.map(async (user) => {
+        const isFollowing = await this.prisma.friend.findFirst({
+          where: {
+            requesterId: userId,
+            addresseeId: user.id,
+            status: 'accepted'
+          }
+        });
+
+        return {
+          ...user,
+          mbti: user.mbti || '',
+          isFollowing: !!isFollowing
+        };
+      })
+    );
+
+    return { users: usersWithFollowStatus };
   }
 }

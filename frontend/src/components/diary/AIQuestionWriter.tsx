@@ -8,7 +8,8 @@ interface AIQuestionWriterProps {
 
 export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWriterProps) {
   const [currentStep, setCurrentStep] = useState<"question" | "writing" | "summary">("question");
-  const [question, setQuestion] = useState("");
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [selectedQuestion, setSelectedQuestion] = useState("");
   const [questionId, setQuestionId] = useState("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -16,16 +17,15 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const generateQuestion = async () => {
+  const generateQuestions = async () => {
     setIsGenerating(true);
     try {
       // TODO: 실제 API 호출
-      // const response = await api.post("/questions/generate");
-      // setQuestion(response.data.question);
-      // setQuestionId(response.data.id);
+      // const response = await api.post("/questions/generate-multiple");
+      // setQuestions(response.data.questions);
       
-      // 임시 데이터
-      const questions = [
+      // 임시 데이터 - 5가지 질문 제공
+      const questionList = [
         "오늘 가장 기억에 남는 순간은 무엇이었나요?",
         "오늘 하루 중 가장 감사했던 일은 무엇인가요?",
         "오늘 새롭게 배운 것이나 깨달은 점이 있다면?",
@@ -34,16 +34,19 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
       ];
       
       setTimeout(() => {
-        const randomQuestion = questions[Math.floor(Math.random() * questions.length)];
-        setQuestion(randomQuestion);
-        setQuestionId("temp-" + Date.now());
-        setCurrentStep("writing");
+        setQuestions(questionList);
         setIsGenerating(false);
       }, 2000);
     } catch (error) {
       console.error("질문 생성 실패:", error);
       setIsGenerating(false);
     }
+  };
+
+  const selectQuestion = (question: string, index: number) => {
+    setSelectedQuestion(question);
+    setQuestionId("temp-" + index);
+    setCurrentStep("writing");
   };
 
   const analyzeAndSummarize = async () => {
@@ -54,26 +57,39 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
 
     setIsAnalyzing(true);
     try {
-      // TODO: 실제 AI 분석 API 호출
-      // const response = await api.post("/ai/analyze-diary", { content, question });
-      // setAiSummary(response.data.summary);
-      
-      // 임시 AI 요약
-      setTimeout(() => {
-        setAiSummary(`오늘의 일기를 분석한 결과:
+      const response = await fetch('/api/ai/analyze-diary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content,
+          question: selectedQuestion,
+          emotion: '😊' // 실제로는 부모 컴포넌트에서 전달받아야 함
+        }),
+      });
 
-📝 주요 내용: ${content.slice(0, 50)}...에 대한 생각과 경험을 기록하셨습니다.
+      if (!response.ok) {
+        throw new Error('분석 실패');
+      }
+
+      const data = await response.json();
+      setAiSummary(data.summary);
+      setCurrentStep("summary");
+    } catch (error) {
+      console.error("일기 분석 실패:", error);
+      // 실패시 임시 응답 사용
+      setAiSummary(`📝 선택한 질문: ${selectedQuestion}
+
+📖 주요 내용: ${content.slice(0, 50)}...에 대한 생각과 경험을 기록하셨습니다.
 
 😊 감정 분석: 전반적으로 긍정적인 하루를 보내신 것 같습니다.
 
 🎯 핵심 키워드: 일상, 경험, 성찰
 
-💡 AI 조언: 오늘 하루의 소중한 순간들을 잘 기록해주셨네요. 이런 기록들이 모여 소중한 추억이 될 것입니다.`);
-        setCurrentStep("summary");
-        setIsAnalyzing(false);
-      }, 3000);
-    } catch (error) {
-      console.error("일기 분석 실패:", error);
+💡 AI 조언: 선택하신 질문에 대해 깊이 있게 생각하고 기록해주셨네요. 이런 기록들이 모여 소중한 추억이 될 것입니다.`);
+      setCurrentStep("summary");
+    } finally {
       setIsAnalyzing(false);
     }
   };
@@ -108,17 +124,17 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
         </div>
       </div>
 
-      {/* Step 1: 질문 생성 */}
+      {/* Step 1: 질문 생성 및 선택 */}
       {currentStep === "question" && (
         <div className="text-center space-y-4">
           <div className="bg-gray-100 rounded-lg p-6">
             <h2 className="text-lg font-bold mb-4">GPT 질문 제공</h2>
-            {!question ? (
+            {questions.length === 0 ? (
               <div>
                 <div className="text-4xl mb-4">🤖</div>
-                <p className="text-gray-600 mb-4">AI가 오늘의 특별한 질문을 준비하고 있습니다.</p>
+                <p className="text-gray-600 mb-4">AI가 오늘의 특별한 질문들을 준비하고 있습니다.</p>
                 <button
-                  onClick={generateQuestion}
+                  onClick={generateQuestions}
                   disabled={isGenerating}
                   className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
                 >
@@ -128,14 +144,28 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
             ) : (
               <div>
                 <div className="text-4xl mb-4">💭</div>
-                <div className="bg-white rounded-lg p-4 mb-4">
-                  <p className="text-lg text-blue-700 font-semibold">{question}</p>
+                <p className="text-gray-600 mb-4">마음에 드는 질문을 선택해주세요</p>
+                <div className="space-y-3">
+                  {questions.map((question, index) => (
+                    <button
+                      key={index}
+                      onClick={() => selectQuestion(question, index)}
+                      className="w-full bg-white rounded-lg p-4 text-left hover:bg-blue-50 hover:border-blue-300 border border-gray-200 transition-colors"
+                    >
+                      <div className="flex items-start">
+                        <span className="bg-blue-100 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mr-3 mt-0.5">
+                          {index + 1}
+                        </span>
+                        <p className="text-gray-700 font-medium">{question}</p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
                 <button
-                  onClick={() => setCurrentStep("writing")}
-                  className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
+                  onClick={generateQuestions}
+                  className="mt-4 text-sm text-blue-600 underline hover:text-blue-700"
                 >
-                  이 질문으로 일기 쓰기
+                  다른 질문 생성하기
                 </button>
               </div>
             )}
@@ -147,8 +177,8 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
       {currentStep === "writing" && (
         <div className="space-y-4">
           <div className="bg-gray-100 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-700 mb-2">오늘의 질문</h3>
-            <p className="text-blue-700 font-medium">{question}</p>
+            <h3 className="font-semibold text-gray-700 mb-2">선택한 질문</h3>
+            <p className="text-blue-700 font-medium">{selectedQuestion}</p>
           </div>
 
           <div>

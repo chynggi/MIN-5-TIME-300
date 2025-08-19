@@ -4,22 +4,22 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
 
-interface DiaryPreview { id: string; content: string; createdAt: string; question: string; emotion?: string; }
-interface CommunityPreview { id: string; content: string; createdAt: string; user: { username: string }; question: string; }
-interface ChatRoomPreview { id: string; name: string; createdAt: string; }
-interface FriendPreview { id: string; username: string; avatar?: string; isOnline?: boolean; }
+interface DiaryPreview { id: string; content: string; createdAt: string; question: string; emotion?: string; likes?: number; username?: string; }
+interface FriendPrevi        </div>
+      </div>
+    </div>
+  );
+}sername: string; avatar?: string; isOnline?: boolean; hasTodayDiary?: boolean; }
 interface CalendarDay { date: number; emotion?: string; hasEntry: boolean; }
 
 export default function DashboardPage() {
   const [diaries, setDiaries] = useState<DiaryPreview[]>([]);
-  const [communities, setCommunities] = useState<CommunityPreview[]>([]);
-  const [chatRooms, setChatRooms] = useState<ChatRoomPreview[]>([]);
+  const [popularDiary, setPopularDiary] = useState<DiaryPreview | null>(null);
   const [friends, setFriends] = useState<FriendPreview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarData, setCalendarData] = useState<CalendarDay[]>([]);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const router = useRouter();
 
   // 감정 이모지 매핑
@@ -61,24 +61,22 @@ export default function DashboardPage() {
       let emotion = "";
       let hasEntry = false;
       
-      // 오늘 이전 날짜들 - 일부만 감정 데이터가 있다고 가정
+      // 과거 날짜들 - 일부만 감정 데이터가 있다고 가정 (실제 일기가 작성된 날짜만)
       if (currentDateObj < todayObj) {
-        // 과거 날짜 중 일부만 일기를 작성했다고 가정 (30% 확률)
-        if (Math.random() > 0.7) {
+        // 과거 날짜 중 일부만 일기를 작성했다고 가정 (20% 확률로 줄임)
+        if (Math.random() > 0.8) {
           const emotions = ["happy", "sad", "excited", "calm", "tired"];
           emotion = emotions[Math.floor(Math.random() * emotions.length)];
           hasEntry = true;
         }
       } 
-      // 오늘 날짜 - 활성화
+      // 오늘 날짜 - 활성화 (일기 작성 가능)
       else if (currentDateObj.getTime() === todayObj.getTime()) {
-        // 오늘은 아직 작성하지 않았거나 작성했을 수 있음
         hasEntry = false; // 기본적으로 미작성 상태
       }
-      // 미래 날짜들 - 자물쇠 표시
+      // 미래 날짜들 - 이제 일기 작성 가능 (잠금 해제)
       else {
-        emotion = "🔒"; // 자물쇠 이모지
-        hasEntry = false;
+        hasEntry = false; // 미래 날짜도 일기 작성 가능
       }
       
       calendar.push({
@@ -95,85 +93,68 @@ export default function DashboardPage() {
     generateCalendarData();
   }, [currentDate]);
 
-  // 실시간 시계 업데이트
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
   useEffect(() => {
     setLoading(true);
     Promise.all([
       api.get("/diaries").then(res => res.data.diaries.slice(0, 3)).catch(() => []),
-      api.get("/communities/diaries").then(res => res.data.diaries.slice(0, 3)).catch(() => []),
-      api.get("/chat/rooms").then(res => res.data.rooms.slice(0, 3)).catch(() => []),
       api.get("/friends").then(res => res.data.friends.slice(0, 5)).catch(() => []),
+      // 가장 최근에 작성된 일기 중 인기 있는 일기 가져오기
+      api.get("/diaries?sort=popularity&limit=1").then(res => res.data.diaries[0] || null).catch(() => null),
     ])
-      .then(([d, c, r, f]) => {
+      .then(([d, f, popular]) => {
         setDiaries(d);
-        setCommunities(c);
-        setChatRooms(r);
         setFriends(f);
+        setPopularDiary(popular);
       })
       .catch(() => setError("대시보드 데이터를 불러오지 못했습니다."))
       .finally(() => setLoading(false));
   }, []);
 
   return (
+    return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-pink-50">
-      {/* 헤더 */}
-      <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-            <span className="text-xs">⏰</span>
-          </div>
-          <h1 className="text-xl font-bold">5MIN</h1>
-        </div>
-        <button 
-          onClick={() => {
-            window.location.href = '/notifications';
-          }}
-          className="text-yellow-500 text-xl hover:text-yellow-600 transition-colors cursor-pointer"
-          aria-label="알림 목록 보기"
-          type="button"
-        >
-          🔔
-        </button>
-      </header>
-
+      {/* 메인 콘텐츠 */}
       <div className="flex-1 p-4 space-y-6">
-        {/* 친구들 프로필 섹션 */}
+        {/* 친구들 일기 스토리 섹션 */}
         <section className="bg-white rounded-xl shadow p-4">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="font-bold text-lg">친구들</h2>
+            <h2 className="font-bold text-lg">오늘의 일기</h2>
             <Link href="/friends" className="text-blue-600 text-sm">더보기</Link>
           </div>
           <div className="flex gap-3 overflow-x-auto pb-2">
             {friends.length === 0 ? (
-              // 기본 친구 아바타들 (데이터가 없을 때)
-              Array.from({length: 5}).map((_, i) => (
+              // 기본 친구 아바타들 (당일 일기를 작성한 친구들)
+              Array.from({length: 3}).map((_, i) => (
                 <div key={i} className="flex-shrink-0 text-center">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg ${
-                    i === 0 ? 'bg-green-200' : i === 1 ? 'bg-orange-200' : 
-                    i === 2 ? 'bg-blue-200' : i === 3 ? 'bg-gray-200' : 'bg-purple-200'
-                  }`}>
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-lg border-4 ${
+                    i === 0 ? 'border-pink-400 bg-green-200' : 
+                    i === 1 ? 'border-orange-400 bg-orange-200' : 
+                    'border-blue-400 bg-blue-200'
+                  } relative`}>
                     👤
+                    {/* 새 일기 알림 점 */}
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
                   </div>
-                  <p className="text-xs mt-1 text-red-500">Unknown</p>
+                  <p className="text-xs mt-1 text-gray-700 font-medium">
+                    {i === 0 ? '민수' : i === 1 ? '지영' : '현우'}
+                  </p>
                 </div>
               ))
             ) : (
-              friends.map((friend, i) => (
-                <div key={friend.id} className="flex-shrink-0 text-center">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg ${
+              friends.filter(friend => friend.hasTodayDiary).map((friend, i) => (
+                <div key={friend.id} className="flex-shrink-0 text-center cursor-pointer" 
+                     onClick={() => {
+                       // 친구의 오늘 일기 보기
+                       console.log(`View ${friend.username}'s today diary`);
+                     }}>
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-lg border-4 border-pink-400 relative ${
                     friend.isOnline ? 'bg-green-200' : 'bg-gray-200'
                   }`}>
                     {friend.avatar || '👤'}
+                    {/* 새 일기 알림 점 */}
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
                   </div>
-                  <p className="text-xs mt-1 text-red-500">{friend.username}</p>
+                  <p className="text-xs mt-1 text-gray-700 font-medium">{friend.username}</p>
                 </div>
               ))
             )}
@@ -224,31 +205,33 @@ export default function DashboardPage() {
                 <div key={index} className="aspect-square">
                   <button
                     className={`w-full h-full rounded-lg flex flex-col items-center justify-center text-xs transition-all ${
-                      isFuture 
-                        ? 'bg-gray-100 cursor-not-allowed opacity-60' 
-                        : isToday 
-                          ? 'bg-blue-100 border-2 border-blue-400 cursor-pointer hover:bg-blue-200'
-                          : day.hasEntry 
-                            ? 'bg-white shadow-sm cursor-pointer hover:bg-gray-50' 
-                            : 'bg-yellow-100 cursor-default'
+                      isToday 
+                        ? 'bg-blue-100 border-2 border-blue-400 cursor-pointer hover:bg-blue-200'
+                        : day.hasEntry 
+                          ? 'bg-white shadow-sm cursor-pointer hover:bg-gray-50' 
+                          : isFuture
+                            ? 'bg-yellow-100 cursor-pointer hover:bg-yellow-200'
+                            : 'bg-yellow-100 cursor-pointer hover:bg-yellow-200'
                     }`}
-                    disabled={isFuture}
                     onClick={() => {
-                      if (isToday) {
-                        // 오늘 날짜 클릭 시 일기 작성 페이지로 이동
+                      if (isToday || isFuture) {
+                        // 오늘 또는 미래 날짜 클릭 시 일기 작성 페이지로 이동
                         window.location.href = '/diary/new';
                       } else if (isPast && day.hasEntry) {
                         // 과거 작성된 일기 클릭 시 해당 일기 보기
                         console.log(`View diary for ${day.date}`);
+                      } else if (isPast && !day.hasEntry) {
+                        // 과거 미작성 날짜도 일기 작성 가능
+                        window.location.href = '/diary/new';
                       }
                     }}
                   >
                     <span className={`font-medium ${isToday ? 'text-blue-600 font-bold' : ''}`}>
                       {day.date}
                     </span>
-                    {day.emotion && (
+                    {day.emotion && day.hasEntry && (
                       <span className="text-lg leading-none">
-                        {day.emotion === "🔒" ? day.emotion : emotionEmojis[day.emotion] || '😊'}
+                        {emotionEmojis[day.emotion] || '😊'}
                       </span>
                     )}
                     {isToday && !day.hasEntry && (
@@ -261,101 +244,95 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 스터디 타이머 섹션 */}
+        {/* 가장 인기 있는 일기 배너 */}
         <section className="bg-gradient-to-r from-pink-200 to-pink-300 rounded-xl shadow p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                👤
-              </div>
-              <span className="text-red-500 text-sm">Unknown</span>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              <div className="bg-green-400 px-4 py-2 rounded-lg">
-                <span className="font-bold text-white">
-                  {String(currentTime.getHours()).padStart(2, '0')}:
-                  {String(currentTime.getMinutes()).padStart(2, '0')}:
-                  {String(currentTime.getSeconds()).padStart(2, '0')}
-                </span>
+          <h2 className="font-bold text-lg mb-3 text-gray-800">🔥 가장 인기 있는 일기</h2>
+          {popularDiary ? (
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-purple-200 rounded-full flex items-center justify-center">
+                    👤
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-800">{popularDiary.username || '익명'}</span>
+                    <p className="text-xs text-gray-500">
+                      {new Date(popularDiary.createdAt).toLocaleDateString('ko-KR')}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {/* 음성 메시지 아이콘 */}
+                  <button className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    🎤
+                  </button>
+                  <span className="text-sm text-gray-600">❤️ {popularDiary.likes || 12}</span>
+                </div>
               </div>
               
-              <div className="flex gap-2">
-                <button className="w-10 h-10 bg-black rounded-lg flex items-center justify-center">
-                  📷
-                </button>
-                <button className="w-10 h-10 bg-black rounded-lg flex items-center justify-center">
-                  🎧
+              <div className="mb-2">
+                <h3 className="font-semibold text-gray-800 mb-1">{popularDiary.question}</h3>
+                <p className="text-gray-700 text-sm line-clamp-2">{popularDiary.content}</p>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {popularDiary.emotion && (
+                    <span className="text-lg">{emotionEmojis[popularDiary.emotion] || '😊'}</span>
+                  )}
+                  <span className="text-xs text-gray-500">감정 일기</span>
+                </div>
+                <button 
+                  className="text-blue-600 text-sm font-medium hover:text-blue-700"
+                  onClick={() => window.location.href = `/diary/${popularDiary.id}`}
+                >
+                  자세히 보기
                 </button>
               </div>
             </div>
-          </div>
-        </section>
-
-        {/* 기존 섹션들 */}
-        <div className="space-y-4">
-          {/* 최근 일기 */}
-          <section className="bg-white rounded-xl shadow p-4 border">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="font-bold text-lg">최근 일기</h2>
-              <Link href="/diary" className="text-blue-600 text-sm">더보기</Link>
+          ) : (
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-purple-200 rounded-full flex items-center justify-center">
+                    👤
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-800">지영</span>
+                    <p className="text-xs text-gray-500">2일 전</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  {/* 음성 메시지 아이콘 */}
+                  <button className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    🎤
+                  </button>
+                  <span className="text-sm text-gray-600">❤️ 15</span>
+                </div>
+              </div>
+              
+              <div className="mb-2">
+                <h3 className="font-semibold text-gray-800 mb-1">오늘 가장 감사했던 일은?</h3>
+                <p className="text-gray-700 text-sm line-clamp-2">
+                  친구들과 함께한 점심시간이 정말 즐거웠어요. 함께 웃고 이야기하며 스트레스가 모두 날아갔습니다...
+                </p>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🙏</span>
+                  <span className="text-xs text-gray-500">감정 일기</span>
+                </div>
+                <button className="text-blue-600 text-sm font-medium hover:text-blue-700">
+                  자세히 보기
+                </button>
+              </div>
             </div>
-            {loading ? <div>로딩 중...</div> : error ? <div className="text-red-500">{error}</div> : (
-              <ul className="space-y-2">
-                {diaries.length === 0 ? <li>작성한 일기가 없습니다.</li> : diaries.map(d => (
-                  <li key={d.id} className="border rounded p-2 hover:bg-gray-50">
-                    <Link href={`/diary/${d.id}`}>
-                      {d.emotion && <span className="mr-2">{emotionEmojis[d.emotion] || '😊'}</span>}
-                      {d.question || d.content.slice(0, 20)}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        {/* 최근 커뮤니티 */}
-        <section className="bg-white rounded-xl shadow p-4 border">
-          <div className="flex justify-between items-center mb-2">
-            <h2 className="font-bold text-lg">최근 커뮤니티</h2>
-            <Link href="/community2" className="text-blue-600 text-sm">더보기</Link>
-          </div>
-          {loading ? <div>로딩 중...</div> : error ? <div className="text-red-500">{error}</div> : (
-            <ul className="space-y-2">
-              {communities.length === 0 ? <li>추천된 질문이 없습니다.</li> : communities.map(c => (
-                <li key={c.id} className="border rounded p-2 hover:bg-gray-50">
-                  <Link href={`/community2/${c.id}`}>{c.question || c.content.slice(0, 20)} <span className="text-xs text-gray-400">- {c.user?.username}</span></Link>
-                </li>
-              ))}
-            </ul>
           )}
         </section>
-        
-        {/* 최근 채팅방 */}
-        <section className="bg-white rounded-xl shadow p-4 border">
-          <div className="flex justify-between items-center mb-2">
-            <h2 className="font-bold text-lg">최근 채팅방</h2>
-            <Link href="/chat" className="text-blue-600 text-sm">더보기</Link>
-          </div>
-          {loading ? <div>로딩 중...</div> : error ? <div className="text-red-500">{error}</div> : (
-            <ul className="space-y-2">
-              {chatRooms.length === 0 ? <li>참여한 채팅방이 없습니다.</li> : chatRooms.map(r => (
-                <li key={r.id} className="border rounded p-2 hover:bg-gray-50">
-                  <Link href={`/chat/${r.id}`}>{r.name}</Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-        </div>
       </div>
-
-      {/* 오늘 일기 작성 버튼 */}
-      <Link
-        href="/diary/new"
-        className="fixed bottom-24 md:bottom-10 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-8 py-3 rounded-full shadow-lg font-bold z-20"
-      >
-        오늘 일기 쓰기
-      </Link>
 
       {/* 하단 네비게이션 */}
       <nav className="fixed bottom-0 left-0 w-full bg-white border-t flex justify-around py-2 z-10 md:max-w-2xl md:left-1/2 md:-translate-x-1/2 md:rounded-t-xl md:shadow">

@@ -29,7 +29,7 @@ export default function NewDiaryPage() {
   const router = useRouter();
   
   // Current view state
-  const [currentView, setCurrentView] = useState<"main" | "ai-question" | "free-write">("main");
+  const [currentView, setCurrentView] = useState<"main" | "ai-question" | "free-write" | "settings">("main");
   
   // Main form data
   const [image, setImage] = useState<File | null>(null);
@@ -104,13 +104,19 @@ export default function NewDiaryPage() {
       if (voiceRecord) formData.append("voice", voiceRecord);
       if (selectedMusic) formData.append("musicData", JSON.stringify(selectedMusic));
 
-      await api.post("/diaries", formData, {
+      const response = await api.post("/diaries", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       
-      router.push("/diary");
+      if (response.status === 200 || response.status === 201) {
+        alert("일기가 성공적으로 저장되었습니다!");
+        router.push("/dashboard");
+      } else {
+        throw new Error("저장 실패");
+      }
     } catch (err: any) {
-      setError("일기 저장에 실패했습니다.");
+      console.error("일기 저장 오류:", err);
+      setError(err.response?.data?.message || "일기 저장에 실패했습니다. 다시 시도해주세요.");
     } finally {
       setLoading(false);
     }
@@ -145,11 +151,27 @@ export default function NewDiaryPage() {
           {/* Writing Mode Selection */}
           <WritingMode onModeSelect={handleWritingModeSelect} />
 
-          {/* Diary Settings */}
-          <DiarySettings 
-            settings={diarySettings}
-            onSettingsChange={setDiarySettings}
-          />
+          {/* Diary Settings Button */}
+          <div className="bg-gray-100 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">일기 설정</h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  공개범위: {diarySettings.postVisibility === "private" ? "🔒 비공개" : 
+                           diarySettings.postVisibility === "public" ? "🌍 전체공개" : "👥 친구공개"} | 
+                  날씨: {diarySettings.weather === "sunny" ? "☀️ 맑음" : 
+                        diarySettings.weather === "cloudy" ? "☁️ 흐림" : 
+                        diarySettings.weather === "rainy" ? "🌧️ 비" : "❄️ 눈"}
+                </p>
+              </div>
+              <button
+                onClick={() => setCurrentView("settings")}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
+              >
+                설정 변경
+              </button>
+            </div>
+          </div>
 
           {/* Content Preview (if written) */}
           {(title || content) && (
@@ -185,7 +207,7 @@ export default function NewDiaryPage() {
           {/* Submit Button */}
           <div className="flex gap-2">
             <Link 
-              href="/diary" 
+              href="/dashboard" 
               className="flex-1 bg-gray-400 text-white py-3 rounded-lg text-center hover:bg-gray-500"
             >
               취소
@@ -230,6 +252,45 @@ export default function NewDiaryPage() {
             onComplete={handleFreeWriteComplete}
             onBack={() => setCurrentView("main")}
           />
+        </div>
+      </div>
+    );
+  }
+
+  // Settings view
+  if (currentView === "settings") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
+        <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-xl font-bold text-gray-800">일기 설정</h1>
+            <button
+              onClick={() => setCurrentView("main")}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              ✕
+            </button>
+          </div>
+          
+          <DiarySettings 
+            settings={diarySettings}
+            onSettingsChange={setDiarySettings}
+          />
+          
+          <div className="flex gap-2 mt-6">
+            <button
+              onClick={() => setCurrentView("main")}
+              className="flex-1 bg-gray-400 text-white py-3 rounded-lg text-center hover:bg-gray-500"
+            >
+              취소
+            </button>
+            <button
+              onClick={() => setCurrentView("main")}
+              className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700"
+            >
+              설정 완료
+            </button>
+          </div>
         </div>
       </div>
     );

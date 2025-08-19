@@ -49,24 +49,25 @@ export default function MusicSetting({ onMusicSelect, selectedTrack }: MusicSett
     
     setIsSearching(true);
     try {
-      // TODO: 실제 Spotify API 호출
-      // const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(searchQuery)}`);
-      // const data = await response.json();
-      // setSearchResults(data.tracks.items);
-      
-      // 임시 데이터
+      const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(searchQuery)}`);
+      if (!response.ok) {
+        throw new Error('검색 실패');
+      }
+      const data = await response.json();
+      setSearchResults(data.tracks.items || []);
+    } catch (error) {
+      console.error("음악 검색 실패:", error);
+      // 검색 실패시 임시 데이터 표시
       setSearchResults([
         {
-          id: "search1",
-          name: searchQuery,
-          artists: [{ name: "검색 결과" }],
+          id: "temp1",
+          name: searchQuery + " - 검색 결과 (임시)",
+          artists: [{ name: "임시 아티스트" }],
           preview_url: null,
           external_urls: { spotify: "#" },
           album: { images: [{ url: "/images/music/placeholder.jpg" }] }
         }
       ]);
-    } catch (error) {
-      console.error("음악 검색 실패:", error);
     } finally {
       setIsSearching(false);
     }

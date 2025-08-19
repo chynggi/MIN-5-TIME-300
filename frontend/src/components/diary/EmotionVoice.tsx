@@ -24,6 +24,8 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
 
   const startRecording = async () => {
+    if (isRecording) return; // 이미 녹음 중이면 무시
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -51,7 +53,7 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
   };
 
   const stopRecording = () => {
-    if (mediaRecorder) {
+    if (mediaRecorder && isRecording) {
       mediaRecorder.stop();
       setIsRecording(false);
       setMediaRecorder(null);
@@ -69,23 +71,17 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
         {/* 감정 선택 */}
         <div className="flex-1 mr-4">
           <h3 className="text-sm font-semibold text-gray-700 mb-2">감정 선택</h3>
-          <div className="grid grid-cols-4 gap-2">
+          <select
+            value={emotion}
+            onChange={(e) => onEmotionChange(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+          >
             {emotions.map((item) => (
-              <button
-                key={item.emoji}
-                type="button"
-                onClick={() => onEmotionChange(item.emoji)}
-                className={`p-2 rounded-lg border-2 text-center transition-colors ${
-                  emotion === item.emoji
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-300 bg-white hover:bg-gray-50"
-                }`}
-              >
-                <div className="text-lg">{item.emoji}</div>
-                <div className="text-xs text-gray-600">{item.label}</div>
-              </button>
+              <option key={item.emoji} value={item.emoji}>
+                {item.emoji} {item.label}
+              </option>
             ))}
-          </div>
+          </select>
         </div>
 
         {/* 음성 메시지 */}
@@ -96,45 +92,35 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
             <div className="text-center">
               <button
                 type="button"
-                onClick={isRecording ? stopRecording : startRecording}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${
+                onMouseDown={startRecording}
+                onMouseUp={stopRecording}
+                onTouchStart={startRecording}
+                onTouchEnd={stopRecording}
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-150 ${
                   isRecording
-                    ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                    : "bg-gray-500 hover:bg-gray-600"
+                    ? "bg-red-500 scale-110 shadow-lg animate-pulse"
+                    : "bg-green-500 hover:bg-green-600 shadow-md"
                 } text-white`}
               >
-                {isRecording ? (
-                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <rect x="6" y="6" width="12" height="12" rx="2" />
-                  </svg>
-                ) : (
-                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z" />
-                    <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-                    <line x1="12" y1="19" x2="12" y2="23" />
-                    <line x1="8" y1="23" x2="16" y2="23" />
-                  </svg>
-                )}
+                🎤
               </button>
-              <p className="text-xs text-gray-600 mt-2">
-                {isRecording ? "녹음 중..." : "음성 녹음"}
+              <p className="text-xs text-gray-600 mt-1">
+                {isRecording ? "녹음 중..." : "길게 눌러서 녹음"}
               </p>
             </div>
           ) : (
             <div className="bg-white rounded-lg p-3 border">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">녹음된 음성</span>
+                <span className="text-sm text-gray-600">🎤 음성메시지</span>
                 <button
                   type="button"
                   onClick={deleteRecording}
-                  className="text-red-500 hover:text-red-700"
+                  className="text-red-500 hover:text-red-700 text-sm"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
+                  삭제
                 </button>
               </div>
-              <audio controls className="w-full">
+              <audio controls className="w-full h-8">
                 <source src={recordedAudio} type="audio/wav" />
               </audio>
             </div>

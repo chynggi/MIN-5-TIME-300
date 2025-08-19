@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Post, Put, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Delete, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FriendService } from './friend.service';
-import { FriendListResponseDto, FriendRequestDto, FriendRequestResponseDto, FriendRespondDto, FriendRespondResponseDto, RecommendFriendsResponseDto } from './dto/friend.dto';
+import { FriendListResponseDto, FriendRequestDto, FriendRequestResponseDto, FriendRespondDto, FriendRespondResponseDto, RecommendFriendsResponseDto, FollowDto, FollowResponseDto } from './dto/friend.dto';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/friends')
@@ -31,5 +31,31 @@ export class FriendController {
   @Get('recommend')
   async recommendUsers(@Req() req): Promise<RecommendFriendsResponseDto> {
     return this.friendService.recommendUsers(req);
+  }
+
+  // 팔로우 기능 추가
+  @Post('follow')
+  async followUser(@Req() req, @Body() dto: FollowDto): Promise<FollowResponseDto> {
+    return this.friendService.followUser(req, dto);
+  }
+
+  @Delete('follow/:targetUserId')
+  async unfollowUser(@Req() req, @Param('targetUserId') targetUserId: string): Promise<FollowResponseDto> {
+    return this.friendService.unfollowUser(req, targetUserId);
+  }
+
+  @Get('followers')
+  async getFollowers(@Req() req): Promise<FriendListResponseDto> {
+    return this.friendService.getFollowers(req);
+  }
+
+  @Get('following')
+  async getFollowing(@Req() req): Promise<FriendListResponseDto> {
+    return this.friendService.getFollowing(req);
+  }
+
+  @Get('search')
+  async searchUsers(@Req() req, @Query('query') query: string): Promise<{ users: any[] }> {
+    return this.friendService.searchUsers(req, query);
   }
 }
