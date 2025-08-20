@@ -38,15 +38,29 @@ export default function Community2ListPage() {
   useEffect(() => {
     api.get("/community2/public-diaries")
       .then(res => {
-        // 실제 API에서 위치 정보가 없을 경우 임시 위치 정보 추가
-        const diariesWithLocation = res.data.diaries.map((diary: PublicDiary, index: number) => ({
+        const raw: PublicDiary[] = res.data.diaries || [];
+
+        // 사용자별 최신 일기만 남기기 (Record 기반)
+        const latestByUser: Record<string, PublicDiary> = {};
+        raw.forEach((d, idx) => {
+          const uid = d.userId || `unknown-${idx}`;
+          const prev = latestByUser[uid];
+          const curTime = new Date(d.updatedAt || d.createdAt).getTime();
+          const prevTime = prev ? new Date(prev.updatedAt || prev.createdAt).getTime() : -Infinity;
+          if (!prev || curTime > prevTime) {
+            latestByUser[uid] = d;
+          }
+        });
+
+        // 위치 정보 보정 + 기본 프로필/닉네임 보강
+        const diariesWithLocation: PublicDiary[] = Object.values(latestByUser).map((diary: PublicDiary, index: number) => ({
           ...diary,
-          // 임시 위치 정보 (서울 시내 랜덤 위치)
-          lat: diary.lat || (37.5665 + (Math.random() - 0.5) * 0.02),
-          lng: diary.lng || (126.9780 + (Math.random() - 0.5) * 0.02),
+          lat: typeof diary.lat === 'number' ? diary.lat : (37.5665 + (Math.random() - 0.5) * 0.02),
+          lng: typeof diary.lng === 'number' ? diary.lng : (126.9780 + (Math.random() - 0.5) * 0.02),
           profileImageUrl: diary.profileImageUrl || '/default-profile.png',
           username: diary.username || `사용자${index + 1}`
         }));
+
         setDiaries(diariesWithLocation);
       })
       .catch(() => setError("공개 일기 목록을 불러오지 못했습니다."))

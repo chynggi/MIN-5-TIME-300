@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Image from "next/image";
 
 interface ImageUploadProps {
@@ -21,12 +21,18 @@ const defaultImages = {
 export default function ImageUpload({ onImageSelect, preview }: ImageUploadProps) {
   const [selectedDefault, setSelectedDefault] = useState<string | null>(null);
   const [showDefaultImages, setShowDefaultImages] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       onImageSelect(e.target.files[0]);
       setSelectedDefault(null);
     }
+  };
+
+  // 미리보기 영역 클릭 시 파일 업로드 input 클릭
+  const handlePreviewClick = () => {
+    if (fileInputRef.current) fileInputRef.current.click();
   };
 
   const handleDefaultSelect = (imageKey: string) => {
@@ -52,8 +58,14 @@ export default function ImageUpload({ onImageSelect, preview }: ImageUploadProps
         </button>
       </div>
 
-      {/* 이미지 미리보기 영역 */}
-      <div className="relative w-full h-40 bg-gray-200 rounded-lg mb-3 overflow-hidden">
+      {/* 이미지 미리보기 영역 (클릭 시 파일 업로드) */}
+      <div
+        className="relative w-full h-40 bg-gray-200 rounded-lg mb-3 overflow-hidden cursor-pointer group"
+        onClick={handlePreviewClick}
+        tabIndex={0}
+        role="button"
+        aria-label="이미지 업로드"
+      >
         {preview ? (
           <Image src={preview} alt="미리보기" fill className="object-cover" />
         ) : selectedDefault ? (
@@ -69,7 +81,7 @@ export default function ImageUpload({ onImageSelect, preview }: ImageUploadProps
         {(preview || selectedDefault) && (
           <button
             type="button"
-            onClick={handleRemoveImage}
+            onClick={e => { e.stopPropagation(); handleRemoveImage(); }}
             className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md hover:bg-gray-100"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,19 +89,15 @@ export default function ImageUpload({ onImageSelect, preview }: ImageUploadProps
             </svg>
           </button>
         )}
-      </div>
-
-      {/* 파일 업로드 버튼 */}
-      <div className="mb-3">
-        <label className="bg-gray-500 text-white px-4 py-2 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors text-sm">
-          사진 업로드
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-        </label>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+  {/* 오버레이 제거 또는 opacity 0으로 고정 */}
+  {/* <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition" /> */}
       </div>
 
       {/* 기본 이미지 선택 */}

@@ -1,5 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
+// 기본 제공 이미지들 (예시)
+const defaultImages = [
+  "/images/default1.jpg",
+  "/images/default2.jpg",
+  "/images/default3.jpg",
+  "/images/default4.jpg",
+];
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
 import Link from "next/link";
@@ -34,6 +41,7 @@ export default function NewDiaryPage() {
   // Main form data
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [showDefaultImageSelect, setShowDefaultImageSelect] = useState(false);
   const [emotion, setEmotion] = useState("😊");
   const [voiceRecord, setVoiceRecord] = useState<Blob | null>(null);
   const [selectedMusic, setSelectedMusic] = useState<SpotifyTrack | null>(null);
@@ -56,9 +64,17 @@ export default function NewDiaryPage() {
     setImage(file);
     if (file) {
       setPreview(URL.createObjectURL(file));
+      setShowDefaultImageSelect(false);
     } else {
       setPreview(null);
     }
+  };
+
+  // 기본 이미지 선택 핸들러
+  const handleDefaultImageSelect = (url: string) => {
+    setImage(null);
+    setPreview(url);
+    setShowDefaultImageSelect(false);
   };
 
   const handleWritingModeSelect = (mode: "question" | "free") => {
@@ -82,9 +98,16 @@ export default function NewDiaryPage() {
     setCurrentView("main");
   };
 
+
   const handleSubmit = async () => {
     if (!title.trim() || !content.trim()) {
       setError("제목과 내용을 모두 입력해주세요.");
+      return;
+    }
+    // 이미지가 없으면 기본 이미지 선택 안내
+    if (!image && !preview) {
+      setShowDefaultImageSelect(true);
+      setError("이미지를 추가하거나 기본 이미지 중 하나를 선택해주세요.");
       return;
     }
 
@@ -104,7 +127,12 @@ export default function NewDiaryPage() {
       formData.append("isPublic", isPublic.toString());
       
       if (questionId) formData.append("questionId", questionId);
-      if (image) formData.append("file", image); // 백엔드에서 'file'로 받음
+      if (image) {
+        formData.append("file", image); // 백엔드에서 'file'로 받음
+      } else if (preview) {
+        // 기본 이미지는 URL로 전달
+        formData.append("defaultImageUrl", preview);
+      }
       if (voiceRecord) formData.append("voice", voiceRecord);
       if (selectedMusic) formData.append("musicData", JSON.stringify(selectedMusic));
 
@@ -136,8 +164,28 @@ export default function NewDiaryPage() {
             <span className="text-sm text-gray-500">{new Date().toLocaleDateString('ko-KR')}</span>
           </div>
 
+
           {/* Image Upload Component */}
           <ImageUpload onImageSelect={handleImageSelect} preview={preview} />
+
+          {/* 기본 이미지 선택 안내 및 UI */}
+          {showDefaultImageSelect && (
+            <div className="my-4">
+              <div className="text-sm text-red-500 font-semibold mb-2">이미지를 추가하거나 아래 기본 이미지 중 하나를 선택하세요.</div>
+              <div className="grid grid-cols-2 gap-3">
+                {defaultImages.map((url, idx) => (
+                  <button
+                    key={url}
+                    type="button"
+                    className={`border-2 rounded-lg overflow-hidden focus:ring-2 focus:ring-blue-400 ${preview === url ? 'border-blue-500 ring-2' : 'border-gray-200'}`}
+                    onClick={() => handleDefaultImageSelect(url)}
+                  >
+                    <img src={url} alt={`기본 이미지 ${idx+1}`} className="w-full h-24 object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Emotion & Voice Component */}
           <EmotionVoice 

@@ -67,11 +67,20 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
   };
 
   const selectQuestion = (index: number) => {
-    setCurrentQuestionIndex(index);
-    setShowAnswerInput(true);
-    setCurrentAnswer(questions[index]?.answer || "");
-    setAnswerType(questions[index]?.answerType || "text");
-    setSelectedEmoji(questions[index]?.emoji || "");
+    if (showAnswerInput && currentQuestionIndex === index) {
+      // 이미 열려있는 질문을 다시 클릭하면 닫기
+      setShowAnswerInput(false);
+      setCurrentAnswer("");
+      setSelectedEmoji("");
+      setAnswerType("text");
+    } else {
+      // 다른 질문 클릭 시 해당 질문 열기
+      setCurrentQuestionIndex(index);
+      setShowAnswerInput(true);
+      setCurrentAnswer(questions[index]?.answer || "");
+      setAnswerType("text");
+      setSelectedEmoji("");
+    }
   };
 
   const saveAnswer = () => {
@@ -79,9 +88,9 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
     updatedQuestions[currentQuestionIndex] = {
       ...updatedQuestions[currentQuestionIndex],
       answered: true,
-      answer: answerType === "text" ? currentAnswer : selectedEmoji,
-      answerType,
-      emoji: answerType === "emoji" ? selectedEmoji : ""
+      answer: currentAnswer,
+      answerType: "text",
+      emoji: ""
     };
     setQuestions(updatedQuestions);
     setShowAnswerInput(false);
@@ -146,12 +155,21 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
     <div className="space-y-4">
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={onBack}
-          className="text-gray-500 hover:text-gray-700"
-        >
-          ← 뒤로
-        </button>
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={onBack}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            ← 뒤로
+          </button>
+          <button
+            onClick={generateQuestions}
+            disabled={isGenerating}
+            className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 disabled:opacity-50"
+          >
+            🔄 재생성
+          </button>
+        </div>
         <h1 className="text-lg font-bold text-gray-800">질문 기반 일기 작성</h1>
         <div className="text-sm text-gray-500">
           {answeredCount}/{totalCount}
@@ -180,7 +198,7 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
                   ? "bg-blue-50 border-blue-200"
                   : "bg-gray-50 border-gray-200 hover:bg-gray-100"
               }`}
-              onClick={() => !showAnswerInput && selectQuestion(index)}
+              onClick={() => selectQuestion(index)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center flex-1">
@@ -194,13 +212,10 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
                 {question.answered && (
                   <div className="flex items-center space-x-2">
                     <span className="text-xs text-green-600">✓ 완료</span>
-                    {question.answerType === "emoji" && (
-                      <span className="text-lg">{question.emoji}</span>
-                    )}
                   </div>
                 )}
               </div>
-              {question.answered && question.answerType === "text" && (
+              {question.answered && (
                 <div className="mt-2 ml-9">
                   <p className="text-xs text-gray-600 bg-white rounded p-2 line-clamp-2">
                     {question.answer}
@@ -219,67 +234,20 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
             질문 {currentQuestionIndex + 1}: {questions[currentQuestionIndex]?.text}
           </h3>
           
-          {/* 답변 유형 선택 */}
-          <div className="flex space-x-4 mb-4">
-            <button
-              onClick={() => setAnswerType("text")}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                answerType === "text" 
-                  ? "bg-blue-500 text-white" 
-                  : "bg-white text-gray-600 border"
-              }`}
-            >
-              📝 텍스트로 답변
-            </button>
-            <button
-              onClick={() => setAnswerType("emoji")}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                answerType === "emoji" 
-                  ? "bg-blue-500 text-white" 
-                  : "bg-white text-gray-600 border"
-              }`}
-            >
-              😊 이모티콘으로 답변
-            </button>
-          </div>
 
           {/* 텍스트 입력 */}
-          {answerType === "text" && (
-            <div className="mb-4">
-              <textarea
-                value={currentAnswer}
-                onChange={(e) => setCurrentAnswer(e.target.value)}
-                placeholder="이 질문에 대한 답변을 자유롭게 작성해보세요..."
-                className="w-full px-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px] resize-none"
-                maxLength={500}
-              />
-              <div className="text-right text-xs text-gray-500 mt-1">
-                {currentAnswer.length}/500자
-              </div>
+          <div className="mb-4">
+            <textarea
+              value={currentAnswer}
+              onChange={(e) => setCurrentAnswer(e.target.value)}
+              placeholder="이 질문에 대한 답변을 자유롭게 작성해보세요..."
+              className="w-full px-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px] resize-none"
+              maxLength={500}
+            />
+            <div className="text-right text-xs text-gray-500 mt-1">
+              {currentAnswer.length}/500자
             </div>
-          )}
-
-          {/* 이모티콘 선택 */}
-          {answerType === "emoji" && (
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-3">이 질문에 대한 감정을 이모티콘으로 표현해보세요:</p>
-              <div className="grid grid-cols-6 gap-2">
-                {emojiOptions.map((emoji) => (
-                  <button
-                    key={emoji}
-                    onClick={() => setSelectedEmoji(emoji)}
-                    className={`p-3 text-2xl rounded-lg border transition-all ${
-                      selectedEmoji === emoji 
-                        ? "bg-blue-500 border-blue-500 transform scale-110" 
-                        : "bg-white border-gray-200 hover:bg-gray-50"
-                    }`}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          </div>
 
           {/* 답변 저장 버튼 */}
           <div className="flex space-x-2">
@@ -291,10 +259,7 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
             </button>
             <button
               onClick={saveAnswer}
-              disabled={
-                (answerType === "text" && !currentAnswer.trim()) ||
-                (answerType === "emoji" && !selectedEmoji)
-              }
+              disabled={!currentAnswer.trim()}
               className="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
             >
               답변 저장
@@ -303,18 +268,22 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
         </div>
       )}
 
-      {/* 제목 입력 (선택사항) */}
+      {/* 제목 입력 (필수) */}
       {answeredCount > 0 && !showAnswerInput && (
         <div className="bg-gray-50 rounded-lg p-4">
-          <h3 className="font-semibold text-gray-700 mb-2">일기 제목 (선택사항)</h3>
+          <h3 className="font-semibold text-gray-700 mb-2">일기 제목 <span className="text-red-500">*</span></h3>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="제목을 입력하지 않으면 자동으로 생성됩니다"
+            placeholder="일기 제목을 입력하세요"
             className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             maxLength={50}
+            required
           />
+          {!title.trim() && (
+            <div className="text-xs text-red-500 mt-1">제목을 입력해야 일기를 저장할 수 있습니다.</div>
+          )}
         </div>
       )}
 
@@ -327,7 +296,8 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
             <p className="text-sm text-green-600 mb-4">일기를 저장하시겠습니까?</p>
             <button
               onClick={generateDiary}
-              className="bg-green-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-600"
+              disabled={!title.trim()}
+              className="bg-green-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-600 disabled:opacity-50"
             >
               일기 완성하기
             </button>
@@ -340,7 +310,8 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
         <div className="text-center">
           <button
             onClick={generateDiary}
-            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600"
+            disabled={!title.trim()}
+            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:opacity-50"
           >
             현재까지 답변으로 일기 저장하기 ({answeredCount}/{totalCount})
           </button>
