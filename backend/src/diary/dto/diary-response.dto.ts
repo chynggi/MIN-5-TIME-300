@@ -3,8 +3,10 @@ export class DiaryListItemDto {
   content: string;
   createdAt: string;
   updatedAt: string;
+  diaryDate: string; // 일기 날짜 필드 추가
   isPublic: boolean;
   emotionScore: number;
+  emotion?: string; // 감정 이모지 필드 추가
   mediaUrl?: string;
   mediaType?: string;
   question: string;
@@ -30,8 +32,10 @@ export class DiaryDetailResponseDto {
   content: string;
   createdAt: string;
   updatedAt: string;
+  diaryDate: string; // 일기 날짜 필드 추가
   isPublic: boolean;
   emotionScore: number;
+  emotion?: string; // 감정 이모지 필드 추가
   mediaUrl?: string;
   mediaType?: string;
   question: string;
@@ -39,4 +43,9 @@ export class DiaryDetailResponseDto {
   reactions: DiaryDetailReactionDto[];
   lat?: number;
   lng?: number;
+  userId?: string; // 소유자 ID 추가
+  user?: {
+    id: string;
+    username: string;
+  }; // 소유자 정보 추가
 }

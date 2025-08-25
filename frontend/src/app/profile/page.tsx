@@ -23,19 +23,21 @@ interface MyProfile {
   heartProgress: number;
   isPublic: boolean;
   mbti: string;
+  profileImageUrl?: string;
 }
 
 interface CalendarDay {
   date: number;
   emotion?: string;
   hasEntry: boolean;
+  diaryId?: string;
 }
 
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<MyProfile>({
     name: 'Unknown',
-    message: 'Happy Day!! 😊',
+    message: '',
     diaryCount: 0,
     followerCount: 0,
     followingCount: 0,
@@ -99,31 +101,55 @@ export default function ProfilePage() {
         console.error('본인 일기 조회 실패:', error);
       }
       
+      // 로컬 날짜 형식 변환 함수 (시간대 문제 해결)
+      const formatLocalDate = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      const todayLocalDate = formatLocalDate(new Date());
+      
       // 현재 달의 날짜들 추가
       for (let date = 1; date <= daysInMonth; date++) {
         const currentDateObj = new Date(year, month, date);
         const todayObj = new Date(todayYear, todayMonth, todayDate);
-        const dateString = currentDateObj.toISOString().split('T')[0];
+        const dateString = formatLocalDate(currentDateObj);
         
         let emotion = "";
         let hasEntry = false;
+        let diaryId = "";
         
-        // 오늘 이전 날짜들
-        if (currentDateObj < todayObj) {
-          const diary = myDiaries.find(d => d.createdAt.split('T')[0] === dateString);
+        // 해당 날짜에 일기가 있는지 확인 (로컬 날짜 기준)
+        const diary = myDiaries.find(d => {
+          const diaryDate = new Date(d.diaryDate); // diaryDate 사용
+          return formatLocalDate(diaryDate) === dateString;
+        });
+          console.log('📅 오늘 날짜 처리 디버그:');
+          console.log('- 오늘 날짜:', dateString);
+        
+        // 오늘 이전 날짜들과 오늘
+        if (currentDateObj <= todayObj) {
           if (diary) {
-            emotion = diary.emotion || "happy";
             hasEntry = true;
+            diaryId = diary.id;
+            // 실제 저장된 이모지 사용, 없으면 emotionScore 기반으로 폴백
+            const emotionScore = diary.emotionScore || 0;
+            if (diary.emotion) {
+              emotion = diary.emotion; // 실제 저장된 이모지 사용
+            } else {
+              // emotionScore를 기반으로 감정 결정 (폴백)
+              if (emotionScore >= 8) emotion = "😊"; // happy
+              else if (emotionScore >= 6) emotion = "🤩"; // excited
+              else if (emotionScore >= 4) emotion = "😌"; // calm
+              else if (emotionScore >= 2) emotion = "😢"; // sad
+              else emotion = "😠"; // angry
+            }
+          } else {
+            // 일기가 없는 경우 (미래 날짜나 과거에 작성하지 않은 날짜)
           }
         } 
-        // 오늘 날짜
-        else if (currentDateObj.getTime() === todayObj.getTime()) {
-          const diary = myDiaries.find(d => d.createdAt.split('T')[0] === dateString);
-          if (diary) {
-            emotion = diary.emotion || "happy";
-            hasEntry = true;
-          }
-        }
         // 미래 날짜들 - 자물쇠 표시
         else {
           emotion = "🔒";
@@ -133,7 +159,8 @@ export default function ProfilePage() {
         calendar.push({
           date,
           emotion,
-          hasEntry
+          hasEntry,
+          diaryId
         });
       }
       
@@ -169,7 +196,9 @@ export default function ProfilePage() {
       setProfile(prev => ({
         ...prev,
         name: profileData.username || 'Unknown',
+        message: profileData.bio || '안녕하세요! 😊',
         mbti: profileData.mbti || 'INFJ',
+        profileImageUrl: profileData.profileImageUrl,
       }));
     } catch (err: any) {
       console.error('프로필 로드 실패:', err);
@@ -296,7 +325,10 @@ export default function ProfilePage() {
         <div className={styles.avatarBox}>
           <div className={styles.avatarWrap}>
             <img
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=ececec&color=bbb`}
+              src={profile.profileImageUrl 
+                ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${profile.profileImageUrl}`
+                : `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=ececec&color=bbb`
+              }
               alt="프로필 이미지"
               className={styles.avatarImg}
             />
@@ -320,7 +352,7 @@ export default function ProfilePage() {
       {/* 이름/메시지 */}
       <div className={styles.profileTextBox}>
         <div className={styles.nickname}><span role="img" aria-label="heart">💖</span>{profile.name}</div>
-        <div className={styles.bio}>{profile.message} <span role="img" aria-label="smile">😊</span></div>
+        <div className={styles.bio}>{profile.message}</div>
       </div>
 
       {/* 버튼 */}
@@ -390,9 +422,13 @@ export default function ProfilePage() {
             const today = new Date();
             const todayObj = new Date(today.getFullYear(), today.getMonth(), today.getDate());
             
-            const isPast = currentDateObj < todayObj;
-            const isToday = currentDateObj.getTime() === todayObj.getTime();
-            const isFuture = currentDateObj > todayObj;
+            // 로컬 날짜 비교 (시간대 문제 해결)
+            const currentLocalDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day.date).padStart(2, '0')}`;
+            const todayLocalDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            
+            const isPast = currentLocalDate < todayLocalDate;
+            const isToday = currentLocalDate === todayLocalDate;
+            const isFuture = currentLocalDate > todayLocalDate;
             
             return (
               <div key={index} style={{ aspectRatio: '1' }}>
@@ -422,10 +458,27 @@ export default function ProfilePage() {
                   }}
                   disabled={isFuture}
                   onClick={() => {
-                    if (isToday) {
+                    console.log('🔍 Profile Calendar Click Debug:');
+                    console.log('- 클릭한 날짜:', day.date);
+                    console.log('- isFuture:', isFuture);
+                    console.log('- isToday:', isToday);
+                    console.log('- isPast:', isPast);
+                    console.log('- day.hasEntry:', day.hasEntry);
+                    console.log('- day.diaryId:', day.diaryId);
+                    console.log('- day.emotion:', day.emotion);
+                    console.log('- day 전체 객체:', day);
+                    
+                    if (isFuture) {
+                      console.log('➡️ 미래 날짜이므로 클릭 불가');
+                      return;
+                    }
+                    
+                    if (day.hasEntry && day.diaryId) {
+                      console.log('➡️ 일기가 있으므로 상세 페이지로 이동:', `/diary/${day.diaryId}`);
+                      router.push(`/diary/${day.diaryId}`);
+                    } else {
+                      console.log('➡️ 일기가 없으므로 새 일기 작성 페이지로 이동');
                       router.push('/diary/new');
-                    } else if (isPast && day.hasEntry) {
-                      console.log(`View my diary for ${day.date}`);
                     }
                   }}
                 >
@@ -437,7 +490,7 @@ export default function ProfilePage() {
                   </span>
                   {day.emotion && (
                     <span style={{ fontSize: '18px', lineHeight: 'none' }}>
-                      {day.emotion === "🔒" ? day.emotion : emotionEmojis[day.emotion] || '😊'}
+                      {day.emotion === "🔒" ? day.emotion : day.emotion}
                     </span>
                   )}
                   {isToday && !day.hasEntry && (

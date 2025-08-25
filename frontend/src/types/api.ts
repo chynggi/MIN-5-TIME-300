@@ -10,6 +10,9 @@ export interface ProfileResponse {
   email: string;
   username: string;
   mbti: string;
+  bio?: string;
+  birthDate?: string;
+  location?: string;
   profileImageUrl: string;
   interests: ProfileInterest[];
   createdAt: string;
@@ -41,16 +44,20 @@ export interface LifestyleAnswerData {
 // 친구 관련 타입
 export interface Friend {
   id: string;
-  username: string;
-  profileImageUrl?: string;
-  mbti?: string;
+  user: {
+    id: string;
+    username: string;
+    mbti: string;
+    profileImageUrl?: string;
+  };
   status: 'pending' | 'accepted';
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface FriendListResponse {
   friends: Friend[];
-  totalCount: number;
+  totalCount?: number;
 }
 
 export interface FriendRequestData {

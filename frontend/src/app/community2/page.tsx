@@ -36,7 +36,7 @@ export default function Community2ListPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.get("/community2/public-diaries")
+    api.get("/diaries/public")
       .then(res => {
         const raw: PublicDiary[] = res.data.diaries || [];
 

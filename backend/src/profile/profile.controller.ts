@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Put, Post, Delete, Req, UseGuards, Param } from '@nestjs/common';
+import { Body, Controller, Get, Put, Post, Delete, Req, UseGuards, Param, UploadedFile, UseInterceptors, UseFilters } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Multer } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -7,7 +9,10 @@ import { DetailedPrivacyDto, BlockUserDto, UnblockUserDto, PrivacySettingsRespon
 import { ProfileResponseDto, OtherProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateInterestsDto, InterestResponseDto } from './dto/update-interests.dto';
 import { LifestyleAnswerDto } from './dto/lifestyle-answer.dto';
+import { ProfileEditDataDto, ProfileBasicInfoDto, InterestOptionsDto, LifestyleOptionsDto } from './dto/profile-edit-data.dto';
 import { PersonaService } from './persona.service';
+import { profileImageUploadOptions } from '../common/config/multer.config';
+import { FileUploadExceptionFilter } from '../common/filters/file-upload-exception.filter';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/profile')
@@ -63,6 +68,26 @@ export class ProfileController {
     return this.profileService.getOtherProfile(req, username);
   }
 
+  /**
+   * 다른 사용자의 일기 달력 데이터 조회 (공개 설정에 따라 필터링)
+   */
+  @Get(':username/calendar/:year/:month')
+  async getOtherUserCalendarData(
+    @Req() req, 
+    @Param('username') username: string,
+    @Param('year') year: string,
+    @Param('month') month: string
+  ) {
+    const yearNum = parseInt(year, 10);
+    const monthNum = parseInt(month, 10);
+    
+    if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+      throw new Error('올바른 년도와 월을 입력해주세요.');
+    }
+    
+    return this.profileService.getOtherUserCalendarData(req, username, yearNum, monthNum);
+  }
+
   // 프로필 편집 관련 엔드포인트 추가
   @Put('basic')
   async updateBasicInfo(@Req() req, @Body() dto: UpdateBasicInfoDto): Promise<{ success: boolean; message: string }> {
@@ -72,6 +97,28 @@ export class ProfileController {
   @Put('image')
   async updateProfileImage(@Req() req, @Body() dto: UpdateProfileImageDto): Promise<{ success: boolean; message: string }> {
     return this.profileService.updateProfileImage(req, dto);
+  }
+
+  @Post('upload-image')
+  @UseInterceptors(FileInterceptor('file', profileImageUploadOptions))
+  @UseFilters(FileUploadExceptionFilter)
+  async uploadProfileImage(@Req() req, @UploadedFile() file: Multer.File): Promise<{ success: boolean; profileImageUrl: string; message: string }> {
+    return this.profileService.uploadProfileImage(req, file);
+  }
+
+  @Delete('image')
+  async deleteProfileImage(@Req() req): Promise<{ success: boolean; message: string }> {
+    return this.profileService.deleteProfileImage(req);
+  }
+
+  @Get('upload-progress/:uploadId')
+  async getUploadProgress(@Param('uploadId') uploadId: string): Promise<{ progress: number; status: string }> {
+    // 실제 구현에서는 Redis나 메모리 캐시를 사용하여 업로드 진행 상황 추적
+    // 여기서는 간단한 예시만 제공
+    return {
+      progress: 100,
+      status: 'completed'
+    };
   }
 
   @Put('privacy')
@@ -125,5 +172,39 @@ export class ProfileController {
   @Get(':username/visibility')
   async checkProfileVisibility(@Req() req, @Param('username') username: string): Promise<{ canView: boolean; visibleFields: string[] }> {
     return this.profileService.checkProfileVisibility(req, username);
+  }
+
+  // === 프로필 편집을 위한 데이터 조회 API들 ===
+
+  /**
+   * 프로필 편집을 위한 기본 정보 조회
+   */
+  @Get('edit/basic-info')
+  async getProfileBasicInfo(@Req() req): Promise<ProfileBasicInfoDto> {
+    return this.profileService.getProfileBasicInfo(req);
+  }
+
+  /**
+   * 관심사 편집을 위한 데이터 조회 (선택 가능한 옵션들 + 현재 선택된 항목들)
+   */
+  @Get('edit/interests')
+  async getInterestEditData(@Req() req): Promise<InterestOptionsDto> {
+    return this.profileService.getInterestEditData(req);
+  }
+
+  /**
+   * 라이프스타일 편집을 위한 데이터 조회 (선택 가능한 옵션들 + 현재 선택된 항목들)
+   */
+  @Get('edit/lifestyle')
+  async getLifestyleEditData(@Req() req): Promise<LifestyleOptionsDto> {
+    return this.profileService.getLifestyleEditData(req);
+  }
+
+  /**
+   * 프로필 편집을 위한 모든 데이터를 한 번에 조회
+   */
+  @Get('edit/all')
+  async getProfileEditData(@Req() req): Promise<ProfileEditDataDto> {
+    return this.profileService.getProfileEditData(req);
   }
 }

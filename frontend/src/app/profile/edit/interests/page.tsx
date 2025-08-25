@@ -1,194 +1,163 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import styles from '../../profile.module.css';
-import { profileApi } from '../../../../services/profile-api';
+import { InterestSelector, Interest } from '@/components/profile';
 
-interface Interest {
-  category: string;
-  item: string;
+interface InterestEditData {
+  availableInterests: string[];
+  selectedInterests: Interest[];
 }
 
-export default function InterestsEditPage() {
+export default function ProfileEditInterestsPage() {
   const router = useRouter();
-  const [interests, setInterests] = useState<Interest[]>([]);
-  const [categoryIndex, setCategoryIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [interestData, setInterestData] = useState<InterestEditData>({
+    availableInterests: [],
+    selectedInterests: []
+  });
+  const [selectedInterests, setSelectedInterests] = useState<Interest[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // 회원가입과 동일한 관심사 카테고리
-  const INTEREST_CATEGORIES = [
-    {
-      name: "음악",
-      items: [
-        "음악 감상", "공연 관람", "작곡/편곡", "밴드/합주", "악기 연주", "보컬/노래", "음반/LP 수집", "음악 리뷰", "음악 이론 공부", "음악 수업"
-      ],
-    },
-    {
-      name: "영화/영상",
-      items: [
-        "영화 감상", "로맨스 영화 감상", "스릴러/호러 감상", "코미디/드라마 감상", "다큐멘터리 감상", "애니메이션 감상", "단편영화 감상", "영화 리뷰", "영화 제작", "OTT 신작 탐색"
-      ],
-    },
-    {
-      name: "예술/디자인",
-      items: [
-        "미술관 관람", "전시회 탐방", "일러스트 그리기", "사진 촬영", "AR/VR 아트 감상", "공예/핸드메이드", "디자인 트렌드 탐색", "포트폴리오 제작", "아트 클래스 참여", "예술 독서"
-      ],
-    },
-    {
-      name: "게임",
-      items: [
-        "콘솔 게임 즐기기", "PC 게임 즐기기", "모바일 게임 즐기기", "보드게임 즐기기", "RPG 게임 플레이", "FPS 게임 플레이", "시뮬레이션 게임", "게임 리뷰", "게임 스트리밍", "게임 대회 참가"
-      ],
-    },
-    {
-      name: "독서/글쓰기",
-      items: [
-        "소설 읽기", "에세이 읽기", "시/시집 읽기", "자기계발서 읽기", "잡지/웹툰 읽기", "독서 모임 참여", "감상문/서평 쓰기", "일기 쓰기", "창작 소설 쓰기", "블로그/에세이 쓰기"
-      ],
-    },
-    {
-      name: "운동/스포츠",
-      items: [
-        "헬스/웨이트 트레이닝", "러닝(조깅)", "등산/트레킹", "수영", "요가/필라테스", "자전거 타기", "구기종목(축구/농구 등)", "라켓스포츠(테니스/배드민턴 등)", "댄스/에어로빅", "겨울스포츠(스키/보드)"
-      ],
-    },
-  ];
-
   useEffect(() => {
-    loadInterests();
+    loadInterestData();
   }, []);
 
-  const loadInterests = async () => {
+  const loadInterestData = async () => {
     try {
-      const profile = await profileApi.getProfile();
-      const userInterests = profile.interests || [];
-      
-      // 기존 선택된 관심사를 카테고리-항목 형태로 변환
-      const selectedInterests = userInterests.map(interest => {
-        // "카테고리 - 항목" 형식으로 저장되어 있다고 가정
-        const [category, item] = interest.interest.split(' - ');
-        return { category: category || '', item: item || interest.interest };
+      setLoading(true);
+      const response = await fetch('/api/v1/profile/edit/interests', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       });
-      
-      setInterests(selectedInterests);
-      setLoading(false);
-    } catch (err) {
-      console.error('관심사 로드 실패:', err);
+      const data = await response.json();
+      setInterestData(data);
+      setSelectedInterests(data.selectedInterests);
+    } catch (error) {
+      console.error('관심사 데이터 로드 오류:', error);
+      alert('관심사 데이터를 불러오는 중 오류가 발생했습니다.');
+    } finally {
       setLoading(false);
     }
   };
 
-  const toggleInterest = (category: string, item: string) => {
-    const exists = interests.find((i) => i.category === category && i.item === item);
-    if (exists) {
-      setInterests(interests.filter((i) => !(i.category === category && i.item === item)));
-    } else {
-      setInterests([...interests, { category, item }]);
-    }
+  const handleInterestsChange = (interests: Interest[]) => {
+    setSelectedInterests(interests);
+    setHasChanges(true);
   };
 
   const handleSave = async () => {
-    setSaving(true);
     try {
-      // 관심사 priority 자동 부여 (카테고리-항목)
-      const interestData = interests.map((interest, i) => ({
-        interest: `${interest.category} - ${interest.item}`,
-        priority: i + 1,
-      }));
-
-      await profileApi.updateInterests({
-        interests: interestData
+      setSaving(true);
+      const response = await fetch('/api/v1/profile/interests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          interests: selectedInterests.map((item, index) => ({
+            interest: item.interest,
+            priority: index + 1
+          }))
+        })
       });
-      
-      router.back();
-    } catch (err) {
-      console.error('관심사 저장 실패:', err);
-      alert('관심사 저장에 실패했습니다.');
+
+      if (response.ok) {
+        setHasChanges(false);
+        alert('관심사가 저장되었습니다.');
+        router.back();
+      }
+    } catch (error) {
+      console.error('저장 오류:', error);
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
+  };
+
+  const handleCancel = () => {
+    if (hasChanges) {
+      if (confirm('변경사항이 있습니다. 정말 취소하시겠습니까?')) {
+        router.back();
+      }
+    } else {
+      router.back();
+    }
   };
 
   if (loading) {
     return (
-      <div className={styles.profileContainer}>
-        <div className={styles.loadingContainer}>
-          관심사를 불러오는 중...
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">관심사 데이터를 불러오는 중...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={styles.profileContainer}>
-      <div className={styles.editHeader}>
-        <button 
-          className={styles.backButton}
-          onClick={() => router.back()}
-        >
-          ← 뒤로
-        </button>
-        <h1 className={styles.editTitle}>관심사</h1>
+    <div className="min-h-screen bg-gray-50">
+      {/* 헤더 */}
+      <div className="bg-white border-b">
+        <div className="max-w-4xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">관심사 편집</h1>
+              <p className="text-gray-600">관심사를 수정하여 더 나은 추천을 받아보세요</p>
+            </div>
+            <button
+              onClick={handleCancel}
+              className="text-gray-600 hover:text-gray-800"
+            >
+              ← 뒤로가기
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className={styles.editForm}>
-        <div className={styles.signupSection}>
-          {/* 카테고리 네비게이션 */}
-          <div className={styles.categoryNav}>
-            <button
-              type="button"
-              className={styles.navButton}
-              onClick={() => setCategoryIndex((idx) => Math.max(0, idx - 1))}
-              disabled={categoryIndex === 0}
-            >
-              이전 카테고리
-            </button>
-            <span className={styles.categoryTitle}>
-              {INTEREST_CATEGORIES[categoryIndex].name}
-            </span>
-            <button
-              type="button"
-              className={styles.navButton}
-              onClick={() => setCategoryIndex((idx) => Math.min(INTEREST_CATEGORIES.length - 1, idx + 1))}
-              disabled={categoryIndex === INTEREST_CATEGORIES.length - 1}
-            >
-              다음 카테고리
-            </button>
-          </div>
+      {/* 메인 컨텐츠 */}
+      <div className="py-8">
+        <InterestSelector
+          availableInterests={interestData.availableInterests}
+          preSelectedInterests={interestData.selectedInterests}
+          onInterestsChange={handleInterestsChange}
+          mode="edit"
+          title="관심사 수정"
+          description="변경하고 싶은 관심사를 선택해주세요"
+          minSelections={1}
+          maxSelections={15}
+        />
+      </div>
 
-          <div className={styles.categoryBox}>
-            <div className={styles.categoryBoxTitle}>{INTEREST_CATEGORIES[categoryIndex].name}</div>
-            <div className={styles.itemGrid}>
-              {INTEREST_CATEGORIES[categoryIndex].items.map((item) => {
-                const isSelected = interests.find(
-                  (interest) => interest.category === INTEREST_CATEGORIES[categoryIndex].name && interest.item === item
-                );
-                return (
-                  <button
-                    key={item}
-                    type="button"
-                    className={`${styles.itemChip} ${isSelected ? styles.itemChipSelected : ''}`}
-                    onClick={() => toggleInterest(INTEREST_CATEGORIES[categoryIndex].name, item)}
-                  >
-                    {item}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className={styles.selectionCount}>선택된 관심사: {interests.length}개</div>
+      {/* 하단 저장 버튼 */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-6">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <button
+            onClick={handleCancel}
+            className="px-6 py-2 text-gray-600 hover:text-gray-800"
+            disabled={saving}
+          >
+            취소
+          </button>
+          
+          <button
+            onClick={handleSave}
+            disabled={saving || !hasChanges}
+            className={`
+              px-8 py-2 rounded-lg font-medium transition-all
+              ${saving || !hasChanges
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+              }
+            `}
+          >
+            {saving ? '저장 중...' : '변경사항 저장'}
+          </button>
         </div>
-
-        <button 
-          className={styles.saveButton} 
-          onClick={handleSave}
-          disabled={saving || interests.length === 0}
-        >
-          {saving ? '저장 중...' : '저장하기'}
-        </button>
       </div>
     </div>
   );

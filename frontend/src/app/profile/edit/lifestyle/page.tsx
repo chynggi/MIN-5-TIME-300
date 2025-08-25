@@ -1,191 +1,167 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import styles from '../../profile.module.css';
-import { profileApi } from '../../../../services/profile-api';
+import { LifestyleSelector, LifestyleData } from '@/components/profile';
 
-interface Lifestyle {
-  category: string;
-  item: string;
+interface LifestyleEditData {
+  workStyleOptions: string[];
+  exerciseFrequencyOptions: string[];
+  sleepPatternOptions: string[];
+  socialActivityOptions: string[];
+  currentSelections: LifestyleData;
 }
 
-export default function LifestyleEditPage() {
+export default function ProfileEditLifestylePage() {
   const router = useRouter();
-  const [lifestyle, setLifestyle] = useState<Lifestyle[]>([]);
-  const [categoryIndex, setCategoryIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [lifestyleData, setLifestyleData] = useState<LifestyleEditData>({
+    workStyleOptions: [],
+    exerciseFrequencyOptions: [],
+    sleepPatternOptions: [],
+    socialActivityOptions: [],
+    currentSelections: {}
+  });
+  const [selectedLifestyle, setSelectedLifestyle] = useState<LifestyleData>({});
+  const [hasChanges, setHasChanges] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // 회원가입과 동일한 라이프스타일 카테고리
-  const LIFESTYLE_CATEGORIES = [
-    {
-      name: "인간관계 스타일",
-      items: [
-        "사람을 자주 만나는 편이다", "친한 사람과 자주 논다", "혼자 있는 시간을 좋아한다", "스킨십/동행을 좋아한다", "다양한 모임에 참여한다", "연락을 자주 하는 편이다", "친구와의 약속을 잘 지킨다", "새로운 사람 만나는 걸 두려워하지 않는다", "혼자만의 시간이 필요하다", "오래된 인연을 소중히 여긴다"
-      ],
-    },
-    {
-      name: "소비/금전 습관",
-      items: [
-        "소비를 아끼는 편이다", "작은 것에 감사한다", "충동구매를 잘 안 한다", "물건을 오래 쓴다", "중고거래를 한다", "할인/이벤트를 챙긴다", "가성비를 중요시한다", "브랜드/트렌드를 신경 쓴다", "계획적으로 소비한다", "후불 소비습관을 받지 않는다"
-      ],
-    },
-    {
-      name: "생활 리듬",
-      items: [
-        "아침형 인간이다", "저녁형 인간이다", "계획적으로 생활한다", "즉흥적으로 생활한다", "주말은 꼭 쉬는 편이다", "운동을 자주 한다", "야외 활동을 즐긴다", "집에 있는 걸 좋아한다", "취미가 많다", "여행을 자주 간다"
-      ],
-    },
-    {
-      name: "자기계발/성장욕구",
-      items: [
-        "목표를 세우고 꾸준히 관리한다", "독서를 자주 한다", "자격증/학습에 관심이 많다", "취미를 확장하는 편이다", "새로운 도전을 즐긴다", "스스로 동기부여를 잘 한다", "스터디/모임에 참여한다", "멘토/롤모델이 있다", "자기계발 강의를 듣는다", "성장한 경험을 남기고 싶다"
-      ],
-    },
-  ];
-
   useEffect(() => {
-    loadLifestyle();
+    loadLifestyleData();
   }, []);
 
-  const loadLifestyle = async () => {
+  const loadLifestyleData = async () => {
     try {
-      const profile = await profileApi.getProfile();
-      const userLifestyle = profile.lifestyle || [];
-      
-      // 기존 선택된 라이프스타일을 카테고리-항목 형태로 변환
-      const selectedLifestyle = userLifestyle.map((life: any) => {
-        // "카테고리 - 항목" 형식으로 저장되어 있다고 가정
-        const [category, item] = life.question.split(' - ');
-        return { category: category || '', item: item || life.question };
+      setLoading(true);
+      const response = await fetch('/api/v1/profile/edit/lifestyle', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       });
-      
-      setLifestyle(selectedLifestyle);
-      setLoading(false);
-    } catch (err) {
-      console.error('라이프스타일 로드 실패:', err);
+      const data = await response.json();
+      setLifestyleData(data);
+      setSelectedLifestyle(data.currentSelections);
+    } catch (error) {
+      console.error('라이프스타일 데이터 로드 오류:', error);
+      alert('라이프스타일 데이터를 불러오는 중 오류가 발생했습니다.');
+    } finally {
       setLoading(false);
     }
   };
 
-  const toggleLifestyle = (category: string, item: string) => {
-    const exists = lifestyle.find((i) => i.category === category && i.item === item);
-    if (exists) {
-      setLifestyle(lifestyle.filter((i) => !(i.category === category && i.item === item)));
-    } else {
-      setLifestyle([...lifestyle, { category, item }]);
-    }
+  const handleLifestyleChange = (lifestyle: LifestyleData) => {
+    setSelectedLifestyle(lifestyle);
+    setHasChanges(true);
   };
 
   const handleSave = async () => {
-    setSaving(true);
     try {
-      // 라이프스타일 카테고리-항목
-      const lifestyleData = lifestyle.map((life, i) => ({
-        question: `${life.category} - ${life.item}`,
-        answer: "선택",
-      }));
-
-      await profileApi.updateLifestyle({
-        answers: lifestyleData
+      setSaving(true);
+      const response = await fetch('/api/v1/profile/lifestyle', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(selectedLifestyle)
       });
-      
-      router.back();
-    } catch (err) {
-      console.error('라이프스타일 저장 실패:', err);
-      alert('라이프스타일 저장에 실패했습니다.');
+
+      if (response.ok) {
+        setHasChanges(false);
+        alert('라이프스타일이 저장되었습니다.');
+        router.back();
+      }
+    } catch (error) {
+      console.error('저장 오류:', error);
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
+  };
+
+  const handleCancel = () => {
+    if (hasChanges) {
+      if (confirm('변경사항이 있습니다. 정말 취소하시겠습니까?')) {
+        router.back();
+      }
+    } else {
+      router.back();
+    }
   };
 
   if (loading) {
     return (
-      <div className={styles.profileContainer}>
-        <div className={styles.loadingContainer}>
-          라이프스타일 정보를 불러오는 중...
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">라이프스타일 데이터를 불러오는 중...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={styles.profileContainer}>
-      <div className={styles.editHeader}>
-        <button 
-          className={styles.backButton}
-          onClick={() => router.back()}
-        >
-          ← 뒤로
-        </button>
-        <h1 className={styles.editTitle}>라이프스타일</h1>
+    <div className="min-h-screen bg-gray-50">
+      {/* 헤더 */}
+      <div className="bg-white border-b">
+        <div className="max-w-4xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">라이프스타일 편집</h1>
+              <p className="text-gray-600">라이프스타일을 수정하여 더 나은 매칭을 받아보세요</p>
+            </div>
+            <button
+              onClick={handleCancel}
+              className="text-gray-600 hover:text-gray-800"
+            >
+              ← 뒤로가기
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className={styles.editForm}>
-        <div className={styles.signupSection}>
-          {/* 라이프스타일 카테고리 네비게이션 */}
-          <div className={styles.categoryNav}>
-            <button
-              type="button"
-              className={styles.navButton}
-              onClick={() => setCategoryIndex((idx) => Math.max(0, idx - 1))}
-              disabled={categoryIndex === 0}
-            >
-              이전 카테고리
-            </button>
-            <span className={styles.categoryTitle}>
-              {LIFESTYLE_CATEGORIES[categoryIndex].name}
-            </span>
-            <button
-              type="button"
-              className={styles.navButton}
-              onClick={() => setCategoryIndex((idx) => Math.min(LIFESTYLE_CATEGORIES.length - 1, idx + 1))}
-              disabled={categoryIndex === LIFESTYLE_CATEGORIES.length - 1}
-            >
-              다음 카테고리
-            </button>
-          </div>
+      {/* 메인 컨텐츠 */}
+      <div className="py-8">
+        <LifestyleSelector
+          options={{
+            workStyleOptions: lifestyleData.workStyleOptions,
+            exerciseFrequencyOptions: lifestyleData.exerciseFrequencyOptions,
+            sleepPatternOptions: lifestyleData.sleepPatternOptions,
+            socialActivityOptions: lifestyleData.socialActivityOptions
+          }}
+          preSelectedValues={lifestyleData.currentSelections}
+          onLifestyleChange={handleLifestyleChange}
+          mode="edit"
+          title="라이프스타일 수정"
+          description="변경하고 싶은 라이프스타일을 선택해주세요"
+        />
+      </div>
 
-          <div className={styles.categoryBox} style={{ backgroundColor: '#fff5f5' }}>
-            <div className={styles.categoryBoxTitle} style={{ color: '#c53030' }}>
-              {LIFESTYLE_CATEGORIES[categoryIndex].name}
-            </div>
-            <div className={styles.itemGrid}>
-              {LIFESTYLE_CATEGORIES[categoryIndex].items.map((item) => {
-                const isSelected = lifestyle.find(
-                  (life) => life.category === LIFESTYLE_CATEGORIES[categoryIndex].name && life.item === item
-                );
-                return (
-                  <button
-                    key={item}
-                    type="button"
-                    className={`${styles.itemChip} ${isSelected ? styles.itemChipSelected : ''}`}
-                    onClick={() => toggleLifestyle(LIFESTYLE_CATEGORIES[categoryIndex].name, item)}
-                  >
-                    {item}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className={styles.selectionCount}>선택된 라이프스타일: {lifestyle.length}개</div>
+      {/* 하단 저장 버튼 */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-6">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <button
+            onClick={handleCancel}
+            className="px-6 py-2 text-gray-600 hover:text-gray-800"
+            disabled={saving}
+          >
+            취소
+          </button>
+          
+          <button
+            onClick={handleSave}
+            disabled={saving || !hasChanges}
+            className={`
+              px-8 py-2 rounded-lg font-medium transition-all
+              ${saving || !hasChanges
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+              }
+            `}
+          >
+            {saving ? '저장 중...' : '변경사항 저장'}
+          </button>
         </div>
-
-        <div style={{ marginTop: '16px', padding: '12px', background: '#f9f9f9', borderRadius: '8px' }}>
-          <small style={{ color: '#666', fontSize: '12px' }}>
-            * 라이프스타일 설정은 아직 백엔드 구현 대기 중입니다.<br/>
-            * 이 정보는 더 나은 매칭과 추천을 위해 사용됩니다.
-          </small>
-        </div>
-
-        <button 
-          className={styles.saveButton} 
-          onClick={handleSave}
-          disabled={saving || lifestyle.length === 0}
-        >
-          {saving ? '저장 중...' : '저장하기'}
-        </button>
       </div>
     </div>
   );

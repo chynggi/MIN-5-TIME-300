@@ -31,7 +31,9 @@ export default function PhotoEditPage() {
       const profile = await profileApi.getProfile();
       setPhotoData(prev => ({
         ...prev,
-        currentPhoto: profile.profileImageUrl || null
+        currentPhoto: profile.profileImageUrl 
+          ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${profile.profileImageUrl}`
+          : null
       }));
       setLoading(false);
     } catch (err) {
@@ -87,7 +89,7 @@ export default function PhotoEditPage() {
       if (photoData.file) {
         // 새 사진 업로드
         const formData = new FormData();
-        formData.append('profileImage', photoData.file);
+        formData.append('file', photoData.file);
         
         await profileApi.uploadProfileImage(formData);
         alert('프로필 사진이 업데이트되었습니다.');
@@ -97,7 +99,9 @@ export default function PhotoEditPage() {
         alert('프로필 사진이 삭제되었습니다.');
       }
       
-      router.back();
+      // 프로필 페이지로 돌아가면서 새로고침
+      router.push('/profile');
+      router.refresh();
     } catch (err) {
       console.error('프로필 사진 저장 실패:', err);
       alert('프로필 사진 저장에 실패했습니다.');

@@ -11,7 +11,6 @@ import { ChatModule } from './chat/chat.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { NotificationModule } from './notification/notification.module';
 import { PrismaModule } from './prisma.module';
-import { Community2Module } from './community2/community2.module';
 import { UsersModule } from './users/users.module';
 import { ChatGateway } from './chat/chat.gateway';
 import { JwtModule } from '@nestjs/jwt';
@@ -31,7 +30,6 @@ import { JwtModule } from '@nestjs/jwt';
     ChatModule,
     StatisticsModule,
     NotificationModule,
-    Community2Module,
     UsersModule,
   ],
   controllers: [AppController],

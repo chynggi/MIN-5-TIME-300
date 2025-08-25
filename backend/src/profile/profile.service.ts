@@ -1,13 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateBasicInfoDto, UpdateProfileImageDto, UpdatePrivacyDto, UpdateLifestyleDto, ProfileCompleteDto } from './dto/update-profile-extended.dto';
 import { DetailedPrivacyDto, BlockUserDto, UnblockUserDto, PrivacySettingsResponseDto, VisibilityLevel } from './dto/privacy-settings.dto';
 import { ProfileResponseDto, OtherProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateInterestsDto, InterestResponseDto } from './dto/update-interests.dto';
 import { LifestyleAnswerDto } from './dto/lifestyle-answer.dto';
+import { ProfileEditDataDto, ProfileBasicInfoDto, InterestInfoDto, LifestyleInfoDto, InterestOptionsDto, LifestyleOptionsDto } from './dto/profile-edit-data.dto';
 import { PrismaService } from '../prisma.service';
 import { PersonaService } from './persona.service';
 import { StatisticsService } from '../statistics/statistics.service';
+import { FileUploadService } from '../common/services/file-upload.service';
 
 @Injectable()
 export class ProfileService {
@@ -15,6 +17,7 @@ export class ProfileService {
     private readonly prisma: PrismaService,
     private readonly personaService: PersonaService,
     private readonly statisticsService: StatisticsService,
+    private readonly fileUploadService: FileUploadService,
   ) {}
 
   async getProfile(req: any): Promise<ProfileResponseDto> {
@@ -31,6 +34,9 @@ export class ProfileService {
       email: user.email,
       username: user.username,
       mbti: user.mbti ?? '',
+      bio: user.bio ?? '',
+      birthDate: user.birthDate ?? '',
+      location: user.location ?? '',
       profileImageUrl: user.profileImageUrl || '',
       interests: user.interests.map(i => ({ id: i.id, interest: i.interest, priority: i.priority })),
       createdAt: user.createdAt.toISOString(),
@@ -42,29 +48,299 @@ export class ProfileService {
   async getOtherProfile(req: any, otherUsername: string): Promise<OtherProfileResponseDto> {
     const currentUserId = req.user.userId;
     // username 기반 조회
-  const otherUser = await this.prisma.user.findFirst({ where: { username: otherUsername } });
+    const otherUser = await this.prisma.user.findFirst({ 
+      where: { username: otherUsername },
+      include: {
+        privacySettings: true,
+      },
+    });
     if (!otherUser) throw new NotFoundException('유저를 찾을 수 없습니다.');
     const otherUserId = otherUser.id;
+    
     // 공개 일기 수
     const diaryCount = await this.prisma.journal.count({ where: { userId: otherUserId, isPublic: true } });
     // 팔로워/팔로잉 카운트
     const followerCount = await this.prisma.friend.count({ where: { addresseeId: otherUserId, status: 'accepted' } });
     const followingCount = await this.prisma.friend.count({ where: { requesterId: otherUserId, status: 'accepted' } });
     // 현재 사용자 팔로우 상태
-  const isFollowing = !!(await this.prisma.friend.findFirst({ where: { requesterId: currentUserId, addresseeId: otherUserId, status: 'accepted' } }));
+    const isFollowing = !!(await this.prisma.friend.findFirst({ where: { requesterId: currentUserId, addresseeId: otherUserId, status: 'accepted' } }));
     // LPG 점수 조회 (StatisticsService 이용)
     const lpgData = await this.statisticsService.getLPGScore({ user: { userId: otherUserId } });
+
+    // 달력 조회 권한 계산
+    let canViewCalendar = false;
+    
+    // 본인인 경우 모든 권한
+    if (currentUserId === otherUserId) {
+      canViewCalendar = true;
+    } else {
+      // 차단된 사용자인지 확인
+      const isBlocked = await this.prisma.userBlock.findFirst({
+        where: {
+          OR: [
+            { blockerId: otherUserId, blockedId: currentUserId },
+            { blockerId: currentUserId, blockedId: otherUserId },
+          ],
+        },
+      });
+
+      if (!isBlocked) {
+        // 친구 관계 확인
+        const friendship = await this.prisma.friend.findFirst({
+          where: {
+            OR: [
+              { requesterId: currentUserId, addresseeId: otherUserId, status: 'accepted' },
+              { requesterId: otherUserId, addresseeId: currentUserId, status: 'accepted' },
+            ],
+          },
+        });
+
+        const isFriend = !!friendship;
+
+        // 일기 공개 설정 확인
+        // 먼저 공개된 개별 일기가 있는지 확인
+        const hasPublicJournals = await this.prisma.journal.count({
+          where: { 
+            userId: otherUserId, 
+            isPublic: true 
+          }
+        }) > 0;
+        
+        // 개별 일기가 공개되어 있으면 누구나 볼 수 있음
+        if (hasPublicJournals) {
+          canViewCalendar = true;
+        }
+        // 그렇지 않으면 사용자 전체 설정 확인
+        else {
+          if (otherUser.showDiariesToPublic) {
+            canViewCalendar = true;
+          } else if (otherUser.showDiariesToFriends && isFriend) {
+            canViewCalendar = true;
+          }
+        }
+
+        // PrivacySettings 테이블의 설정도 확인 (더 세부적인 설정이 있는 경우)
+        if (otherUser.privacySettings) {
+          const { diaryDefaultVisibility } = otherUser.privacySettings;
+          
+          switch (diaryDefaultVisibility) {
+            case 'PUBLIC':
+              canViewCalendar = true;
+              break;
+            case 'FRIENDS':
+              canViewCalendar = isFriend;
+              break;
+            case 'PRIVATE':
+              canViewCalendar = false;
+              break;
+            default:
+              // 기본값은 위에서 설정한 값 유지
+              break;
+          }
+        }
+      }
+    }
+
     return {
       id: otherUser.id,
       username: otherUser.username,
-      bio: otherUser.username,
+      bio: otherUser.bio || undefined,
       diaryCount,
       followerCount,
       followingCount,
       lpgScore: lpgData.lpgScore,
       isFollowing,
       isPublic: true,
-  mbti: otherUser.mbti || '',
+      mbti: otherUser.mbti || '',
+      canViewCalendar,
+    };
+  }
+
+  /**
+   * 다른 사용자의 일기 달력 데이터 조회 (공개 설정에 따라 필터링)
+   */
+  async getOtherUserCalendarData(req: any, otherUsername: string, year: number, month: number) {
+    const currentUserId = req.user.userId;
+    
+    // 대상 사용자 조회
+    const otherUser = await this.prisma.user.findFirst({ 
+      where: { username: otherUsername },
+      include: {
+        privacySettings: true,
+      },
+    });
+    
+    if (!otherUser) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    const otherUserId = otherUser.id;
+
+    // 본인인 경우 모든 일기 반환
+    if (currentUserId === otherUserId) {
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59);
+      
+      const journals = await this.prisma.journal.findMany({
+        where: {
+          userId: otherUserId,
+          diaryDate: {
+            gte: startDate,
+            lte: endDate,
+          },
+        },
+        select: {
+          id: true,
+          diaryDate: true,
+          emotion: true,
+          emotionScore: true,
+          isPublic: true,
+        },
+        orderBy: { diaryDate: 'asc' },
+      });
+
+      return {
+        canViewCalendar: true,
+        journals: journals.map(journal => ({
+          id: journal.id,
+          date: journal.diaryDate.toISOString().split('T')[0],
+          emotion: journal.emotion,
+          emotionScore: journal.emotionScore,
+          isPublic: journal.isPublic,
+        })),
+      };
+    }
+
+    // 차단된 사용자인지 확인
+    const isBlocked = await this.prisma.userBlock.findFirst({
+      where: {
+        OR: [
+          { blockerId: otherUserId, blockedId: currentUserId },
+          { blockerId: currentUserId, blockedId: otherUserId },
+        ],
+      },
+    });
+
+    if (isBlocked) {
+      return {
+        canViewCalendar: false,
+        journals: [],
+      };
+    }
+
+    // 친구 관계 확인
+    const friendship = await this.prisma.friend.findFirst({
+      where: {
+        OR: [
+          { requesterId: currentUserId, addresseeId: otherUserId, status: 'accepted' },
+          { requesterId: otherUserId, addresseeId: currentUserId, status: 'accepted' },
+        ],
+      },
+    });
+
+    const isFriend = !!friendship;
+
+    // 일기 공개 설정 확인
+    let canViewDiaries = false;
+    
+    // 먼저 공개된 개별 일기가 있는지 확인
+    const hasPublicJournals = await this.prisma.journal.count({
+      where: { 
+        userId: otherUserId, 
+        isPublic: true 
+      }
+    }) > 0;
+    
+    // 개별 일기가 공개되어 있으면 누구나 볼 수 있음
+    if (hasPublicJournals) {
+      canViewDiaries = true;
+    }
+    // 그렇지 않으면 사용자 전체 설정 확인
+    else {
+      // 기본 User 테이블의 설정 확인
+      if (otherUser.showDiariesToPublic) {
+        canViewDiaries = true;
+      } else if (otherUser.showDiariesToFriends && isFriend) {
+        canViewDiaries = true;
+      }
+    }
+
+    // PrivacySettings 테이블의 설정도 확인 (더 세부적인 설정이 있는 경우)
+    if (otherUser.privacySettings) {
+      const { diaryDefaultVisibility } = otherUser.privacySettings;
+      
+      switch (diaryDefaultVisibility) {
+        case 'PUBLIC':
+          canViewDiaries = true;
+          break;
+        case 'FRIENDS':
+          canViewDiaries = isFriend;
+          break;
+        case 'PRIVATE':
+          canViewDiaries = false;
+          break;
+        default:
+          // 기본값은 위에서 설정한 값 유지
+          break;
+      }
+    }
+
+    if (!canViewDiaries) {
+      return {
+        canViewCalendar: false,
+        journals: [],
+      };
+    }
+
+    // 달력 데이터 조회
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+    
+    // 일기 조회 조건 설정
+    let journalWhereCondition: any = {
+      userId: otherUserId,
+      diaryDate: {
+        gte: startDate,
+        lte: endDate,
+      },
+    };
+
+    // 조회 권한에 따른 필터링
+    if (isFriend) {
+      // 친구인 경우: 전체 공개 설정이거나 친구 공개 설정인 경우 모든 일기, 아니면 공개 일기만
+      if (!otherUser.showDiariesToPublic && !otherUser.showDiariesToFriends) {
+        journalWhereCondition.isPublic = true;
+      }
+      // showDiariesToFriends가 true이면 친구는 모든 일기(공개/비공개) 볼 수 있음
+    } else {
+      // 친구가 아닌 경우: 전체 공개 설정이거나 개별적으로 공개된 일기만
+      if (!otherUser.showDiariesToPublic) {
+        journalWhereCondition.isPublic = true;
+      }
+      // showDiariesToPublic이 true이면 누구나 모든 일기 볼 수 있음
+    }
+
+    const journals = await this.prisma.journal.findMany({
+      where: journalWhereCondition,
+      select: {
+        id: true,
+        diaryDate: true,
+        emotion: true,
+        emotionScore: true,
+        isPublic: true,
+      },
+      orderBy: { diaryDate: 'asc' },
+    });
+
+    return {
+      canViewCalendar: true,
+      journals: journals.map(journal => ({
+        id: journal.id,
+        date: journal.diaryDate.toISOString().split('T')[0],
+        emotion: journal.emotion,
+        emotionScore: journal.emotionScore,
+        isPublic: journal.isPublic,
+      })),
     };
   }
 
@@ -209,6 +485,84 @@ export class ProfileService {
       success: true,
       message: '프로필 이미지가 업데이트되었습니다.',
     };
+  }
+
+  async uploadProfileImage(req: any, file: any): Promise<{ success: boolean; profileImageUrl: string; message: string }> {
+    const userId = req.user.userId;
+
+    try {
+      // 기존 프로필 이미지가 있다면 삭제
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { profileImageUrl: true },
+      });
+
+      if (user?.profileImageUrl) {
+        await this.fileUploadService.deleteFile(user.profileImageUrl);
+      }
+
+      // 새 프로필 이미지 업로드
+      const config = this.fileUploadService.getUploadConfig('profile');
+      const uploadResult = await this.fileUploadService.uploadFile(
+        file,
+        config.uploadPath,
+        config.allowedTypes,
+        config.maxSize
+      );
+
+      // 데이터베이스 업데이트
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          profileImageUrl: uploadResult.fileUrl,
+        },
+      });
+
+      return {
+        success: true,
+        profileImageUrl: uploadResult.fileUrl,
+        message: '프로필 이미지가 성공적으로 업로드되었습니다.',
+      };
+    } catch (error) {
+      console.error('프로필 이미지 업로드 오류:', error);
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('파일 업로드 중 오류가 발생했습니다.');
+    }
+  }
+
+  async deleteProfileImage(req: any): Promise<{ success: boolean; message: string }> {
+    const userId = req.user.userId;
+
+    try {
+      // 현재 프로필 이미지 URL 조회
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { profileImageUrl: true },
+      });
+
+      if (user?.profileImageUrl) {
+        // 파일 시스템에서 이미지 파일 삭제
+        await this.fileUploadService.deleteFile(user.profileImageUrl);
+      }
+
+      // 데이터베이스에서 프로필 이미지 URL 제거
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          profileImageUrl: null,
+        },
+      });
+
+      return {
+        success: true,
+        message: '프로필 이미지가 삭제되었습니다.',
+      };
+    } catch (error) {
+      console.error('프로필 이미지 삭제 오류:', error);
+      throw new BadRequestException('프로필 이미지 삭제 중 오류가 발생했습니다.');
+    }
   }
 
   async updatePrivacy(req: any, dto: UpdatePrivacyDto): Promise<{ success: boolean; message: string }> {
@@ -644,6 +998,174 @@ export class ProfileService {
     return {
       canView: visibleFields.length > 0,
       visibleFields,
+    };
+  }
+
+  // === 프로필 편집을 위한 데이터 조회 메서드들 ===
+
+  /**
+   * 프로필 편집을 위한 기본 정보 조회
+   */
+  async getProfileBasicInfo(req: any): Promise<ProfileBasicInfoDto> {
+    const userId = req.user.userId;
+    
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        username: true,
+        bio: true,
+        mbti: true,
+        location: true,
+        birthDate: true,
+        profileImageUrl: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    return {
+      username: user.username,
+      bio: user.bio ?? undefined,
+      mbti: user.mbti ?? undefined,
+      location: user.location ?? undefined,
+      birthDate: user.birthDate ?? undefined,
+      profileImageUrl: user.profileImageUrl ?? undefined,
+    };
+  }
+
+  /**
+   * 관심사 편집을 위한 데이터 조회 (선택 가능한 옵션들 + 현재 선택된 항목들)
+   */
+  async getInterestEditData(req: any): Promise<InterestOptionsDto> {
+    const userId = req.user.userId;
+    
+    // 현재 사용자가 선택한 관심사들 조회
+    const userInterests = await this.prisma.userInterest.findMany({
+      where: { userId },
+      orderBy: { priority: 'asc' },
+    });
+
+    // 선택 가능한 관심사 옵션들 (프론트엔드와 동일한 목록)
+    const availableInterests = [
+      '독서', '영화감상', '음악', '게임', '운동', '요리', '여행', '사진촬영',
+      '그림그리기', '글쓰기', '외국어학습', '코딩', '디자인', '패션', '뷰티',
+      '반려동물', '원예', '악기연주', '댄스', '보드게임', '카페투어', '맛집탐방',
+      '등산', '캠핑', '낚시', '자전거', '요가', '헬스', '수영', '테니스',
+      '골프', '축구', '농구', '야구', '볼링', '당구', '스키', '서핑'
+    ];
+
+    return {
+      availableInterests,
+      selectedInterests: userInterests.map(interest => ({
+        id: interest.id,
+        interest: interest.interest,
+        priority: interest.priority,
+      })),
+    };
+  }
+
+  /**
+   * 라이프스타일 편집을 위한 데이터 조회 (선택 가능한 옵션들 + 현재 선택된 항목들)
+   */
+  async getLifestyleEditData(req: any): Promise<LifestyleOptionsDto> {
+    const userId = req.user.userId;
+    
+    // 현재 사용자의 라이프스타일 정보 조회
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        workStyle: true,
+        exerciseFrequency: true,
+        sleepPattern: true,
+        socialActivity: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    // 선택 가능한 옵션들 (프론트엔드와 동일한 목록)
+    const workStyleOptions = [
+      '재택근무', '사무실 근무', '하이브리드', '프리랜서', '학생', '기타'
+    ];
+
+    const exerciseFrequencyOptions = [
+      '매일', '주 3-4회', '주 1-2회', '월 1-2회', '거의 안함'
+    ];
+
+    const sleepPatternOptions = [
+      '일찍 자고 일찍 일어남', '늦게 자고 늦게 일어남', '불규칙함', '정해진 시간에 잠'
+    ];
+
+    const socialActivityOptions = [
+      '매우 활동적', '보통', '조용함', '집에 있는 것을 선호'
+    ];
+
+    return {
+      workStyleOptions,
+      exerciseFrequencyOptions,
+      sleepPatternOptions,
+      socialActivityOptions,
+      currentSelections: {
+        workStyle: user.workStyle || undefined,
+        exerciseFrequency: user.exerciseFrequency || undefined,
+        sleepPattern: user.sleepPattern || undefined,
+        socialActivity: user.socialActivity || undefined,
+      },
+    };
+  }
+
+  /**
+   * 프로필 편집을 위한 모든 데이터를 한 번에 조회
+   */
+  async getProfileEditData(req: any): Promise<ProfileEditDataDto> {
+    const userId = req.user.userId;
+    
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        interests: {
+          orderBy: { priority: 'asc' },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
+    return {
+      basicInfo: {
+        username: user.username,
+        bio: user.bio || undefined,
+        mbti: user.mbti || undefined,
+        location: user.location || undefined,
+        birthDate: user.birthDate || undefined,
+        profileImageUrl: user.profileImageUrl || undefined,
+      },
+      interests: user.interests.map(interest => ({
+        id: interest.id,
+        interest: interest.interest,
+        priority: interest.priority,
+      })),
+      lifestyle: {
+        workStyle: user.workStyle || undefined,
+        exerciseFrequency: user.exerciseFrequency || undefined,
+        sleepPattern: user.sleepPattern || undefined,
+        socialActivity: user.socialActivity || undefined,
+      },
+      privacySettings: {
+        isProfilePublic: user.isProfilePublic,
+        showMbti: user.showMbti,
+        showLocation: user.showLocation,
+        showBirthDate: user.showBirthDate,
+        allowFollowRequests: user.allowFollowRequests,
+        showDiariesToFriends: user.showDiariesToFriends,
+        showDiariesToPublic: user.showDiariesToPublic,
+      },
     };
   }
 }

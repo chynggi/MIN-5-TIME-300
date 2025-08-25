@@ -9,6 +9,9 @@ export class ProfileResponseDto {
   email: string;
   username: string;
   mbti: string;
+  bio?: string;
+  birthDate?: string;
+  location?: string;
   profileImageUrl: string;
   interests: ProfileInterestDto[];
   createdAt: string;
@@ -25,4 +28,5 @@ export class OtherProfileResponseDto {
   isFollowing: boolean;
   isPublic: boolean;
   mbti: string;
+  canViewCalendar?: boolean; // 달력 조회 권한 추가
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Param, Query, Req, UseGuards, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Post, Put, Delete, Param, Query, Req, UseGuards, UploadedFile, UseInterceptors, UseFilters } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Multer } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
@@ -8,6 +8,8 @@ import { RateDiaryDto } from './dto/rate-diary.dto';
 import { DiaryListResponseDto, DiaryDetailResponseDto } from './dto/diary-response.dto';
 import { TodayQuestionResponseDto } from './dto/today-question-response.dto';
 import { VectorDbService } from '../vector-db/vector-db.service';
+import { diaryMediaUploadOptions } from '../common/config/multer.config';
+import { FileUploadExceptionFilter } from '../common/filters/file-upload-exception.filter';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/diaries')
@@ -33,7 +35,8 @@ export class DiaryController {
   }
 
   @Post()
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', diaryMediaUploadOptions))
+  @UseFilters(FileUploadExceptionFilter)
   async createDiary(
     @Req() req,
     @Body() dto: CreateDiaryDto,
@@ -58,5 +61,39 @@ export class DiaryController {
   @Post('search-similar')
   async searchSimilarDiaries(@Req() req, @Body('text') text?: string, @Body('limit') limit = 5) {
     return this.diaryService.searchSimilarDiaries(req, text, limit);
+  }
+
+  // ==== 공개 일기 관리 엔드포인트들 (Community2 통합) ====
+
+  /**
+   * 공개 일기 목록 조회
+   */
+  @Get('public')
+  async getPublicDiaries(@Req() req, @Query() query) {
+    return this.diaryService.getPublicDiaries(req, query);
+  }
+
+  /**
+   * 공개 일기 생성
+   */
+  @Post('public')
+  async createPublicDiary(@Req() req, @Body() dto: any) {
+    return this.diaryService.createPublicDiary(req, dto);
+  }
+
+  /**
+   * 공개 일기 수정
+   */
+  @Put('public/:id')
+  async updatePublicDiary(@Req() req, @Param('id') id: string, @Body() dto: any) {
+    return this.diaryService.updatePublicDiary(req, id, dto);
+  }
+
+  /**
+   * 공개 일기 삭제
+   */
+  @Delete('public/:id')
+  async deletePublicDiary(@Req() req, @Param('id') id: string) {
+    return this.diaryService.deletePublicDiary(req, id);
   }
 }

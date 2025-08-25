@@ -23,7 +23,7 @@ export default function Community2DetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get(`/community2/public-diaries/${id}`)
+    api.get(`/diaries/public/${id}`)
       .then(res => {
         setDiary(res.data);
         setContent(res.data.content);
@@ -34,7 +34,7 @@ export default function Community2DetailPage() {
 
   const handleUpdate = async () => {
     try {
-      await api.put(`/community2/public-diaries/${id}`, { content });
+      await api.put(`/diaries/public/${id}`, { content });
       setDiary(d => d ? { ...d, content } : d);
       setEditMode(false);
     } catch {
@@ -45,7 +45,7 @@ export default function Community2DetailPage() {
   const handleDelete = async () => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
     try {
-      await api.delete(`/community2/public-diaries/${id}`);
+      await api.delete(`/diaries/public/${id}`);
       router.push("/community2");
     } catch {
       setError("삭제에 실패했습니다.");

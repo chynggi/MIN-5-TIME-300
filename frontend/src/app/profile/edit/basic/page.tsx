@@ -31,17 +31,60 @@ export default function BasicInfoEditPage() {
 
   const loadProfileData = async () => {
     try {
-      const profile = await profileApi.getProfile();
+      // 기본 정보 API 사용
+      const response = await fetch('/api/v1/profile/edit/basic-info', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('프로필 정보를 불러올 수 없습니다.');
+      }
+      
+      const basicInfo = await response.json();
+      
+      // birthDate 처리
+      let formattedBirthDate = '';
+      if (basicInfo.birthDate) {
+        // 다양한 날짜 형식 처리
+        if (typeof basicInfo.birthDate === 'string') {
+          if (basicInfo.birthDate.includes('T')) {
+            // ISO 형식 (2024-01-01T00:00:00.000Z)
+            formattedBirthDate = basicInfo.birthDate.split('T')[0];
+          } else if (basicInfo.birthDate.includes('-')) {
+            // 이미 YYYY-MM-DD 형식
+            formattedBirthDate = basicInfo.birthDate;
+          } else {
+            // 다른 형식일 경우 Date 객체로 변환 시도
+            const date = new Date(basicInfo.birthDate);
+            if (!isNaN(date.getTime())) {
+              formattedBirthDate = date.toISOString().split('T')[0];
+            }
+          }
+        } else if (basicInfo.birthDate instanceof Date) {
+          formattedBirthDate = basicInfo.birthDate.toISOString().split('T')[0];
+        }
+      }
+      
       setFormData({
-        name: profile.username || '',
-        birthDate: '1995-01-01', // TODO: 백엔드에서 생년월일 필드 추가 필요
+        name: basicInfo.username || '',
+        birthDate: formattedBirthDate || '', // 빈 값으로 설정하여 사용자가 직접 입력하도록 함
         gender: 'male', // TODO: 백엔드에서 성별 필드 추가 필요
-        mbti: profile.mbti || '',
-        bio: 'Happy Day!! 😊' // TODO: 백엔드에서 자기소개 필드 추가 필요
+        mbti: basicInfo.mbti || '',
+        bio: basicInfo.bio || ''
       });
       setLoading(false);
     } catch (err) {
       console.error('프로필 데이터 로드 실패:', err);
+      // 실패 시 기본값으로 설정
+      setFormData({
+        name: '',
+        birthDate: '',
+        gender: 'male',
+        mbti: '',
+        bio: ''
+      });
       setLoading(false);
     }
   };
@@ -56,10 +99,25 @@ export default function BasicInfoEditPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await profileApi.updateProfile({
-        username: formData.name,
-        mbti: formData.mbti,
+      const response = await fetch('/api/v1/profile/basic', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          username: formData.name,
+          mbti: formData.mbti,
+          bio: formData.bio,
+          birthDate: formData.birthDate ? new Date(formData.birthDate).toISOString() : undefined
+        })
       });
+
+      if (!response.ok) {
+        throw new Error('프로필 저장에 실패했습니다.');
+      }
+
+      alert('프로필이 저장되었습니다.');
       router.back();
     } catch (err) {
       console.error('프로필 저장 실패:', err);
@@ -123,9 +181,6 @@ export default function BasicInfoEditPage() {
             value={formData.birthDate}
             onChange={(e) => handleInputChange('birthDate', e.target.value)}
           />
-          <small style={{ color: '#666', fontSize: '12px' }}>
-            * 생년월일은 아직 백엔드 구현 대기 중입니다.
-          </small>
         </div>
 
         <div className={styles.formGroup}>
@@ -172,9 +227,6 @@ export default function BasicInfoEditPage() {
             placeholder="자신을 소개해보세요"
             rows={3}
           />
-          <small style={{ color: '#666', fontSize: '12px' }}>
-            * 자기소개는 아직 백엔드 구현 대기 중입니다.
-          </small>
         </div>
 
         <button 

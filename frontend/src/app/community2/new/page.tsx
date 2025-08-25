@@ -34,7 +34,7 @@ export default function Community2NewPage() {
     setLoading(true);
     setError("");
     try {
-      await api.post("/community2/public-diaries", {
+      await api.post("/diaries/public", {
         content,
         writingDuration: writingDuration || 1,
         ...(coords ? { lat: coords.lat, lng: coords.lng } : {}),

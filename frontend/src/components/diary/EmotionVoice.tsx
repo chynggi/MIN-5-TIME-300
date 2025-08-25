@@ -153,7 +153,7 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
           >
             <option value="" disabled>감정을 선택하세요</option>
             {emotions.map((item) => (
-              <option key={item.label} value={item.label}>
+              <option key={item.label} value={item.emoji}>
                 {item.emoji} {item.label}
               </option>
             ))}

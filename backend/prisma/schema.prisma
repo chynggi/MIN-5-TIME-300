@@ -49,7 +49,6 @@ model User {
   notificationSettings NotificationSettings?
   persona          UserPersona?
   feedbackLogs     FeedbackLog[]
-  publicDiaries   PublicDiary[]
   privacySettings PrivacySettings?
   blockedUsers    UserBlock[]      @relation("BlockedUsers")
   blockedByUsers  UserBlock[]      @relation("BlockedByUsers")
@@ -93,8 +92,10 @@ model Journal {
   content         String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  diaryDate       DateTime @default(now()) // 일기 작성 날짜 (사용자가 지정, 기본값은 현재 시각)
   isPublic        Boolean  @default(false)
   emotionScore    Int
+  emotion         String?           // 감정 이모지 저장
   mediaUrl        String?
   mediaType       String?
   writingDuration Int
@@ -219,19 +220,6 @@ model NotificationSettings {
   messageNotification       Boolean  @default(true)
   createdAt                 DateTime @default(now())
   updatedAt                 DateTime @updatedAt
-}
-
-model PublicDiary {
-  id              String   @id @default(uuid())
-  user            User     @relation(fields: [userId], references: [id])
-  userId          String
-  content         String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  isPublic        Boolean  @default(true)
-  writingDuration Int
-  lat        Float?   // 위도
-  lng        Float?   // 경도
 }
 
 model PrivacySettings {

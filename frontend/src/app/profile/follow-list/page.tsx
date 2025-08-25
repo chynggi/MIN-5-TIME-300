@@ -31,34 +31,43 @@ function FollowListContent() {
   const loadFriendData = async () => {
     setLoading(true);
     try {
-  if (username) {
+      if (username) {
         // 타인의 팔로워/팔로잉 목록 (별도 API 필요)
         // TODO: 타인의 친구 목록 조회 API 구현 필요
         setFollowers([]);
         setFollowing([]);
       } else {
-        // 내 친구 목록 조회
-        const friendData = await friendApi.getFriends('accepted');
-        const userList = friendData.friends.map(friend => ({
-          id: friend.id,
-          name: friend.username,
-          mbti: friend.mbti,
-          isFollowing: true,
-          isFollower: true,
-          status: friend.status,
-        }));
-        
-        setFollowers(userList);
-        setFollowing(userList);
+        // 내 팔로워/팔로잉 목록 조회
+        if (tab === 'followers') {
+          const followersData = await friendApi.getFollowers();
+          const followerList = followersData.friends.map(friend => ({
+            id: friend.user.id,
+            name: friend.user.username,
+            mbti: friend.user.mbti,
+            isFollowing: false, // 팔로워 탭에서는 내가 그들을 팔로우하는지 별도 확인 필요
+            isFollower: true,
+            status: friend.status,
+          }));
+          setFollowers(followerList);
+        } else {
+          const followingData = await friendApi.getFollowing();
+          const followingList = followingData.friends.map(friend => ({
+            id: friend.user.id,
+            name: friend.user.username,
+            mbti: friend.user.mbti,
+            isFollowing: true,
+            isFollower: false, // 팔로잉 탭에서는 그들이 나를 팔로우하는지 별도 확인 필요
+            status: friend.status,
+          }));
+          setFollowing(followingList);
+        }
       }
       setLoading(false);
     } catch (err) {
       console.error('친구 데이터 로드 실패:', err);
       setLoading(false);
     }
-  };
-
-  const handleTabChange = (newTab: string) => {
+  };  const handleTabChange = (newTab: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', newTab);
     router.push(`/profile/follow-list?${params.toString()}`);
@@ -71,39 +80,37 @@ function FollowListContent() {
   const handleFollowToggle = async (targetUserId: string, currentlyFollowing: boolean) => {
     try {
       if (currentlyFollowing) {
-        // 언팔로우 로직 (친구 삭제 - 별도 API 필요)
-        // TODO: 친구 삭제 API 구현 필요
-        console.log('언팔로우:', targetUserId);
+        // 언팔로우
+        await friendApi.unfollowUser(targetUserId);
       } else {
-        // 팔로우 로직 (친구 요청)
-        await friendApi.requestFriend({ targetUserId });
+        // 팔로우
+        await friendApi.followUser(targetUserId);
       }
       
       // 로컬 상태 업데이트
       if (tab === 'followers') {
         setFollowers(prev => 
           currentlyFollowing 
-            ? prev.filter(user => user.id !== targetUserId)
+            ? prev.map(user => 
+                user.id === targetUserId 
+                  ? { ...user, isFollowing: false }
+                  : user
+              )
             : prev.map(user => 
                 user.id === targetUserId 
-                  ? { ...user, isFollowing: !currentlyFollowing }
+                  ? { ...user, isFollowing: true }
                   : user
               )
         );
       } else {
-        setFollowing(prev => 
-          currentlyFollowing 
-            ? prev.filter(user => user.id !== targetUserId)
-            : prev.map(user => 
-                user.id === targetUserId 
-                  ? { ...user, isFollowing: !currentlyFollowing }
-                  : user
-              )
-        );
+        // 팔로잉 탭에서 언팔로우 시 목록에서 제거
+        if (currentlyFollowing) {
+          setFollowing(prev => prev.filter(user => user.id !== targetUserId));
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('팔로우 토글 실패:', err);
-      alert('작업에 실패했습니다.');
+      alert(err.response?.data?.message || '작업에 실패했습니다.');
     }
   };
 

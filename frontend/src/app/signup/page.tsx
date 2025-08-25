@@ -160,6 +160,12 @@ const SignupPage = () => {
         password: form.password,
         username: form.username,
         mbti: form.mbti,
+        birthDate: form.birth, // 생년월일 추가
+        bio: `안녕하세요! ${form.username}입니다.`, // 기본 자기소개 설정
+        height: form.height,
+        weight: form.weight,
+        job: form.job,
+        education: form.education,
         interests,
         lifestyle,
       };

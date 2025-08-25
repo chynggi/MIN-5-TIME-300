@@ -213,6 +213,15 @@ export class FriendService {
       throw new ForbiddenException('자기 자신을 팔로우할 수 없습니다.');
     }
 
+    // 대상 사용자가 존재하는지 확인
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId }
+    });
+
+    if (!targetUser) {
+      throw new NotFoundException('존재하지 않는 사용자입니다.');
+    }
+
     // 이미 팔로우 중인지 확인
     const existingFollow = await this.prisma.friend.findFirst({
       where: {
@@ -224,6 +233,20 @@ export class FriendService {
 
     if (existingFollow) {
       throw new ConflictException('이미 팔로우 중입니다.');
+    }
+
+    // 차단된 사용자인지 확인
+    const isBlocked = await this.prisma.userBlock.findFirst({
+      where: {
+        OR: [
+          { blockerId: userId, blockedId: targetUserId },
+          { blockerId: targetUserId, blockedId: userId }
+        ]
+      }
+    });
+
+    if (isBlocked) {
+      throw new ForbiddenException('차단된 사용자와는 팔로우할 수 없습니다.');
     }
 
     // 팔로우 관계 생성 (자동 수락)
@@ -244,6 +267,10 @@ export class FriendService {
 
   async unfollowUser(req: any, targetUserId: string): Promise<FollowResponseDto> {
     const userId = req.user.userId;
+
+    if (userId === targetUserId) {
+      throw new ForbiddenException('자기 자신을 언팔로우할 수 없습니다.');
+    }
 
     const follow = await this.prisma.friend.findFirst({
       where: {

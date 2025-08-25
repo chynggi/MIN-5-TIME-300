@@ -69,7 +69,7 @@ export default function DashboardPage() {
     // 날짜별 일기 맵 생성
     const diaryMap = new Map();
     diaries.forEach(diary => {
-      const diaryDate = new Date(diary.createdAt);
+      const diaryDate = new Date(diary.diaryDate); // diaryDate 사용
       const dayKey = diaryDate.getDate();
       if (diaryDate.getFullYear() === year && diaryDate.getMonth() === month) {
         diaryMap.set(dayKey, diary);
@@ -94,12 +94,17 @@ export default function DashboardPage() {
         diaryId = diaryForDate.id;
         emotionScore = diaryForDate.emotionScore || 0;
         
-        // emotionScore를 기반으로 감정 결정
-        if (emotionScore >= 8) emotion = "happy";
-        else if (emotionScore >= 6) emotion = "excited";
-        else if (emotionScore >= 4) emotion = "calm";
-        else if (emotionScore >= 2) emotion = "sad";
-        else emotion = "angry";
+        // 실제 저장된 이모지 사용, 없으면 emotionScore 기반으로 폴백
+        if (diaryForDate.emotion) {
+          emotion = diaryForDate.emotion; // 실제 저장된 이모지 사용
+        } else {
+          // emotionScore를 기반으로 감정 결정 (폴백)
+          if (emotionScore >= 8) emotion = "😊"; // happy
+          else if (emotionScore >= 6) emotion = "🤩"; // excited  
+          else if (emotionScore >= 4) emotion = "😌"; // calm
+          else if (emotionScore >= 2) emotion = "😢"; // sad
+          else emotion = "😠"; // angry
+        }
       }
       
       // 미래 날짜는 잠금 처리
@@ -266,7 +271,7 @@ export default function DashboardPage() {
                     {/* 이모티콘 또는 자물쇠 아이콘 표시 */}
                     {day.emotion && day.hasEntry ? (
                       <span className="text-lg leading-none">
-                        {emotionEmojis[day.emotion] || '😊'}
+                        {day.emotion}
                       </span>
                     ) : day.isLocked ? (
                       <span className="text-sm text-gray-500">🔒</span>

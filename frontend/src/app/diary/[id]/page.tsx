@@ -41,6 +41,7 @@ export default function DiaryDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [diary, setDiary] = useState<DiaryEntry | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -49,6 +50,19 @@ export default function DiaryDetailPage() {
   // Edit mode states
   const [editMode, setEditMode] = useState(false);
   const [editContent, setEditContent] = useState("");
+
+  useEffect(() => {
+    // 현재 사용자 정보 가져오기
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await api.get('/profile');
+        setCurrentUser({ id: response.data.id });
+      } catch (err) {
+        console.error('현재 사용자 정보 조회 실패:', err);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
 
   useEffect(() => {
     const fetchDiary = async () => {
@@ -70,11 +84,11 @@ export default function DiaryDetailPage() {
           image: diaryData.mediaUrl && diaryData.mediaType?.includes("image") ? diaryData.mediaUrl : undefined,
           voice: diaryData.mediaUrl && diaryData.mediaType?.includes("audio") ? diaryData.mediaUrl : undefined,
           user: {
-            id: diaryData.userId || "user",
-            nickname: diaryData.user?.nickname || "사용자",
+            id: diaryData.userId || diaryData.user?.id || "user",
+            nickname: diaryData.user?.username || diaryData.user?.nickname || "사용자",
             profileImage: diaryData.user?.profileImage
           },
-          isOwner: true, // TODO: 실제 소유자 확인 로직
+          isOwner: currentUser ? currentUser.id === (diaryData.userId || diaryData.user?.id) : false,
           question: diaryData.question,
           writingDuration: diaryData.writingDuration,
           emotionScore: diaryData.emotionScore,
@@ -90,10 +104,10 @@ export default function DiaryDetailPage() {
       }
     };
 
-    if (params.id) {
+    if (params.id && currentUser) {
       fetchDiary();
     }
-  }, [params.id]);
+  }, [params.id, currentUser]);
 
   const playVoice = () => {
     if (!diary?.voice) return;

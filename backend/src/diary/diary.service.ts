@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { generateDailyQuestion } from '../question/gemini-question.service';
 import type { Multer } from 'multer';
 import { CreateDiaryDto } from './dto/create-diary.dto';
@@ -7,12 +7,14 @@ import { DiaryListResponseDto, DiaryDetailResponseDto } from './dto/diary-respon
 import { TodayQuestionResponseDto } from './dto/today-question-response.dto';
 import { PrismaService } from '../prisma.service';
 import { VectorDbService } from '../vector-db/vector-db.service';
+import { FileUploadService } from '../common/services/file-upload.service';
 
 @Injectable()
 export class DiaryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly vectorDbService: VectorDbService,
+    private readonly fileUploadService: FileUploadService,
   ) {}
 
   async getTodayQuestion(req: any): Promise<TodayQuestionResponseDto> {
@@ -112,8 +114,10 @@ export class DiaryService {
         content: d.content,
         createdAt: d.createdAt.toISOString(),
         updatedAt: d.updatedAt.toISOString(),
+        diaryDate: d.diaryDate.toISOString(), // 일기 날짜 포함
         isPublic: d.isPublic,
         emotionScore: d.emotionScore,
+        emotion: d.emotion ?? undefined, // 감정 이모지 포함
         mediaUrl: d.mediaUrl ?? undefined,
         mediaType: d.mediaType ?? undefined,
         question: '', // 추후 질문 연동
@@ -126,21 +130,52 @@ export class DiaryService {
 
   async getDiary(req: any, id: string): Promise<DiaryDetailResponseDto> {
     const userId = req.user.userId;
-    const diary = await this.prisma.journal.findUnique({ where: { id } });
+    const diary = await this.prisma.journal.findUnique({ 
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            showDiariesToPublic: true,
+            showDiariesToFriends: true,
+          }
+        }
+      }
+    });
+    
     if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
-    if (diary.userId !== userId) throw new ForbiddenException('본인 일기만 조회할 수 있습니다.');
+    
+    // 본인 일기가 아닌 경우 접근 권한 확인
+    if (diary.userId !== userId) {
+      // 개별 일기가 공개되어 있지 않으면 접근 불가
+      if (!diary.isPublic) {
+        throw new ForbiddenException('이 일기에 접근할 권한이 없습니다.');
+      }
+      
+      // 개별 일기가 공개되어 있으면 접근 허용
+      // (사용자가 개별적으로 공개한 일기는 볼 수 있어야 함)
+    }
+    
     return {
       id: diary.id,
       content: diary.content,
       createdAt: diary.createdAt.toISOString(),
       updatedAt: diary.updatedAt.toISOString(),
+      diaryDate: diary.diaryDate.toISOString(), // 일기 날짜 포함
       isPublic: diary.isPublic,
       emotionScore: diary.emotionScore,
+      emotion: diary.emotion ?? undefined, // 감정 이모지 포함
       mediaUrl: diary.mediaUrl ?? undefined,
       mediaType: diary.mediaType ?? undefined,
       question: '', // 추후 질문 연동
       writingDuration: diary.writingDuration,
       reactions: [], // 추후 구현
+      userId: diary.userId, // 소유자 ID 추가
+      user: {
+        id: diary.user.id,
+        username: diary.user.username,
+      },
     };
   }
 
@@ -152,19 +187,26 @@ export class DiaryService {
     const userId = req.user.userId;
     let mediaUrl: string | undefined = undefined;
     let mediaType: string | undefined = undefined;
-    // 파일이 있으면 저장 (여기서는 uploads 폴더에 저장, 실제 서비스에서는 S3 등 외부 저장 권장)
+    // 파일이 있으면 저장 (공통 파일 업로드 서비스 사용)
     if (file) {
-      const fs = await import('fs');
-      const path = await import('path');
-      const uploadDir = path.join(process.cwd(), 'uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir);
+      try {
+        const config = this.fileUploadService.getUploadConfig('diary');
+        const uploadResult = await this.fileUploadService.uploadFile(
+          file,
+          config.uploadPath,
+          config.allowedTypes,
+          config.maxSize
+        );
+        
+        mediaUrl = uploadResult.fileUrl;
+        mediaType = file.mimetype;
+      } catch (error) {
+        console.error('파일 업로드 오류:', error);
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+        throw new BadRequestException('파일 업로드 중 오류가 발생했습니다.');
       }
-      const filename = `${Date.now()}_${file.originalname}`;
-      const filepath = path.join(uploadDir, filename);
-      fs.writeFileSync(filepath, file.buffer);
-      mediaUrl = `/uploads/${filename}`;
-      mediaType = file.mimetype;
     }
     
     // FormData로 전달된 문자열 값들을 올바른 타입으로 변환
@@ -173,11 +215,16 @@ export class DiaryService {
       ? parseInt((dto.writingDuration as any), 10) 
       : dto.writingDuration;
     
+    // diaryDate 처리 - 전달되면 사용, 없으면 현재 시각
+    const diaryDate = dto.diaryDate ? new Date(dto.diaryDate) : new Date();
+    
     const diary = await this.prisma.journal.create({
       data: {
         userId,
         content: dto.content,
         isPublic,
+        emotion: dto.emotion, // 감정 이모지 저장
+        diaryDate, // 일기 날짜 저장
         mediaUrl,
         mediaType,
         writingDuration,
@@ -286,5 +333,112 @@ export class DiaryService {
     // 결과 정렬: Pinecone 순서대로
     const idToDiary = Object.fromEntries(diaries.map(d => [d.id, d]));
     return ids.map((id: string) => idToDiary[id]).filter(Boolean);
+  }
+
+  // ==== 공개 일기 관리 메서드들 (Community2 통합) ====
+
+  /**
+   * 공개 일기 목록 조회
+   */
+  async getPublicDiaries(req: any, query: any) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+    
+    const where: any = { isPublic: true };
+    
+    // MBTI 필터링
+    if (query.mbtiFilter) {
+      where.user = { mbti: query.mbtiFilter };
+    }
+    
+    // 정렬 기준
+    const orderBy = query.sortBy === 'popular'
+      ? { emotionScore: 'desc' as const }
+      : { createdAt: 'desc' as const };
+
+    const [diaries, totalCount] = await Promise.all([
+      this.prisma.journal.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+        include: {
+          user: true,
+          communityComments: true,
+          reactions: true,
+        },
+      }),
+      this.prisma.journal.count({ where }),
+    ]);
+
+    return { diaries, totalCount, page, limit };
+  }
+
+  /**
+   * 공개 일기 생성 (기존 일기를 공개로 변경하거나 새로 생성)
+   */
+  async createPublicDiary(req: any, dto: any) {
+    const userId = req.user.userId;
+    
+    // 좌표 파싱
+    const lat = typeof dto.lat === 'number' ? dto.lat : (dto.lat != null ? Number(dto.lat) : null);
+    const lng = typeof dto.lng === 'number' ? dto.lng : (dto.lng != null ? Number(dto.lng) : null);
+    
+    const created = await this.prisma.journal.create({
+      data: {
+        content: dto.content,
+        userId,
+        isPublic: true,
+        emotionScore: 0,
+        writingDuration: dto.writingDuration || 1,
+        lat: Number.isFinite(lat) ? lat : null,
+        lng: Number.isFinite(lng) ? lng : null,
+      },
+    });
+    
+    return { id: created.id };
+  }
+
+  /**
+   * 공개 일기 수정
+   */
+  async updatePublicDiary(req: any, id: string, dto: any) {
+    const userId = req.user.userId;
+    const diary = await this.prisma.journal.findUnique({ where: { id } });
+    
+    if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
+    if (diary.userId !== userId) throw new ForbiddenException('수정 권한이 없습니다.');
+    if (!diary.isPublic) throw new ForbiddenException('공개 일기만 수정할 수 있습니다.');
+    
+    // 좌표 파싱
+    const lat = typeof dto.lat === 'number' ? dto.lat : (dto.lat != null ? Number(dto.lat) : undefined);
+    const lng = typeof dto.lng === 'number' ? dto.lng : (dto.lng != null ? Number(dto.lng) : undefined);
+    
+    await this.prisma.journal.update({
+      where: { id },
+      data: {
+        content: dto.content,
+        ...(lat !== undefined ? { lat: Number.isFinite(lat) ? (lat as number) : null } : {}),
+        ...(lng !== undefined ? { lng: Number.isFinite(lng) ? (lng as number) : null } : {}),
+      },
+    });
+    
+    return { success: true };
+  }
+
+  /**
+   * 공개 일기 삭제
+   */
+  async deletePublicDiary(req: any, id: string) {
+    const userId = req.user.userId;
+    const diary = await this.prisma.journal.findUnique({ where: { id } });
+    
+    if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
+    if (diary.userId !== userId) throw new ForbiddenException('삭제 권한이 없습니다.');
+    if (!diary.isPublic) throw new ForbiddenException('공개 일기만 삭제할 수 있습니다.');
+    
+    await this.prisma.journal.delete({ where: { id } });
+    return { success: true };
   }
 }

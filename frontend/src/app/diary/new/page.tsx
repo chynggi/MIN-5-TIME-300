@@ -49,6 +49,7 @@ export default function NewDiaryPage() {
   const [content, setContent] = useState("");
   const [questionId, setQuestionId] = useState("");
   const [startTime, setStartTime] = useState<number>(Date.now());
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]); // 일기 날짜 선택
   
   // Settings
   const [diarySettings, setDiarySettings] = useState({
@@ -120,6 +121,8 @@ export default function NewDiaryPage() {
       
       const formData = new FormData();
       formData.append("content", content);
+      formData.append("emotion", emotion); // 감정 이모지 추가
+      formData.append("diaryDate", selectedDate); // 일기 날짜 추가
       formData.append("writingDuration", writingDuration.toString());
       
       // isPublic 설정 (postVisibility가 "private"가 아니면 public으로 설정)
@@ -161,7 +164,15 @@ export default function NewDiaryPage() {
         <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-bold text-gray-800">오늘의 일기</h1>
-            <span className="text-sm text-gray-500">{new Date().toLocaleDateString('ko-KR')}</span>
+            <div className="flex flex-col items-end">
+              <span className="text-sm text-gray-500 mb-1">일기 날짜</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="text-sm text-gray-700 border border-gray-200 rounded px-2 py-1"
+              />
+            </div>
           </div>
 
 

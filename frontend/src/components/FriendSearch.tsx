@@ -133,11 +133,11 @@ export default function FriendSearch({ className = '' }: FriendSearchProps) {
       if (response.data.success) {
         // 추천 목록에서 제거
         setRecommendations(prev => prev.filter(rec => rec.id !== user.id));
-        alert(`${user.username}님에게 친구 요청을 보냈습니다.`);
+        alert(`${user.username}님을 팔로우했습니다.`);
       }
     } catch (error) {
-      console.error('친구 요청 오류:', error);
-      alert('친구 요청에 실패했습니다.');
+      console.error('팔로우 오류:', error);
+      alert('팔로우에 실패했습니다.');
     }
   };
 
@@ -151,36 +151,33 @@ export default function FriendSearch({ className = '' }: FriendSearchProps) {
   // 친구 요청 또는 팔로우 토글
   const handleFollowToggle = async (user: SearchUser) => {
     try {
-      let response;
       if (user.isFollowing) {
-        // 언팔로우 - 친구 관계 삭제
-        response = await api.delete(`/friends/${user.id}`);
+        // 언팔로우
+        await api.delete(`/friends/follow/${user.id}`);
       } else {
-        // 팔로우 - 친구 요청 보내기
-        response = await api.post('/friends/request', { targetUserId: user.id });
+        // 팔로우
+        await api.post('/friends/follow', { targetUserId: user.id });
       }
       
-      if (response.status === 200 || response.status === 201) {
-        // 검색 결과 업데이트
-        setSearchResults(prev => 
-          prev.map(u => 
-            u.id === user.id 
-              ? { ...u, isFollowing: !u.isFollowing }
-              : u
-          )
-        );
-        
-        // 성공 메시지 표시
-        if (user.isFollowing) {
-          console.log(`${user.username}님을 언팔로우했습니다.`);
-        } else {
-          console.log(`${user.username}님에게 친구 요청을 보냈습니다.`);
-        }
+      // 검색 결과 업데이트
+      setSearchResults(prev => 
+        prev.map(u => 
+          u.id === user.id 
+            ? { ...u, isFollowing: !u.isFollowing }
+            : u
+        )
+      );
+      
+      // 성공 메시지 표시
+      if (user.isFollowing) {
+        console.log(`${user.username}님을 언팔로우했습니다.`);
+      } else {
+        console.log(`${user.username}님을 팔로우했습니다.`);
       }
     } catch (error: any) {
-      console.error('친구 요청/해제 실패:', error);
+      console.error('팔로우 토글 실패:', error);
       // 실패 시 사용자에게 알림
-      alert(error.response?.data?.message || '친구 요청 처리에 실패했습니다.');
+      alert(error.response?.data?.message || '팔로우 처리에 실패했습니다.');
     }
   };
 

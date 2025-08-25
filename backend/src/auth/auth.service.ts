@@ -17,15 +17,51 @@ export class AuthService {
   async signup(dto: SignupDto): Promise<AuthResponseDto> {
     const exists = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (exists) throw new ConflictException('이미 가입된 이메일입니다.');
+    
     const hash = await bcrypt.hash(dto.password, 10);
+    
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
         passwordHash: hash,
         username: dto.username,
         mbti: dto.mbti,
+        birthDate: dto.birthDate,
+        bio: dto.bio,
+        // 추가 필드들 (나중에 확장 가능)
+        // height: dto.height,
+        // weight: dto.weight,
+        // job: dto.job,
+        // education: dto.education,
       },
     });
+
+    // 관심사 저장
+    if (dto.interests && dto.interests.length > 0) {
+      const interestData = dto.interests.map((interest, index) => ({
+        userId: user.id,
+        interest: interest.interest,
+        priority: interest.priority || (index + 1),
+      }));
+      
+      await this.prisma.userInterest.createMany({
+        data: interestData,
+      });
+    }
+
+    // 라이프스타일 저장
+    if (dto.lifestyle && dto.lifestyle.length > 0) {
+      const lifestyleData = dto.lifestyle.map((life) => ({
+        userId: user.id,
+        question: life.question,
+        answer: life.answer,
+      }));
+      
+      await this.prisma.lifestyleAnswer.createMany({
+        data: lifestyleData,
+      });
+    }
+
     const token = this.jwtService.sign({ sub: user.id, email: user.email });
     return {
       id: user.id,

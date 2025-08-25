@@ -19,18 +19,11 @@ const editOptions = [
     path: '/profile/edit/photo'
   },
   {
-    id: 'interests',
-    title: '관심사',
-    description: '취미, 관심 분야 설정',
-    icon: '❤️',
-    path: '/profile/edit/interests'
-  },
-  {
-    id: 'lifestyle',
-    title: '라이프스타일',
-    description: '생활 패턴, 선호도 등',
-    icon: '🌟',
-    path: '/profile/edit/lifestyle'
+    id: 'interests-lifestyle',
+    title: '관심사 & 라이프스타일',
+    description: '취미, 관심 분야, 생활 패턴 설정',
+    icon: '❤️🌟',
+    path: '/profile/edit/interests-lifestyle'
   }
 ];
 

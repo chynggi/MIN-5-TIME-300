@@ -59,7 +59,7 @@ export const profileApi = {
 
   // 프로필 이미지 업로드
   uploadProfileImage: (formData: FormData): Promise<{ success: boolean; profileImageUrl: string }> => {
-    return apiRequest('/profile/image', {
+    return apiRequest('/profile/upload-image', {
       method: 'POST',
       body: formData,
     });

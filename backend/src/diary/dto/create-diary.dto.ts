@@ -13,6 +13,14 @@ export class CreateDiaryDto {
 
   @IsOptional()
   @IsString()
+  emotion?: string; // 감정 이모지 필드 추가
+
+  @IsOptional()
+  @IsString()
+  diaryDate?: string; // 일기 날짜 필드 추가 (ISO 문자열)
+
+  @IsOptional()
+  @IsString()
   mediaUrl?: string;
 
   @IsOptional()

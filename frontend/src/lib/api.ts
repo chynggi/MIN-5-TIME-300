@@ -34,9 +34,13 @@ export const removeAuthToken = () => {
 const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   const token = getAuthToken();
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
   };
+
+  // FormData가 아닌 경우에만 Content-Type을 설정
+  if (!(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
