@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LifestyleSelector, LifestyleData } from '@/components/profile';
+import apiRequest from '../../../../lib/api';
 
 interface LifestyleEditData {
   workStyleOptions: string[];
@@ -33,12 +34,7 @@ export default function ProfileEditLifestylePage() {
   const loadLifestyleData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/profile/edit/lifestyle', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
+      const data = await apiRequest('/profile/edit/lifestyle');
       setLifestyleData(data);
       setSelectedLifestyle(data.currentSelections);
     } catch (error) {
@@ -57,20 +53,14 @@ export default function ProfileEditLifestylePage() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const response = await fetch('/api/v1/profile/lifestyle', {
+      await apiRequest('/profile/lifestyle', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify(selectedLifestyle)
       });
 
-      if (response.ok) {
-        setHasChanges(false);
-        alert('라이프스타일이 저장되었습니다.');
-        router.back();
-      }
+      setHasChanges(false);
+      alert('라이프스타일이 저장되었습니다.');
+      router.back();
     } catch (error) {
       console.error('저장 오류:', error);
       alert('저장 중 오류가 발생했습니다.');

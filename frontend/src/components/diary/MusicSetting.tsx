@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import apiRequest from "../../lib/api";
 
 // Spotify 트랙 데이터 구조 정의
 interface SpotifyTrack {
@@ -67,9 +68,7 @@ export default function MusicSetting({ onMusicSelect, selectedTrack }: MusicSett
     const loadPopularTracks = async () => {
       setLoadingPopular(true);
       try {
-        const response = await fetch('/api/spotify/popular?category=toplists&limit=10');
-        if (!response.ok) throw new Error('인기곡을 불러오는데 실패했습니다.');
-        const data = await response.json();
+        const data = await apiRequest('/spotify/popular?category=toplists&limit=10');
         setPopularTracks(data.tracks || []);
       } catch (error: any) {
         console.error('인기곡 로드 실패:', error);
@@ -89,12 +88,7 @@ export default function MusicSetting({ onMusicSelect, selectedTrack }: MusicSett
     setHasSearched(true);
     cleanupAudio();
     try {
-      const response = await fetch(`/api/spotify/search?q=${encodeURIComponent(searchQuery)}`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || '검색 중 오류가 발생했습니다.');
-      }
-      const data = await response.json();
+      const data = await apiRequest(`/spotify/search?q=${encodeURIComponent(searchQuery)}`);
       setSearchResults(data.tracks?.items || []);
     } catch (error: any) {
       setSearchError(error.message);

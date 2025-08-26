@@ -39,6 +39,10 @@ export class SignupDto {
 
   @IsOptional()
   @IsString()
+  gender?: string;
+
+  @IsOptional()
+  @IsString()
   bio?: string;
 
   @IsOptional()

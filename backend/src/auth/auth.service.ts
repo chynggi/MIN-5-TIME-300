@@ -27,6 +27,7 @@ export class AuthService {
         username: dto.username,
         mbti: dto.mbti,
         birthDate: dto.birthDate,
+        gender: dto.gender,
         bio: dto.bio,
         // 추가 필드들 (나중에 확장 가능)
         // height: dto.height,

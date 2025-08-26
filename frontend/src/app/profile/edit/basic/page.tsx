@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from '../../profile.module.css';
 import { profileApi } from '../../../../services/profile-api';
+import apiRequest from '../../../../lib/api';
 
 interface BasicInfo {
   name: string;
@@ -31,18 +32,8 @@ export default function BasicInfoEditPage() {
 
   const loadProfileData = async () => {
     try {
-      // 기본 정보 API 사용
-      const response = await fetch('/api/v1/profile/edit/basic-info', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error('프로필 정보를 불러올 수 없습니다.');
-      }
-      
-      const basicInfo = await response.json();
+      // apiRequest 사용하여 기본 정보 API 호출
+      const basicInfo = await apiRequest('/profile/edit/basic-info');
       
       // birthDate 처리
       let formattedBirthDate = '';
@@ -99,12 +90,8 @@ export default function BasicInfoEditPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch('/api/v1/profile/basic', {
+      await apiRequest('/profile/basic', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({
           username: formData.name,
           mbti: formData.mbti,
@@ -112,10 +99,6 @@ export default function BasicInfoEditPage() {
           birthDate: formData.birthDate ? new Date(formData.birthDate).toISOString() : undefined
         })
       });
-
-      if (!response.ok) {
-        throw new Error('프로필 저장에 실패했습니다.');
-      }
 
       alert('프로필이 저장되었습니다.');
       router.back();

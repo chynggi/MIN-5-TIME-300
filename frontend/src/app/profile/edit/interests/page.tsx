@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { InterestSelector, Interest } from '@/components/profile';
+import apiRequest from '../../../../lib/api';
 
 interface InterestEditData {
   availableInterests: string[];
@@ -27,12 +28,7 @@ export default function ProfileEditInterestsPage() {
   const loadInterestData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/profile/edit/interests', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const data = await response.json();
+      const data = await apiRequest('/profile/edit/interests');
       setInterestData(data);
       setSelectedInterests(data.selectedInterests);
     } catch (error) {
@@ -51,12 +47,8 @@ export default function ProfileEditInterestsPage() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const response = await fetch('/api/v1/profile/interests', {
+      await apiRequest('/profile/interests', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({
           interests: selectedInterests.map((item, index) => ({
             interest: item.interest,
@@ -65,11 +57,9 @@ export default function ProfileEditInterestsPage() {
         })
       });
 
-      if (response.ok) {
-        setHasChanges(false);
-        alert('관심사가 저장되었습니다.');
-        router.back();
-      }
+      setHasChanges(false);
+      alert('관심사가 저장되었습니다.');
+      router.back();
     } catch (error) {
       console.error('저장 오류:', error);
       alert('저장 중 오류가 발생했습니다.');

@@ -1,175 +1,176 @@
-'use client';
+"use client";
+import React, { useState } from 'react';
+import { CATEGORY_ICONS, INTEREST_CATEGORIES } from './interest-lifestyle-data';
+import { InterestSelectorProps } from './types';
 
-import React, { useState, useEffect } from 'react';
+// 재사용 가능한 2단계 관심사 선택 컴포넌트
+export const InterestSelector: React.FC<InterestSelectorProps> = ({
+  categories = INTEREST_CATEGORIES,
+  iconsMap = CATEGORY_ICONS,
+  selectedItems,
+  selectedCategories,
+  onToggleCategory,
+  onToggleItem,
+  onSkipToNextPhase,
+  minCategoryRequired = 1,
+  minItemRequired = 1,
+  showSkipHint = true,
+  title = '관심사 선택',
+  colorTheme = 'blue',
+  className = ''
+}) => {
+  const [phase, setPhase] = useState<'category' | 'items'>('category');
+  const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
 
-export interface Interest {
-  id?: string;
-  interest: string;
-  priority: number;
-}
+  const accent = colorTheme === 'blue' ? 'blue' : 'orange';
+  const accentText = colorTheme === 'blue' ? 'text-blue-700' : 'text-orange-700';
+  const accentBg = colorTheme === 'blue' ? 'bg-blue-500' : 'bg-orange-500';
+  const accentBgHover = colorTheme === 'blue' ? 'hover:bg-blue-600' : 'hover:bg-orange-600';
+  const accentBorder = colorTheme === 'blue' ? 'border-blue-700' : 'border-orange-700';
+  const accentBorderLight = colorTheme === 'blue' ? 'border-blue-200' : 'border-orange-200';
+  const accentTextColor = colorTheme === 'blue' ? 'text-blue-700' : 'text-orange-700';
+  const accentSoftBg = colorTheme === 'blue' ? 'bg-blue-50' : 'bg-orange-50';
 
-export interface InterestSelectorProps {
-  // 선택 가능한 모든 관심사 목록
-  availableInterests?: string[];
-  // 이미 선택된 관심사들 (프로필 편집 시 사용)
-  preSelectedInterests?: Interest[];
-  // 선택된 관심사가 변경될 때 호출되는 콜백
-  onInterestsChange: (interests: Interest[]) => void;
-  // 최대 선택 가능한 개수
-  maxSelections?: number;
-  // 최소 선택해야 하는 개수
-  minSelections?: number;
-  // 컴포넌트 모드 ('signup' | 'edit')
-  mode?: 'signup' | 'edit';
-  // 제목
-  title?: string;
-  // 설명
-  description?: string;
-}
+  const activeCategory = categories[activeCategoryIndex];
+  const isCategorySelected = (name: string) => selectedCategories.includes(name);
+  const isItemSelected = (category: string, item: string) => selectedItems.some(i => i.category === category && i.item === item);
 
-const DEFAULT_INTERESTS = [
-  '독서', '영화감상', '음악', '게임', '운동', '요리', '여행', '사진촬영',
-  '그림그리기', '글쓰기', '외국어학습', '코딩', '디자인', '패션', '뷰티',
-  '반려동물', '원예', '악기연주', '댄스', '보드게임', '카페투어', '맛집탐방',
-  '등산', '캠핑', '낚시', '자전거', '요가', '헬스', '수영', '테니스',
-  '골프', '축구', '농구', '야구', '볼링', '당구', '스키', '서핑'
-];
-
-export default function InterestSelector({
-  availableInterests = DEFAULT_INTERESTS,
-  preSelectedInterests = [],
-  onInterestsChange,
-  maxSelections = 10,
-  minSelections = 3,
-  mode = 'signup',
-  title = '관심사를 선택해주세요',
-  description = '나와 비슷한 관심사를 가진 사람들과 연결될 수 있어요'
-}: InterestSelectorProps) {
-  const [selectedInterests, setSelectedInterests] = useState<Interest[]>([]);
-
-  // 컴포넌트 마운트 시 미리 선택된 관심사들 설정
-  useEffect(() => {
-    if (preSelectedInterests.length > 0) {
-      setSelectedInterests(preSelectedInterests);
-    }
-  }, [preSelectedInterests]);
-
-  // 선택된 관심사가 변경될 때마다 부모 컴포넌트에 알림
-  useEffect(() => {
-    onInterestsChange(selectedInterests);
-  }, [selectedInterests, onInterestsChange]);
-
-  const handleInterestToggle = (interest: string) => {
-    setSelectedInterests(prev => {
-      const isAlreadySelected = prev.some(item => item.interest === interest);
-      
-      if (isAlreadySelected) {
-        // 이미 선택된 경우 제거
-        const newInterests = prev.filter(item => item.interest !== interest);
-        // priority 재정렬
-        return newInterests.map((item, index) => ({
-          ...item,
-          priority: index + 1
-        }));
-      } else {
-        // 최대 선택 개수 체크
-        if (prev.length >= maxSelections) {
-          alert(`최대 ${maxSelections}개까지 선택할 수 있습니다.`);
-          return prev;
-        }
-        
-        // 새로 추가
-        const newInterest: Interest = {
-          id: mode === 'edit' ? undefined : undefined, // 새 항목은 id가 없음
-          interest,
-          priority: prev.length + 1
-        };
-        return [...prev, newInterest];
-      }
-    });
+  const handleCategoryClick = (name: string, index: number) => {
+    onToggleCategory(name);
+    // 선택 즉시 아이템 단계로 이동
+    setActiveCategoryIndex(index);
+    setPhase('items');
   };
 
-  const isInterestSelected = (interest: string) => {
-    return selectedInterests.some(item => item.interest === interest);
-  };
-
-  const canSubmit = selectedInterests.length >= minSelections;
+  const totalItemsCount = selectedItems.length;
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6">
-      {/* 헤더 */}
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">{title}</h2>
-        <p className="text-gray-600">{description}</p>
-        <div className="mt-4">
-          <span className={`text-sm ${canSubmit ? 'text-green-600' : 'text-orange-600'}`}>
-            {selectedInterests.length}/{minSelections}개 이상 선택 
-            {maxSelections && ` (최대 ${maxSelections}개)`}
-          </span>
-        </div>
+    <div className={`w-full max-w-3xl mx-auto ${className}`}>
+      <div className="mb-6 text-center">
+        <h2 className={`text-2xl font-bold ${accentText}`}>{title}</h2>
+        <p className="text-gray-600 text-sm mt-2">
+          {phase === 'category' && '관심 있는 카테고리를 선택하면 바로 세부 항목을 설정할 수 있습니다.'}
+          {phase === 'items' && `${activeCategory.name} 카테고리의 세부 관심사를 선택하세요.`}
+        </p>
+        {showSkipHint && phase === 'category' && totalItemsCount > 0 && (
+          <div className="mt-3 p-3 bg-green-50 text-green-700 rounded text-sm">
+            ✅ {totalItemsCount}개의 관심사가 선택되었습니다. 이미 선택했다면 다음 단계로 이동할 수 있습니다.
+            {onSkipToNextPhase && (
+              <button
+                type="button"
+                className="ml-2 underline font-medium"
+                onClick={() => onSkipToNextPhase()}
+              >
+                바로 이동
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* 선택된 관심사 표시 */}
-      {selectedInterests.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">선택된 관심사</h3>
-          <div className="flex flex-wrap gap-2">
-            {selectedInterests.map((item) => (
-              <div
-                key={item.interest}
-                className="inline-flex items-center px-3 py-1.5 rounded-full text-sm bg-blue-100 text-blue-800"
-              >
-                <span className="mr-1 text-xs bg-blue-200 rounded-full w-5 h-5 flex items-center justify-center">
-                  {item.priority}
-                </span>
-                {item.interest}
+      {phase === 'category' && (
+        <div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            {categories.map((cat, idx) => {
+              const selected = isCategorySelected(cat.name);
+              return (
                 <button
-                  onClick={() => handleInterestToggle(item.interest)}
-                  className="ml-2 hover:text-blue-900"
+                  key={cat.name}
+                  type="button"
+                  onClick={() => handleCategoryClick(cat.name, idx)}
+                  className={`px-4 py-6 rounded-xl font-medium border-2 transition transform hover:scale-105 ${
+                    selected
+                      ? `${accentBg} text-white ${accentBorder} shadow-lg`
+                      : `bg-white ${accentTextColor} ${accentBorderLight} hover:bg-opacity-90`
+                  }`}
                 >
-                  ×
+                  <div className="text-2xl mb-2">{iconsMap[cat.name] || '⭐'}</div>
+                  <div className="text-lg font-bold mb-1">{cat.name}</div>
+                  <div className="text-xs opacity-80">{cat.items.length}개 항목</div>
                 </button>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+          <div className="text-sm text-gray-500 text-center mb-4">
+            선택된 카테고리: {selectedCategories.length}개 / 최소 {minCategoryRequired}개
           </div>
         </div>
       )}
 
-      {/* 관심사 선택 그리드 */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        {availableInterests.map((interest) => {
-          const isSelected = isInterestSelected(interest);
-          return (
+      {phase === 'items' && (
+        <div className="flex flex-col items-center gap-4">
+          {/* 카테고리 네비게이션 */}
+          <div className="flex items-center gap-4">
             <button
-              key={interest}
-              onClick={() => handleInterestToggle(interest)}
-              className={`
-                p-3 rounded-lg border-2 text-sm font-medium transition-all duration-200
-                ${isSelected
-                  ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-md scale-105'
-                  : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-                }
-                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-              `}
-              disabled={!isSelected && selectedInterests.length >= maxSelections}
+              type="button"
+              className="px-3 py-1 rounded bg-gray-200 text-gray-700 font-semibold disabled:opacity-50"
+              disabled={activeCategoryIndex === 0}
+              onClick={() => setActiveCategoryIndex(i => Math.max(0, i - 1))}
             >
-              {interest}
+              이전
             </button>
-          );
-        })}
-      </div>
-
-      {/* 하단 안내 */}
-      <div className="mt-8 text-center">
-        <div className="text-sm text-gray-500">
-          {mode === 'signup' && (
-            <p>선택한 관심사는 나중에 프로필에서 수정할 수 있습니다.</p>
+            <span className={`font-bold text-lg ${accentTextColor}`}>{activeCategory.name}</span>
+            <button
+              type="button"
+              className="px-3 py-1 rounded bg-gray-200 text-gray-700 font-semibold disabled:opacity-50"
+              disabled={activeCategoryIndex === categories.length - 1}
+              onClick={() => setActiveCategoryIndex(i => Math.min(categories.length - 1, i + 1))}
+            >
+              다음
+            </button>
+          </div>
+          <div className="text-sm text-gray-600 -mt-2">
+            {isCategorySelected(activeCategory.name) ? '✅ 선택된 카테고리' : '❌ 미선택 카테고리'}
+          </div>
+          <button
+            type="button"
+            onClick={() => onToggleCategory(activeCategory.name)}
+            className={`px-6 py-2 rounded-lg font-semibold text-sm transition ${
+              isCategorySelected(activeCategory.name)
+                ? 'bg-red-500 text-white hover:bg-red-600'
+                : `${accentBg} text-white ${accentBgHover}`
+            }`}
+          >
+            {isCategorySelected(activeCategory.name) ? '카테고리 선택 해제' : '카테고리 선택하기'}
+          </button>
+          {isCategorySelected(activeCategory.name) && (
+            <div className={`${accentSoftBg} rounded-xl p-4 w-full max-w-lg`}>
+              <div className={`font-bold mb-3 ${accentTextColor}`}>{activeCategory.name}</div>
+              <div className="grid grid-cols-1 gap-2">
+                {activeCategory.items.map(item => {
+                  const selected = isItemSelected(activeCategory.name, item);
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => onToggleItem(activeCategory.name, item)}
+                      className={`w-full px-3 py-2 rounded-lg text-sm font-medium border transition ${
+                        selected
+                          ? `${accentBg} text-white ${accentBorder}`
+                          : `bg-white ${accentTextColor} ${accentBorderLight} hover:bg-opacity-90`
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           )}
-          {mode === 'edit' && (
-            <p>변경사항은 저장 버튼을 눌러야 적용됩니다.</p>
-          )}
+          <div className="text-xs text-gray-500 mt-1">
+            선택된 카테고리: {selectedCategories.length}개 | 선택된 항목: {selectedItems.length}개
+          </div>
+          <button
+            type="button"
+            className="px-4 py-2 rounded-lg bg-gray-500 text-white text-sm hover:bg-gray-600 transition"
+            onClick={() => setPhase('category')}
+          >
+            카테고리 목록으로 돌아가기
+          </button>
         </div>
-      </div>
+      )}
     </div>
   );
-}
+};
+
+export default InterestSelector;
