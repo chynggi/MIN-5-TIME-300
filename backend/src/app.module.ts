@@ -7,6 +7,8 @@ import { DiaryModule } from './diary/diary.module';
 import { QuestionModule } from './question/question.module';
 import { CommunityModule } from './community/community.module';
 import { FriendModule } from './friend/friend.module';
+import { FollowModule } from './follow/follow.module';
+import { SocialModule } from './social/social.module';
 import { ChatModule } from './chat/chat.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { NotificationModule } from './notification/notification.module';
@@ -27,6 +29,8 @@ import { JwtModule } from '@nestjs/jwt';
     QuestionModule,
     CommunityModule,
     FriendModule,
+    FollowModule,
+    SocialModule,
     ChatModule,
     StatisticsModule,
     NotificationModule,

@@ -1,73 +1,81 @@
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsUUID, IsNotEmpty } from 'class-validator';
 
-export class ChatRoomParticipantDto {
+export class CreateConversationDto {
+  @IsUUID()
+  @IsNotEmpty()
+  recipientId: string;
+}
+
+export class SendMessageDto {
+  @IsOptional()
+  @IsString()
+  content?: string;
+
+  @IsOptional()
+  @IsEnum(['text', 'image', 'file', 'audio', 'video', 'system'])
+  type?: 'text' | 'image' | 'file' | 'audio' | 'video' | 'system';
+
+  @IsOptional()
+  attachments?: any;
+
+  @IsOptional()
+  @IsUUID()
+  replyToId?: string;
+
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string;
+}
+
+export class ReadMessagesDto {
+  @IsUUID()
+  @IsNotEmpty()
+  upToMessageId: string;
+}
+
+export class UserDto {
   id: string;
   username: string;
   profileImageUrl?: string;
 }
 
-export class ChatRoomLastMessageDto {
-  content: string;
-  createdAt: string;
-  sender: {
-    id: string;
-    username: string;
-  };
+export class MessageDto {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  type: string;
+  content?: string;
+  attachments?: any;
+  replyToId?: string;
+  createdAt: Date;
+  editedAt?: Date;
+  deletedAt?: Date;
+  sender: UserDto;
+  deliveryStatus?: 'SENT' | 'DELIVERED' | 'READ';
 }
 
-export class ChatRoomListItemDto {
+export class ConversationParticipantDto {
+  userId: string;
+  user: UserDto;
+  lastReadAt?: Date;
+}
+
+export class ConversationDto {
   id: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-  participants: ChatRoomParticipantDto[];
-  lastMessage?: ChatRoomLastMessageDto;
+  dmKey: string;
+  lastMessage?: MessageDto;
+  participants: ConversationParticipantDto[];
   unreadCount: number;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-export class ChatRoomListResponseDto {
-  chatRooms: ChatRoomListItemDto[];
-  rooms?: ChatRoomListItemDto[]; // 호환성을 위한 추가 프로퍼티
+// 응답 전용 DTO들
+export class MessageListResponseDto {
+  messages: MessageDto[];
+  nextCursor?: string;
 }
 
-export class ChatMessageDto {
-  id: string;
-  content: string;
-  createdAt: string;
-  sender: ChatRoomParticipantDto;
-  isRead: boolean;
-}
-
-export class ChatMessageListResponseDto {
-  messages: ChatMessageDto[];
-  hasMore: boolean;
-}
-
-export class SendMessageDto {
-  @IsString()
-  content: string;
-}
-
-export class SendMessageResponseDto {
-  id: string;
-  content: string;
-  createdAt: string;
-  isRead: boolean;
-}
-
-export class CreateChatRoomDto {
-  @IsOptional()
-  @IsString()
-  name?: string;
-
-  @IsArray()
-  @IsString({ each: true })
-  participants: string[];
-}
-
-export class CreateChatRoomResponseDto {
-  id: string;
-  name: string;
-  createdAt: string;
-  participants: ChatRoomParticipantDto[];
+export class SuccessResponseDto {
+  success: boolean;
 }

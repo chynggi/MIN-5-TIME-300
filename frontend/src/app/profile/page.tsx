@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './profile.module.css';
 import { profileApi } from '../../services/profile-api';
-import { friendApi } from '../../services/friend-api';
+import { followApi } from '../../services/follow-api';
 import { diaryApi } from '../../services/diary-api';
 import { statisticsApi } from '../../services/statistics-api';
 import { ProfileResponse } from '../../types/api';
@@ -212,15 +212,20 @@ export default function ProfilePage() {
 
   const loadFriendStats = async () => {
     try {
-      const friendsData = await friendApi.getFriends('accepted');
+      // 새로운 follow API로 현재 사용자의 팔로우 카운터 조회
+      // 현재 사용자 ID를 가져와야 함 - 임시로 localStorage나 프로필에서 가져오기
+      const currentUserProfile = await profileApi.getProfile();
+      const counters = await followApi.getFollowCounters(currentUserProfile.id);
+      
       setProfile(prev => ({
         ...prev,
-        followerCount: friendsData.totalCount || 0,
-        followingCount: friendsData.totalCount || 0,
+        followerCount: counters.followersCount || 0,
+        followingCount: counters.followingCount || 0,
       }));
       setLoading(false);
     } catch (err: any) {
-      console.error('친구 통계 로드 실패:', err);
+      console.error('팔로우 통계 로드 실패:', err);
+      // fallback으로 기존 데이터 유지
       setLoading(false);
     }
   };
@@ -359,6 +364,12 @@ export default function ProfilePage() {
       <div className={styles.buttonRow}>
         <button onClick={handleEditProfile} className={styles.pinkButton}>프로필 편집</button>
         <button onClick={handleTogglePublic} className={styles.pinkButton}>프로필 공개</button>
+        <button 
+          onClick={() => router.push('/profile/follow-requests')} 
+          className={styles.pinkButton}
+        >
+          팔로우 요청
+        </button>
       </div>
 
       {/* 캘린더 섹션 */}

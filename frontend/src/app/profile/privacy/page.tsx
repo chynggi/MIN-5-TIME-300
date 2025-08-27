@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from '../profile.module.css';
 import { notificationApi } from '../../../services/notification-api';
+import { privacyApi } from '../../../services/privacy-api';
+import FollowPrivacySettings from '../../../components/FollowPrivacySettings';
+import { PrivacySettingsResponseDto, FollowPrivacySettings as FollowPrivacyType } from '../../../types/privacy-settings.dto';
 
 interface PrivacySettings {
   isProfilePublic: boolean;
@@ -20,6 +23,11 @@ export default function PrivacySettingsPage() {
     showOnlineStatus: true,
     allowTagging: true
   });
+  const [detailedSettings, setDetailedSettings] = useState<PrivacySettingsResponseDto | null>(null);
+  const [followSettings, setFollowSettings] = useState<FollowPrivacyType>({
+    followersVisibility: 'PUBLIC',
+    followingVisibility: 'PUBLIC'
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -29,13 +37,30 @@ export default function PrivacySettingsPage() {
 
   const loadSettings = async () => {
     try {
-      // 알림 설정 API를 통해 일부 설정 가져오기
+      // 기존 알림 설정 로드
       const notificationSettings = await notificationApi.getSettings();
       setSettings(prev => ({
         ...prev,
         allowDM: notificationSettings.messageNotification,
-        // TODO: 프로필 공개 설정 등은 별도 API 필요
       }));
+
+      // 상세 개인정보 설정 로드
+      try {
+        const privacySettings = await privacyApi.getDetailedPrivacySettings();
+        setDetailedSettings(privacySettings);
+        setFollowSettings({
+          followersVisibility: privacySettings.followersVisibility,
+          followingVisibility: privacySettings.followingVisibility
+        });
+        setSettings(prev => ({
+          ...prev,
+          showOnlineStatus: privacySettings.showOnlineStatus,
+          allowDM: privacySettings.allowDirectMessages,
+        }));
+      } catch (privacyError) {
+        console.log('상세 개인정보 설정 로드 실패 (아직 구현되지 않을 수 있음):', privacyError);
+      }
+
       setLoading(false);
     } catch (err) {
       console.error('설정 로드 실패:', err);
@@ -50,6 +75,10 @@ export default function PrivacySettingsPage() {
     }));
   };
 
+  const handleFollowSettingsChange = (newSettings: FollowPrivacyType) => {
+    setFollowSettings(newSettings);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -58,8 +87,19 @@ export default function PrivacySettingsPage() {
         messageNotification: settings.allowDM,
       });
       
-      // TODO: 프로필 공개 설정 등은 별도 API 호출 필요
+      // 상세 개인정보 설정 업데이트 (팔로우 설정 포함)
+      try {
+        await privacyApi.updateDetailedPrivacySettings({
+          followersVisibility: followSettings.followersVisibility,
+          followingVisibility: followSettings.followingVisibility,
+          showOnlineStatus: settings.showOnlineStatus,
+          allowDirectMessages: settings.allowDM,
+        });
+      } catch (privacyError) {
+        console.log('상세 개인정보 설정 업데이트 실패 (아직 구현되지 않을 수 있음):', privacyError);
+      }
       
+      alert('설정이 저장되었습니다.');
       router.back();
     } catch (err) {
       console.error('설정 저장 실패:', err);
@@ -122,6 +162,17 @@ export default function PrivacySettingsPage() {
       </div>
 
       <div className={styles.settingsContainer}>
+        {/* 팔로우 목록 공개 설정 섹션 */}
+        <div style={{ marginBottom: '2rem' }}>
+          <FollowPrivacySettings
+            initialSettings={followSettings}
+            onSettingsChange={handleFollowSettingsChange}
+            isLoading={saving}
+            className="mb-6"
+          />
+        </div>
+
+        {/* 기존 설정 항목들 */}
         {settingItems.map((item) => (
           <div key={item.key} className={styles.settingItem}>
             <div className={styles.settingIcon}>{item.icon}</div>

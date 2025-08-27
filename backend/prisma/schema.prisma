@@ -23,6 +23,7 @@ model User {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   isActive         Boolean  @default(true)
+  isPrivate        Boolean  @default(false) // 비공개 계정 여부
   profileImageUrl  String?
   // 개인정보 공개 설정
   isProfilePublic      Boolean @default(true)
@@ -41,18 +42,28 @@ model User {
   lifestyleAnswers LifestyleAnswer[]
   journals         Journal[]
   recordScores     RecordScore[]
-  sentMessages     Message[]        @relation("SentMessages")
+  sentMessages     ChatMessage[]    @relation("SentMessages")
+  messageDeliveries MessageDelivery[] @relation("MessageDeliveries")
+  conversationParticipants ConversationParticipant[]
   friendsRequested Friend[]         @relation("FriendsRequested")
   friendsReceived  Friend[]         @relation("FriendsReceived")
   communityComments CommunityComment[]
   journalReactions JournalReaction[]
-  chatRoomParticipants ChatRoomParticipant[]
   notificationSettings NotificationSettings?
   persona          UserPersona?
   feedbackLogs     FeedbackLog[]
   privacySettings PrivacySettings?
   blockedUsers    UserBlock[]      @relation("BlockedUsers")
   blockedByUsers  UserBlock[]      @relation("BlockedByUsers")
+  // 팔로우 관계
+  followers       Follow[]         @relation("Followers")  // 나를 팔로우하는 사람들
+  following       Follow[]         @relation("Following")  // 내가 팔로우하는 사람들
+  followCounters  FollowCounters?
+  // 알림 관련 관계
+  notificationPrefs     NotificationPrefs?
+  notifications         Notification[]
+  notificationCounter   NotificationCounter?
+  deviceTokens          DeviceToken[]
 }
 
 
@@ -162,35 +173,89 @@ model Friend {
   updatedAt    DateTime @updatedAt
 }
 
-model ChatRoom {
-  id           String   @id @default(uuid())
-  name         String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  participants ChatRoomParticipant[]
-  messages     Message[]
+// 1:1 채팅을 위한 대화 모델
+model Conversation {
+  id            String   @id @default(uuid())
+  dmKey         String   @unique // 1:1 전용: "min(userId)-max(userId)" 형태로 중복 방지
+  lastMessageId String?
+  lastMessage   ChatMessage? @relation("ConversationLastMessage", fields: [lastMessageId], references: [id])
+  participants  ConversationParticipant[]
+  messages      ChatMessage[] @relation("ConversationMessages")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
-model ChatRoomParticipant {
-  id           String   @id @default(uuid())
-  chatRoom     ChatRoom @relation(fields: [chatRoomId], references: [id])
-  chatRoomId   String
-  user         User     @relation(fields: [userId], references: [id])
-  userId       String
-  // User.chatRoomParticipants와 연결
-  joinedAt     DateTime @default(now())
-  lastReadAt   DateTime?
+// 대화 참여자 (1:1이므로 항상 2명)
+model ConversationParticipant {
+  conversationId String
+  userId         String
+  joinedAt       DateTime  @default(now())
+  lastReadMessageId String?
+  lastReadAt       DateTime?
+  notificationsMuted Boolean @default(false)
+
+  conversation  Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user          User         @relation(fields: [userId], references: [id])
+
+  @@id([conversationId, userId])
+  @@index([userId])
 }
 
-model Message {
-  id           String   @id @default(uuid())
-  chatRoom     ChatRoom @relation(fields: [chatRoomId], references: [id])
-  chatRoomId   String
-  sender       User     @relation("SentMessages", fields: [senderId], references: [id])
-  senderId     String
-  content      String
-  createdAt    DateTime @default(now())
-  isRead       Boolean  @default(false)
+// 채팅 메시지
+model ChatMessage {
+  id             String       @id @default(uuid())
+  conversationId String
+  senderId       String
+  type           MessageType  @default(text)
+  content        String?
+  attachments    Json?        // 첨부파일 메타데이터 JSON
+  replyToId      String?      // 답장할 메시지 ID
+  createdAt      DateTime     @default(now())
+  editedAt       DateTime?
+  deletedAt      DateTime?    // 소프트 삭제
+
+  // 멱등성: 같은 보낸이+키 중복 방지
+  idempotencyKey String?
+
+  conversation Conversation @relation("ConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id])
+  deliveries   MessageDelivery[]
+  lastMessageOf Conversation[] @relation("ConversationLastMessage")
+
+  @@index([conversationId, createdAt(sort: Desc), id(sort: Desc)]) // 커서 페이지네이션용
+  @@index([senderId])
+}
+
+// 메시지 전달/읽음 상태
+model MessageDelivery {
+  messageId   String
+  recipientId String
+  status      MessageDeliveryStatus @default(SENT)
+  deliveredAt DateTime?
+  readAt      DateTime?
+
+  message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  recipient User        @relation("MessageDeliveries", fields: [recipientId], references: [id])
+
+  @@id([messageId, recipientId])
+  @@index([recipientId, status])
+}
+
+// 메시지 타입 enum
+enum MessageType {
+  text
+  image
+  file
+  audio
+  video
+  system
+}
+
+// 전달 상태 enum (기존 DeliveryStatus와 구분)
+enum MessageDeliveryStatus {
+  SENT
+  DELIVERED
+  READ
 }
 
 model CommunityComment {
@@ -234,6 +299,8 @@ model PrivacySettings {
   interestsVisibility     String   @default("FRIENDS")
   lifestyleVisibility     String   @default("FRIENDS")
   diaryDefaultVisibility  String   @default("PRIVATE")
+  followersVisibility     String   @default("PUBLIC")     // PUBLIC, FRIENDS, PRIVATE
+  followingVisibility     String   @default("PUBLIC")     // PUBLIC, FRIENDS, PRIVATE
   allowFollowRequests     Boolean  @default(true)
   showOnlineStatus        Boolean  @default(true)
   allowDirectMessages     Boolean  @default(true)
@@ -251,4 +318,162 @@ model UserBlock {
   createdAt   DateTime @default(now())
 
   @@unique([blockerId, blockedId])
+}
+
+// 팔로우 관계 테이블
+model Follow {
+  id           String   @id @default(uuid())
+  follower     User     @relation("Following", fields: [followerId], references: [id])
+  followerId   String
+  followee     User     @relation("Followers", fields: [followeeId], references: [id])
+  followeeId   String
+  status       FollowStatus @default(ACTIVE)
+  isFavorite   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  deletedAt    DateTime?
+
+  @@unique([followerId, followeeId])
+  @@index([followeeId, createdAt])  // followers 조회용
+  @@index([followerId, createdAt])  // following 조회용
+  @@index([followerId, status, isFavorite])  // 탭별 조회용
+}
+
+// 팔로우 카운터 캐시
+model FollowCounters {
+  id              String   @id @default(uuid())
+  user            User     @relation(fields: [userId], references: [id])
+  userId          String   @unique
+  followersCount  Int      @default(0)
+  followingCount  Int      @default(0)
+  updatedAt       DateTime @default(now()) @updatedAt
+}
+
+enum FollowStatus {
+  ACTIVE
+  REQUESTED
+}
+
+// 알림 설정 - 채널별/유형별 on/off
+model NotificationPrefs {
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String   @unique
+  // 채널별 설정
+  channelPush         Boolean  @default(true)
+  channelInApp        Boolean  @default(true)
+  channelEmail        Boolean  @default(false)
+  // 조용 시간 설정 (JSON: {tz:"Asia/Seoul", from:"23:00", to:"08:00"})
+  quietHours          Json?
+  // 알림 유형별 설정 (JSON: {follow:true, like:true, comment:true, mention:true})
+  types               Json     @default("{\"follow\":true,\"like\":true,\"comment\":true,\"mention\":true,\"diary\":true}")
+  lang                String   @default("ko-KR")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// 알림 본문 템플릿 (국제화/채널별)
+model NotificationTemplate {
+  id         String   @id @default(uuid())
+  type       String   // 예: 'follow_requested', 'post_liked'
+  channel    String   // 'inapp', 'push', 'email'
+  locale     String   // 'ko-KR', 'en-US'
+  titleTpl   String   // 예: "{{actor_name}}님이 회원님을 팔로우하기 요청했어요"
+  bodyTpl    String?  // 예: "{{actor_name}} 외 {{extra_count}}명이 회원님의 글을 좋아합니다"
+  deepLink   String?  // 예: "myapp://post/{{object_id}}"
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([type, channel, locale])
+}
+
+// 알림 인박스 (사용자별 저장되는 실제 알림)
+model Notification {
+  id           String   @id @default(uuid())
+  recipient    User     @relation(fields: [recipientId], references: [id])
+  recipientId  String
+  type         String   // 'follow_requested', 'post_liked', 'post_commented' 등
+  actorIds     Json     // 집계형: 여러 주체를 담기 위함 (최신이 앞)
+  objectType   String?  // 'user', 'journal', 'comment' 등
+  objectId     String?
+  groupKey     String?  // 집계 기준 키 (예: "post_liked:JOURNAL_ID")
+  groupCount   Int      @default(1)
+  payload      Json?    // 렌더링에 필요한 가변 정보
+  status       NotificationStatus @default(UNREAD)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  expiresAt    DateTime?
+  deliveries   NotificationDelivery[]
+
+  @@index([recipientId, createdAt(sort: Desc)])
+  @@index([recipientId, status])
+}
+
+// 채널별 실제 발송 기록
+model NotificationDelivery {
+  id               String   @id @default(uuid())
+  notification     Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  notificationId   String
+  channel          String   // 'push', 'email'
+  providerMsgId    String?
+  status           DeliveryStatus @default(PENDING)
+  attempts         Int      @default(0)
+  lastAttemptAt    DateTime?
+  error            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// 뱃지/카운트 캐시
+model NotificationCounter {
+  id                 String   @id @default(uuid())
+  user               User     @relation(fields: [userId], references: [id])
+  userId             String   @unique
+  unreadCount        Int      @default(0)
+  lastCalculatedAt   DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// 푸시용 디바이스 토큰
+model DeviceToken {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  token     String
+  platform  String   // 'ios', 'android', 'web'
+  isActive  Boolean  @default(true)
+  locale    String?
+  lastSeen  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, token])
+}
+
+// Outbox: 도메인 이벤트 → 알림 빌더로 전달
+model OutboxEvent {
+  id          String   @id @default(uuid())
+  eventKey    String   @unique  // 멱등성 키
+  type        String   // 예: 'follow_requested'
+  actorId     String
+  objectType  String?
+  objectId    String?
+  payload     Json?
+  createdAt   DateTime @default(now())
+  processedAt DateTime?
+
+  @@index([processedAt])
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  HIDDEN
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  THROTTLED
+  SKIPPED
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
 import { diaryApi } from "@/services/diary-api";
+import { ChatList } from "@/components/chat/ChatList";
 
 interface DiaryPreview { id: string; content: string; createdAt: string; question: string; emotion?: string; likes?: number; username?: string; }
 interface FriendPreview { id: string; username: string; avatar?: string; isOnline?: boolean; hasTodayDiary?: boolean; }
@@ -17,6 +18,7 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarData, setCalendarData] = useState<CalendarDay[]>([]);
+  const [isChatListOpen, setIsChatListOpen] = useState(false);
   const router = useRouter();
 
   // 감정 이모지 매핑
@@ -148,6 +150,24 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-pink-50">
+      {/* 상단 고정 채팅 버튼 */}
+      <div className="fixed top-4 right-4 z-30">
+        <button
+          onClick={() => setIsChatListOpen(true)}
+          className="bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-700 transition-colors"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-4.906-1.455L3 21l2.455-5.094A8.959 8.959 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
+          </svg>
+        </button>
+      </div>
+
+      {/* 채팅방 목록 모달 */}
+      <ChatList 
+        isOpen={isChatListOpen} 
+        onClose={() => setIsChatListOpen(false)} 
+      />
+
       {/* 메인 콘텐츠 */}
       <div className="flex-1 p-4 space-y-6">
         {/* 친구들 일기 스토리 섹션 */}

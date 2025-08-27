@@ -33,6 +33,15 @@ export class DetailedPrivacyDto {
   @IsEnum(VisibilityLevel)
   lifestyleVisibility?: VisibilityLevel;
 
+  // 팔로우/팔로잉 목록 공개 설정
+  @IsOptional()
+  @IsEnum(VisibilityLevel)
+  followersVisibility?: VisibilityLevel;
+
+  @IsOptional()
+  @IsEnum(VisibilityLevel)
+  followingVisibility?: VisibilityLevel;
+
   // 일기 공개 설정
   @IsOptional()
   @IsEnum(VisibilityLevel)
@@ -79,6 +88,8 @@ export class PrivacySettingsResponseDto {
   birthDateVisibility: VisibilityLevel;
   interestsVisibility: VisibilityLevel;
   lifestyleVisibility: VisibilityLevel;
+  followersVisibility: VisibilityLevel;
+  followingVisibility: VisibilityLevel;
   diaryDefaultVisibility: VisibilityLevel;
   allowFollowRequests: boolean;
   showOnlineStatus: boolean;

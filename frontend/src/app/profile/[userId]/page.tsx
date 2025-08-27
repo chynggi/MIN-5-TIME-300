@@ -4,6 +4,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import styles from '../profile.module.css';
 import api from '@/lib/axios';
+import BlockButton from '@/components/follow/BlockButton';
+import { followApi } from '@/services/follow-api';
+import { chatService } from '@/services/chatService';
 
 interface UserProfile {
   id: string;
@@ -17,6 +20,8 @@ interface UserProfile {
   isPublic: boolean;
   mbti?: string;
   canViewCalendar?: boolean; // 달력 조회 권한 추가
+  isBlocked?: boolean; // 차단 상태 추가
+  followStatus?: 'none' | 'active' | 'requested'; // 팔로우 상태 추가
 }
 
 interface CalendarDay {
@@ -150,6 +155,18 @@ export default function UserProfilePage() {
       try {
         const res = await api.get(`/profile/${username}`);
         const data = res.data;
+        
+        // 팔로우 관계 확인
+        let followStatus: 'none' | 'active' | 'requested' = 'none';
+        try {
+          const relationshipRes = await followApi.getFollowRelationship(data.id);
+          followStatus = relationshipRes.status;
+        } catch (relationshipError) {
+          console.log('팔로우 관계 확인 실패:', relationshipError);
+          // 기존 isFollowing 값으로 fallback
+          followStatus = data.isFollowing ? 'active' : 'none';
+        }
+
         setProfile({
           id: data.id,
           name: data.username,
@@ -162,6 +179,8 @@ export default function UserProfilePage() {
           isPublic: data.isPublic,
           mbti: data.mbti,
           canViewCalendar: data.canViewCalendar,
+          isBlocked: data.isBlocked,
+          followStatus: followStatus,
         });
       } catch (e) {
         console.error('프로필 조회 실패', e);
@@ -186,38 +205,137 @@ export default function UserProfilePage() {
     }
   };
 
-  const handleFollowToggle = () => {
+  const handleFollowToggle = async () => {
     if (!profile) return;
-    const toggle = async () => {
-      try {
-        if (profile.isFollowing) {
-          await api.delete(`/friends/follow/${profile.id}`);
-          // 언팔로우 시 팔로워 수 감소
+    
+    // 차단된 상태에서는 팔로우 불가
+    if (profile.isBlocked) {
+      alert('차단된 사용자입니다.');
+      return;
+    }
+    
+    try {
+      if (profile.isFollowing || profile.followStatus === 'active') {
+        // 언팔로우
+        try {
+          await followApi.unfollowUser(profile.id);
           setProfile(prev => prev ? { 
             ...prev, 
-            isFollowing: false, 
-            followerCount: prev.followerCount - 1 
+            isFollowing: false,
+            followStatus: 'none',
+            followerCount: Math.max(0, prev.followerCount - 1)
           } : prev);
-        } else {
-          await api.post('/friends/follow', { targetUserId: profile.id });
-          // 팔로우 시 팔로워 수 증가
-          setProfile(prev => prev ? { 
-            ...prev, 
-            isFollowing: true, 
-            followerCount: prev.followerCount + 1 
-          } : prev);
+        } catch (unfollowError: any) {
+          if (unfollowError.message?.includes('팔로우 관계가 존재하지 않습니다')) {
+            // 이미 언팔로우된 상태라면 상태만 업데이트
+            setProfile(prev => prev ? { 
+              ...prev, 
+              isFollowing: false,
+              followStatus: 'none',
+              followerCount: Math.max(0, prev.followerCount - 1)
+            } : prev);
+          } else {
+            throw unfollowError;
+          }
         }
-      } catch (err) {
-        console.error('팔로우 토글 에러', err);
-        // 에러 발생 시 상태를 원래대로 되돌림
+      } else if (profile.followStatus === 'requested') {
+        // 요청 취소
+        try {
+          await followApi.unfollowUser(profile.id);
+          setProfile(prev => prev ? { 
+            ...prev, 
+            followStatus: 'none'
+          } : prev);
+        } catch (cancelError: any) {
+          if (cancelError.message?.includes('팔로우 관계가 존재하지 않습니다')) {
+            // 이미 취소된 상태라면 상태만 업데이트
+            setProfile(prev => prev ? { 
+              ...prev, 
+              followStatus: 'none'
+            } : prev);
+          } else {
+            throw cancelError;
+          }
+        }
+      } else {
+        // 팔로우 또는 팔로우 요청
+        const result = await followApi.followUser(profile.id);
+        const newStatus = result.status === 'ACTIVE' ? 'active' : 'requested';
         setProfile(prev => prev ? { 
           ...prev, 
-          isFollowing: !prev.isFollowing,
-          followerCount: profile.isFollowing ? prev.followerCount + 1 : prev.followerCount - 1
+          isFollowing: newStatus === 'active',
+          followStatus: newStatus,
+          followerCount: newStatus === 'active' ? prev.followerCount + 1 : prev.followerCount
         } : prev);
       }
-    };
-    toggle();
+    } catch (err: any) {
+      console.error('팔로우 토글 에러:', err);
+      alert(err.message || '작업에 실패했습니다.');
+    }
+  };
+
+  const getFollowButtonText = () => {
+    if (!profile) return '팔로우';
+    
+    if (profile.isBlocked) return '차단됨';
+    
+    // followStatus가 우선, 없으면 isFollowing으로 fallback
+    if (profile.followStatus === 'active' || (profile.isFollowing && !profile.followStatus)) {
+      return '팔로잉';
+    } else if (profile.followStatus === 'requested') {
+      return '요청됨';
+    } else {
+      return '팔로우';
+    }
+  };
+
+  const getFollowButtonStyle = () => {
+    if (!profile) return '';
+    
+    if (profile.isBlocked) return styles.blockedBtn;
+    
+    // followStatus가 우선, 없으면 isFollowing으로 fallback
+    if (profile.followStatus === 'active' || (profile.isFollowing && !profile.followStatus)) {
+      return styles.secondary;
+    } else if (profile.followStatus === 'requested') {
+      return styles.pending;
+    } else {
+      return '';
+    }
+  };
+
+  const handleMessageClick = async () => {
+    if (!profile) return;
+    
+    // 토큰 상태 확인
+    const token = localStorage.getItem('token');
+    console.log('Current token:', token);
+    
+    if (!token) {
+      alert('로그인이 필요합니다. 다시 로그인해주세요.');
+      router.push('/auth/login');
+      return;
+    }
+    
+    try {
+      // 1:1 대화방 생성 또는 기존 대화방 찾기
+      const conversation = await chatService.createOrGetConversation(profile.id);
+      
+      // 채팅 페이지로 이동
+      router.push(`/chat/${conversation.id}`);
+    } catch (error) {
+      console.error('대화방 생성 실패:', error);
+      
+      // 401 에러인 경우 로그인 페이지로 리다이렉트
+      if (error instanceof Error && error.message.includes('Unauthorized')) {
+        alert('인증이 만료되었습니다. 다시 로그인해주세요.');
+        localStorage.removeItem('token');
+        router.push('/auth/login');
+        return;
+      }
+      
+      alert('메시지를 시작할 수 없습니다. 다시 시도해주세요.');
+    }
   };
 
   if (loading) {
@@ -273,12 +391,27 @@ export default function UserProfilePage() {
       <div className={styles.profileMsg}>{profile.message}</div>
       <div className={styles.btnRow}>
         <button 
-          className={`${styles.btn} ${profile.isFollowing ? styles.secondary : ''}`}
+          className={`${styles.btn} ${getFollowButtonStyle()}`}
           onClick={handleFollowToggle}
+          disabled={profile.isBlocked}
         >
-          {profile.isFollowing ? '팔로잉' : '팔로우'}
+          {getFollowButtonText()}
         </button>
-        <button className={`${styles.btn} ${styles.secondary}`}>메시지</button>
+        <button 
+          className={`${styles.btn} ${styles.secondary}`}
+          onClick={handleMessageClick}
+          disabled={profile.isBlocked}
+        >
+          메시지
+        </button>
+        <BlockButton
+          userId={profile.id}
+          username={profile.name}
+          isBlocked={profile.isBlocked}
+          onBlockChange={(isBlocked) => {
+            setProfile(prev => prev ? { ...prev, isBlocked } : prev);
+          }}
+        />
       </div>
       
       {/* 캘린더 섹션 */}

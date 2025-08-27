@@ -3,7 +3,8 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import styles from '../profile.module.css';
-import { friendApi } from '../../../services/friend-api';
+import { followApi } from '../../../services/follow-api';
+import { profileApi } from '../../../services/profile-api';
 
 interface User {
   id: string;
@@ -32,39 +33,45 @@ function FollowListContent() {
     setLoading(true);
     try {
       if (username) {
-        // 타인의 팔로워/팔로잉 목록 (별도 API 필요)
-        // TODO: 타인의 친구 목록 조회 API 구현 필요
+        // 타인의 팔로워/팔로잉 목록 조회
+        // TODO: username을 userId로 변환하는 로직 필요
+        // 임시로 빈 배열 설정
         setFollowers([]);
         setFollowing([]);
       } else {
         // 내 팔로워/팔로잉 목록 조회
         if (tab === 'followers') {
-          const followersData = await friendApi.getFollowers();
-          const followerList = followersData.friends.map(friend => ({
-            id: friend.user.id,
-            name: friend.user.username,
-            mbti: friend.user.mbti,
+          // 현재 사용자의 팔로워 목록 조회 - userId 필요
+          // 임시로 profileApi에서 현재 사용자 정보 가져오기
+          const currentProfile = await profileApi.getProfile();
+          const followersData = await followApi.getFollowers(currentProfile.id);
+          const followerList = followersData.data.map((follow: any) => ({
+            id: follow.follower.id,
+            name: follow.follower.username,
+            mbti: follow.follower.mbti,
             isFollowing: false, // 팔로워 탭에서는 내가 그들을 팔로우하는지 별도 확인 필요
             isFollower: true,
-            status: friend.status,
+            status: (follow.status === 'ACTIVE' ? 'accepted' : 'pending') as 'pending' | 'accepted',
           }));
           setFollowers(followerList);
         } else {
-          const followingData = await friendApi.getFollowing();
-          const followingList = followingData.friends.map(friend => ({
-            id: friend.user.id,
-            name: friend.user.username,
-            mbti: friend.user.mbti,
+          // 현재 사용자의 팔로잉 목록 조회
+          const currentProfile = await profileApi.getProfile();
+          const followingData = await followApi.getFollowing(currentProfile.id);
+          const followingList = followingData.data.map((follow: any) => ({
+            id: follow.followee.id,
+            name: follow.followee.username,
+            mbti: follow.followee.mbti,
             isFollowing: true,
             isFollower: false, // 팔로잉 탭에서는 그들이 나를 팔로우하는지 별도 확인 필요
-            status: friend.status,
+            status: (follow.status === 'ACTIVE' ? 'accepted' : 'pending') as 'pending' | 'accepted',
           }));
           setFollowing(followingList);
         }
       }
       setLoading(false);
     } catch (err) {
-      console.error('친구 데이터 로드 실패:', err);
+      console.error('팔로우 데이터 로드 실패:', err);
       setLoading(false);
     }
   };  const handleTabChange = (newTab: string) => {
@@ -81,10 +88,10 @@ function FollowListContent() {
     try {
       if (currentlyFollowing) {
         // 언팔로우
-        await friendApi.unfollowUser(targetUserId);
+        await followApi.unfollowUser(targetUserId);
       } else {
         // 팔로우
-        await friendApi.followUser(targetUserId);
+        await followApi.followUser(targetUserId);
       }
       
       // 로컬 상태 업데이트

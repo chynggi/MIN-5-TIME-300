@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/axios';
+import { followApi } from '@/services/follow-api';
 
 interface SearchUser {
   id: string;
@@ -10,6 +11,7 @@ interface SearchUser {
   mbti?: string;
   profileImageUrl?: string;
   isFollowing?: boolean;
+  followStatus?: 'none' | 'active' | 'requested';
 }
 
 interface RecommendUser {
@@ -17,6 +19,8 @@ interface RecommendUser {
   username: string;
   mbti?: string;
   profileImageUrl?: string;
+  isFollowing?: boolean;
+  followStatus?: 'none' | 'active' | 'requested';
 }
 
 interface FriendSearchProps {
@@ -34,17 +38,46 @@ export default function FriendSearch({ className = '' }: FriendSearchProps) {
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  // 추천 친구 가져오기
+  // 추천 친구 가져오기 - 새로운 로직으로 변경
   const fetchRecommendations = async () => {
     try {
-      const response = await api.get('/friends/recommend');
-      setRecommendations(response.data.recommendations || []);
+      // 임시로 사용자 검색 API를 사용하여 추천 사용자 목록 가져오기
+      // 실제로는 추천 알고리즘이 구현된 별도 API가 필요
+      const response = await api.get('/users/search?q=&limit=10');
+      const users = response.data.users || [];
+      
+      // 각 사용자의 팔로우 상태 확인
+      const recommendationsWithStatus = await Promise.all(
+        users.map(async (user: any) => {
+          try {
+            const relationship = await followApi.getFollowRelationship(user.id);
+            return {
+              ...user,
+              followStatus: relationship.status,
+              isFollowing: relationship.status === 'active'
+            };
+          } catch (error) {
+            return {
+              ...user,
+              followStatus: 'none' as const,
+              isFollowing: false
+            };
+          }
+        })
+      );
+      
+      // 이미 팔로우하고 있지 않은 사용자만 추천
+      const filteredRecommendations = recommendationsWithStatus.filter(
+        user => user.followStatus === 'none'
+      );
+      
+      setRecommendations(filteredRecommendations);
     } catch (error) {
       console.error('추천 친구 조회 실패:', error);
     }
   };
 
-  // 검색 실행
+  // 검색 실행 - 팔로우 상태 포함
   const performSearch = async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -54,7 +87,29 @@ export default function FriendSearch({ className = '' }: FriendSearchProps) {
     setLoading(true);
     try {
       const response = await api.get(`/users/search?q=${encodeURIComponent(query)}`);
-      setSearchResults(response.data.users || []);
+      const users = response.data.users || [];
+      
+      // 각 사용자의 팔로우 상태 확인
+      const usersWithStatus = await Promise.all(
+        users.map(async (user: any) => {
+          try {
+            const relationship = await followApi.getFollowRelationship(user.id);
+            return {
+              ...user,
+              followStatus: relationship.status,
+              isFollowing: relationship.status === 'active'
+            };
+          } catch (error) {
+            return {
+              ...user,
+              followStatus: 'none' as const,
+              isFollowing: false
+            };
+          }
+        })
+      );
+      
+      setSearchResults(usersWithStatus);
     } catch (error) {
       console.error('검색 실패:', error);
       setSearchResults([]);
@@ -63,16 +118,7 @@ export default function FriendSearch({ className = '' }: FriendSearchProps) {
     }
   };
 
-  // 디바운스된 검색
-  const loadRecommendations = async () => {
-    try {
-      const response = await api.get('/friends/recommend');
-      setRecommendations(response.data.recommendations || []);
-    } catch (error) {
-      console.error('추천 친구 로딩 오류:', error);
-    }
-  };
-
+  // 디바운스된 검색 - 기존 추천 친구 로딩 함수 제거
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchQuery.trim()) {
@@ -85,7 +131,7 @@ export default function FriendSearch({ className = '' }: FriendSearchProps) {
 
   useEffect(() => {
     // 컴포넌트 마운트 시 추천 친구 로딩
-    loadRecommendations();
+    fetchRecommendations();
   }, []);
 
   // 검색창 열기/닫기
@@ -123,21 +169,22 @@ export default function FriendSearch({ className = '' }: FriendSearchProps) {
     };
   }, [isSearchOpen]);
 
-  // 사용자 프로필로 이동
+  // 추천 사용자 팔로우 - 새로운 팔로우 API 사용
   const handleRecommendFollow = async (user: RecommendUser) => {
     try {
-      const response = await api.post('/friends/follow', {
-        targetUserId: user.id
-      });
+      const result = await followApi.followUser(user.id);
       
-      if (response.data.success) {
-        // 추천 목록에서 제거
-        setRecommendations(prev => prev.filter(rec => rec.id !== user.id));
+      // 추천 목록에서 제거
+      setRecommendations(prev => prev.filter(rec => rec.id !== user.id));
+      
+      if (result.status === 'ACTIVE') {
         alert(`${user.username}님을 팔로우했습니다.`);
+      } else if (result.status === 'REQUESTED') {
+        alert(`${user.username}님에게 팔로우 요청을 보냈습니다.`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('팔로우 오류:', error);
-      alert('팔로우에 실패했습니다.');
+      alert(error.message || '팔로우에 실패했습니다.');
     }
   };
 
@@ -148,36 +195,63 @@ export default function FriendSearch({ className = '' }: FriendSearchProps) {
     setSearchResults([]);
   };
 
-  // 친구 요청 또는 팔로우 토글
+  // 팔로우 토글 - 새로운 팔로우 API 사용
   const handleFollowToggle = async (user: SearchUser) => {
     try {
-      if (user.isFollowing) {
+      if (user.isFollowing || user.followStatus === 'active') {
         // 언팔로우
-        await api.delete(`/friends/follow/${user.id}`);
-      } else {
-        // 팔로우
-        await api.post('/friends/follow', { targetUserId: user.id });
-      }
-      
-      // 검색 결과 업데이트
-      setSearchResults(prev => 
-        prev.map(u => 
-          u.id === user.id 
-            ? { ...u, isFollowing: !u.isFollowing }
-            : u
-        )
-      );
-      
-      // 성공 메시지 표시
-      if (user.isFollowing) {
+        await followApi.unfollowUser(user.id);
+        
+        // 검색 결과 업데이트
+        setSearchResults(prev => 
+          prev.map(u => 
+            u.id === user.id 
+              ? { ...u, isFollowing: false, followStatus: 'none' as const }
+              : u
+          )
+        );
+        
         console.log(`${user.username}님을 언팔로우했습니다.`);
+      } else if (user.followStatus === 'requested') {
+        // 요청 취소
+        await followApi.unfollowUser(user.id);
+        
+        // 검색 결과 업데이트
+        setSearchResults(prev => 
+          prev.map(u => 
+            u.id === user.id 
+              ? { ...u, followStatus: 'none' as const }
+              : u
+          )
+        );
+        
+        console.log(`${user.username}님에 대한 팔로우 요청을 취소했습니다.`);
       } else {
-        console.log(`${user.username}님을 팔로우했습니다.`);
+        // 팔로우 요청
+        const result = await followApi.followUser(user.id);
+        
+        // 검색 결과 업데이트
+        setSearchResults(prev => 
+          prev.map(u => 
+            u.id === user.id 
+              ? { 
+                  ...u, 
+                  isFollowing: result.status === 'ACTIVE',
+                  followStatus: result.status === 'ACTIVE' ? 'active' as const : 'requested' as const
+                }
+              : u
+          )
+        );
+        
+        if (result.status === 'ACTIVE') {
+          console.log(`${user.username}님을 팔로우했습니다.`);
+        } else {
+          console.log(`${user.username}님에게 팔로우 요청을 보냈습니다.`);
+        }
       }
     } catch (error: any) {
       console.error('팔로우 토글 실패:', error);
-      // 실패 시 사용자에게 알림
-      alert(error.response?.data?.message || '팔로우 처리에 실패했습니다.');
+      alert(error.message || '팔로우 처리에 실패했습니다.');
     }
   };
 
@@ -284,12 +358,18 @@ export default function FriendSearch({ className = '' }: FriendSearchProps) {
                       <button
                         onClick={() => handleFollowToggle(user)}
                         className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                          user.isFollowing
+                          user.isFollowing || user.followStatus === 'active'
                             ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            : user.followStatus === 'requested'
+                            ? 'bg-orange-200 text-orange-700 hover:bg-orange-300'
                             : 'bg-blue-600 text-white hover:bg-blue-700'
                         }`}
                       >
-                        {user.isFollowing ? '팔로잉' : '팔로우'}
+                        {user.isFollowing || user.followStatus === 'active' 
+                          ? '팔로잉' 
+                          : user.followStatus === 'requested'
+                          ? '요청됨'
+                          : '팔로우'}
                       </button>
                     </div>
                   ))}
@@ -340,7 +420,7 @@ export default function FriendSearch({ className = '' }: FriendSearchProps) {
                         onClick={() => handleRecommendFollow(user)}
                         className="px-3 py-1 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors"
                       >
-                        친구 요청
+                        팔로우
                       </button>
                     </div>
                   ))}

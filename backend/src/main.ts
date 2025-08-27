@@ -1,11 +1,19 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { ValidationPipe } from '@nestjs/common';
 import { join } from 'path';
 import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  
+  // Validation Pipe 설정
+  app.useGlobalPipes(new ValidationPipe({
+    transform: true, // 자동 타입 변환 활성화
+    whitelist: true, // DTO에 정의되지 않은 속성 제거
+    forbidNonWhitelisted: true, // 허용되지 않은 속성 전달 시 에러
+  }));
   
   // CORS 설정
   app.enableCors({
