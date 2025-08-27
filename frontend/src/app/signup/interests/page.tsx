@@ -5,11 +5,28 @@ import { InterestSelector, LifestyleSelector, Interest, LifestyleData } from '@/
 
 export default function SignupInterestsPage() {
   const [selectedInterests, setSelectedInterests] = useState<Interest[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedLifestyle, setSelectedLifestyle] = useState<LifestyleData>({});
   const [currentStep, setCurrentStep] = useState<'interests' | 'lifestyle'>('interests');
 
-  const handleInterestsChange = (interests: Interest[]) => {
-    setSelectedInterests(interests);
+  const handleToggleCategory = (category: string) => {
+    setSelectedCategories(prev => 
+      prev.includes(category) 
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    );
+  };
+
+  const handleToggleItem = (category: string, item: string) => {
+    const newItem = { category, item };
+    setSelectedInterests(prev => {
+      const exists = prev.some(i => i.category === category && i.item === item);
+      if (exists) {
+        return prev.filter(i => !(i.category === category && i.item === item));
+      } else {
+        return [...prev, newItem];
+      }
+    });
   };
 
   const handleLifestyleChange = (lifestyle: LifestyleData) => {
@@ -41,7 +58,7 @@ export default function SignupInterestsPage() {
       // 회원가입 API 호출
       const signupData = {
         // ... 기본 정보 (이전 스텝에서 수집)
-        interests: selectedInterests.map(item => item.interest),
+        interests: selectedInterests.map(item => item.item),
         ...selectedLifestyle
       };
       
@@ -95,21 +112,26 @@ export default function SignupInterestsPage() {
       <div className="py-8">
         {currentStep === 'interests' && (
           <InterestSelector
-            onInterestsChange={handleInterestsChange}
-            mode="signup"
+            selectedItems={selectedInterests}
+            selectedCategories={selectedCategories}
+            onToggleCategory={handleToggleCategory}
+            onToggleItem={handleToggleItem}
             title="관심사를 선택해주세요"
-            description="나와 비슷한 관심사를 가진 사람들과 연결될 수 있어요"
-            minSelections={3}
-            maxSelections={10}
+            minCategoryRequired={1}
+            minItemRequired={3}
+            showSkipHint={true}
+            className="px-6"
           />
         )}
 
         {currentStep === 'lifestyle' && (
           <LifestyleSelector
-            onLifestyleChange={handleLifestyleChange}
-            mode="signup"
+            selectedItems={[]} // 라이프스타일 선택 상태 관리 필요시 추가
+            selectedCategories={[]}
+            onToggleCategory={() => {}} // 라이프스타일 로직 구현 필요시 추가
+            onToggleItem={() => {}}
             title="라이프스타일을 알려주세요"
-            description="더 나은 추천과 매칭을 위해 라이프스타일을 선택해주세요"
+            className="px-6"
           />
         )}
       </div>
