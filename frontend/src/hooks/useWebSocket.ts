@@ -50,10 +50,15 @@ export const useWebSocket = ({
     // Socket.IO 서버 URL 구성
     let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     
-    // 프로덕션 환경에서 API 경로 수정 (중복 방지)
-    if (apiUrl.includes('cafe24.com') && !apiUrl.endsWith('/api')) {
-      // chynggi.cafe24.com -> chynggi.cafe24.com/api로 매핑
-      apiUrl = apiUrl.replace(/\/$/, '') + '/api';
+    if (apiUrl.includes('cafe24.com')) {
+      // cafe24 환경에서는 /api/api 형태로 구성 (의도된 구조)
+      if (!apiUrl.includes('/api/api')) {
+        if (apiUrl.endsWith('/api')) {
+          apiUrl = apiUrl + '/api';
+        } else {
+          apiUrl = apiUrl.replace(/\/$/, '') + '/api/api';
+        }
+      }
     }
     
     console.log('Socket.IO 연결 시도:', `${apiUrl}/chat`);

@@ -1,15 +1,23 @@
 // API 기본 설정
 let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-// 프로덕션 환경에서 API 경로 수정 (중복 방지)
-if (API_BASE_URL.includes('cafe24.com') && !API_BASE_URL.includes('/api/v1')) {
-  if (API_BASE_URL.endsWith('/api')) {
-    API_BASE_URL = API_BASE_URL + '/v1';
-  } else {
-    API_BASE_URL = API_BASE_URL.replace(/\/$/, '') + '/api/v1';
+// 프로덕션 환경에서 API 경로 수정
+if (API_BASE_URL.includes('cafe24.com')) {
+  // cafe24 환경에서는 /api/api/v1 형태로 구성 (의도된 구조)
+  if (!API_BASE_URL.includes('/api/api/v1')) {
+    if (API_BASE_URL.endsWith('/api/api')) {
+      API_BASE_URL = API_BASE_URL + '/v1';
+    } else if (API_BASE_URL.endsWith('/api')) {
+      API_BASE_URL = API_BASE_URL + '/api/v1';
+    } else {
+      API_BASE_URL = API_BASE_URL.replace(/\/$/, '') + '/api/api/v1';
+    }
   }
-} else if (!API_BASE_URL.includes('/api/v1')) {
-  API_BASE_URL = API_BASE_URL + '/api/v1';
+} else {
+  // 로컬 환경에서는 기존 방식 유지
+  if (!API_BASE_URL.includes('/api/v1')) {
+    API_BASE_URL = API_BASE_URL + '/api/v1';
+  }
 }
 
 // JWT 토큰 가져오기
