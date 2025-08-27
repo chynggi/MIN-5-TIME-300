@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Message } from '@/types/chat';
+import { useHttpPolling } from './useHttpPolling';
 
 interface WebSocketHookProps {
   conversationId?: string;
@@ -21,9 +22,17 @@ export const useWebSocket = ({
 }: WebSocketHookProps) => {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [useHttpFallback, setUseHttpFallback] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 5;
+  const maxReconnectAttempts = 3;
+  // HTTP 폴링 대안 훅
+  const httpPolling = useHttpPolling({
+    conversationId: useHttpFallback ? conversationId : undefined,
+    onMessageReceived,
+    onMessageRead,
+    pollingInterval: 3000,
+  });
 
   const connect = useCallback(() => {
     // 이미 연결된 경우 중복 연결 방지
@@ -39,10 +48,13 @@ export const useWebSocket = ({
     }
 
     // Socket.IO 서버 URL 구성
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     
-    // HTTPS 환경에서는 WSS 프로토콜 사용
-    const socketUrl = apiUrl.replace(/^http/, 'ws').replace(/^https/, 'wss');
+    // 프로덕션 환경에서 API 경로 수정
+    if (apiUrl.includes('cafe24.com')) {
+      // chynggi.cafe24.com -> chynggi.cafe24.com/api로 매핑
+      apiUrl = apiUrl.replace(/\/$/, '') + '/api';
+    }
     
     console.log('Socket.IO 연결 시도:', `${apiUrl}/chat`);
     
@@ -62,15 +74,20 @@ export const useWebSocket = ({
         query: {
           token: token
         },
-        transports: isProduction ? ['polling'] : ['polling', 'websocket'], // 프로덕션에서는 polling만 사용
+        transports: ['polling'], // 프로덕션에서는 polling만 사용 (WebSocket 문제 회피)
         autoConnect: true,
         reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        timeout: 20000, // 타임아웃 시간 증가
-        forceNew: true, // 새로운 연결 강제
-        upgrade: !isProduction, // 프로덕션에서는 업그레이드 비활성화
-        rememberUpgrade: false, // 업그레이드 상태 기억하지 않음
+        reconnectionAttempts: 3, // 재연결 시도 횟수 줄임
+        reconnectionDelay: 2000, // 재연결 지연 시간 증가
+        reconnectionDelayMax: 5000, // 최대 재연결 지연 시간
+        timeout: 30000, // 타임아웃 시간 더 증가
+        forceNew: true,
+        upgrade: false, // 업그레이드 완전히 비활성화
+        rememberUpgrade: false,
+        withCredentials: true, // 쿠키 전송 허용
+        extraHeaders: {
+          'Access-Control-Allow-Origin': '*'
+        }
       });
 
       socketRef.current.on('connect', () => {
@@ -94,9 +111,34 @@ export const useWebSocket = ({
         }
       });
 
-      socketRef.current.on('connect_error', (error) => {
+      socketRef.current.on('connect_error', (error: any) => {
         console.error('Socket.IO 연결 오류:', error);
+        console.error('Error details:', {
+          message: error.message,
+          description: error.description,
+          context: error.context,
+          type: error.type
+        });
         setIsConnected(false);
+        
+        // xhr poll error인 경우 특별 처리
+        if (error.message?.includes('xhr poll error') || error.type === 'TransportError') {
+          console.warn('XHR Polling 오류 감지. HTTP 폴링으로 전환합니다.');
+          
+          // 재연결 시도 횟수 증가
+          reconnectAttemptsRef.current++;
+          
+          // 최대 재연결 시도 횟수 도달 시 HTTP 폴링으로 전환
+          if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+            console.log('Socket.IO 연결 포기. HTTP 폴링으로 전환합니다.');
+            setUseHttpFallback(true);
+            
+            if (socketRef.current) {
+              socketRef.current.disconnect();
+              socketRef.current = null;
+            }
+          }
+        }
       });
 
       // 메시지 이벤트 리스너
@@ -120,9 +162,17 @@ export const useWebSocket = ({
         onUserOffline?.(data.userId);
       });
 
+      // 추가 에러 이벤트 핸들러
+      socketRef.current.on('error', (error: any) => {
+        console.error('Socket.IO 일반 오류:', error);
+      });
+
     } catch (error) {
       console.error('Socket.IO 연결 실패:', error);
       setIsConnected(false);
+      
+      // 대안 연결 방법 시도 (HTTP 폴링 기반 실시간 통신)
+      console.log('Socket.IO 실패. HTTP 폴링 대안을 고려해주세요.');
     }
   }, [conversationId, onMessageReceived, onMessageRead, onTyping, onUserOnline, onUserOffline]);
 
@@ -175,11 +225,20 @@ export const useWebSocket = ({
   }, [conversationId, joinConversation]);
 
   return {
-    isConnected,
-    sendMessage,
+    isConnected: useHttpFallback ? httpPolling.isConnected : isConnected,
+    sendMessage: useHttpFallback 
+      ? (event: string, data: any) => {
+          // HTTP 폴링에서는 메시지만 지원
+          if (event === 'send_message' && data.content) {
+            return httpPolling.sendMessage(data.content);
+          }
+          return Promise.resolve(false);
+        }
+      : sendMessage,
     joinConversation,
     leaveConversation,
-    sendTyping,
-    disconnect,
+    sendTyping: useHttpFallback ? () => {} : sendTyping, // HTTP 폴링에서는 타이핑 지원 안함
+    disconnect: useHttpFallback ? httpPolling.stopPolling : disconnect,
+    isUsingHttpFallback: useHttpFallback,
   };
 };

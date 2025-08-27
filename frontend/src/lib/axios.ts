@@ -1,7 +1,14 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: (process.env.NEXT_PUBLIC_API_URL + "/api/v1") || "http://localhost:3001/api/v1",
+  baseURL: (() => {
+    let url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    if (url.includes('cafe24.com')) {
+      return url.replace(/\/$/, '') + '/api/v1';
+    } else {
+      return url + '/api/v1';
+    }
+  })(),
   withCredentials: true,
 });
 

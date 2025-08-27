@@ -87,7 +87,7 @@ export default function ChatRoom({ conversationId, currentUser }: ChatRoomProps)
   }
 
   // WebSocket 연결
-  const { isConnected, sendTyping } = useWebSocket({
+  const { isConnected, sendTyping, isUsingHttpFallback } = useWebSocket({
     conversationId,
     onMessageReceived: handleMessageReceived,
     onMessageRead: handleMessageRead,
@@ -301,7 +301,27 @@ export default function ChatRoom({ conversationId, currentUser }: ChatRoomProps)
           <div className="flex items-center space-x-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
             <span>
-              {isConnected ? '연결 안정화 중...' : '연결 중... 잠시만 기다려주세요.'}
+              {isConnected 
+                ? (isUsingHttpFallback 
+                    ? 'HTTP 폴링으로 연결됨 (제한된 실시간 기능)' 
+                    : '연결 안정화 중...'
+                  )
+                : '연결 중... 잠시만 기다려주세요.'
+              }
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* HTTP 폴링 사용 중 알림 */}
+      {isUsingHttpFallback && isStableConnected && (
+        <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-2 mx-4 mt-2 rounded">
+          <div className="flex items-center space-x-2">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            <span>
+              HTTP 폴링 모드로 연결되었습니다. 실시간 타이핑 표시는 지원되지 않습니다.
             </span>
           </div>
         </div>

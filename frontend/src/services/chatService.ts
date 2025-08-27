@@ -7,7 +7,14 @@ import {
   CreateConversationRequest 
 } from '@/types/chat';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE = (() => {
+  let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  // 프로덕션 환경에서 API 경로 수정
+  if (url.includes('cafe24.com')) {
+    url = url.replace(/\/$/, '') + '/api';
+  }
+  return url;
+})();
 
 class ChatService {
   private getAuthHeaders() {
