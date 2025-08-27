@@ -50,8 +50,8 @@ export const useWebSocket = ({
     // Socket.IO 서버 URL 구성
     let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     
-    // 프로덕션 환경에서 API 경로 수정
-    if (apiUrl.includes('cafe24.com')) {
+    // 프로덕션 환경에서 API 경로 수정 (중복 방지)
+    if (apiUrl.includes('cafe24.com') && !apiUrl.endsWith('/api')) {
       // chynggi.cafe24.com -> chynggi.cafe24.com/api로 매핑
       apiUrl = apiUrl.replace(/\/$/, '') + '/api';
     }

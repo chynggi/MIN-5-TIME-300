@@ -1,10 +1,14 @@
 // API 기본 설정
 let API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-// 프로덕션 환경에서 API 경로 수정
-if (API_BASE_URL.includes('cafe24.com')) {
-  API_BASE_URL = API_BASE_URL.replace(/\/$/, '') + '/api/v1';
-} else {
+// 프로덕션 환경에서 API 경로 수정 (중복 방지)
+if (API_BASE_URL.includes('cafe24.com') && !API_BASE_URL.includes('/api/v1')) {
+  if (API_BASE_URL.endsWith('/api')) {
+    API_BASE_URL = API_BASE_URL + '/v1';
+  } else {
+    API_BASE_URL = API_BASE_URL.replace(/\/$/, '') + '/api/v1';
+  }
+} else if (!API_BASE_URL.includes('/api/v1')) {
   API_BASE_URL = API_BASE_URL + '/api/v1';
 }
 

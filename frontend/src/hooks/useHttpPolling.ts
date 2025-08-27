@@ -22,7 +22,8 @@ export const useHttpPolling = ({
   // API URL 구성
   const getApiUrl = useCallback(() => {
     let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    if (url.includes('cafe24.com')) {
+    // Cafe24 환경에서는 /api 경로가 이미 포함되어 있는지 확인
+    if (url.includes('cafe24.com') && !url.includes('/api')) {
       url = url.replace(/\/$/, '') + '/api';
     }
     return url;

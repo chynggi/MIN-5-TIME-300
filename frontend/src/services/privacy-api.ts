@@ -1,6 +1,13 @@
 import { DetailedPrivacyDto, PrivacySettingsResponseDto } from '../types/privacy-settings.dto';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = (() => {
+  let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  // 중복 방지를 위한 경로 확인
+  if (url.includes('cafe24.com') && !url.includes('/api')) {
+    url = url.replace(/\/$/, '') + '/api';
+  }
+  return url;
+})();
 
 class PrivacyApiService {
   private async request<T>(

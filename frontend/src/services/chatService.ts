@@ -9,8 +9,8 @@ import {
 
 const API_BASE = (() => {
   let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-  // 프로덕션 환경에서 API 경로 수정
-  if (url.includes('cafe24.com')) {
+  // 프로덕션 환경에서 API 경로 수정 (중복 방지)
+  if (url.includes('cafe24.com') && !url.endsWith('/api')) {
     url = url.replace(/\/$/, '') + '/api';
   }
   return url;
