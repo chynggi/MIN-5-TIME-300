@@ -23,13 +23,12 @@ export const useWebSocket = ({
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   
-  // Cafe24 환경에서는 즉시 HTTP 폴링 사용
-  const isCafe24 = (process.env.NEXT_PUBLIC_API_URL || '').includes('cafe24.com');
-  const [useHttpFallback, setUseHttpFallback] = useState(isCafe24);
+  // Socket.IO를 먼저 시도하고, 실패 시에만 HTTP 폴링 사용
+  const [useHttpFallback, setUseHttpFallback] = useState(false);
   
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 2; // 재연결 시도 횟수 줄임
+  const maxReconnectAttempts = 3; // 재연결 시도 횟수 증가
   const hasTriedSocketIORef = useRef(false); // Socket.IO 시도 여부 추적
   
   // HTTP 폴링 대안 훅
@@ -50,25 +49,14 @@ export const useWebSocket = ({
     const token = localStorage.getItem('token');
     if (!token) {
       console.error('인증 토큰이 없습니다.');
-      // 토큰이 없는 경우 즉시 HTTP 폴링으로 전환
-      setUseHttpFallback(true);
       return;
     }
 
-    // Socket.IO 시도 이력 체크 - cafe24에서는 바로 HTTP 폴링 사용
+    // Socket.IO 서버 URL 구성
     let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const isCafe24 = apiUrl.includes('cafe24.com');
     
-    if (isCafe24 && hasTriedSocketIORef.current) {
-      console.log('Cafe24 환경에서 Socket.IO 재시도 생략. HTTP 폴링 사용.');
-      setUseHttpFallback(true);
-      return;
-    }
-    
-    if (isCafe24) {
-      hasTriedSocketIORef.current = true;
-    }
-    
+    // Socket.IO 연결 시도 (모든 환경에서)
     if (isCafe24) {
       // cafe24 환경에서는 /api/api 형태로 구성 (의도된 구조)
       if (!apiUrl.includes('/api/api')) {
@@ -88,7 +76,7 @@ export const useWebSocket = ({
         socketRef.current.disconnect();
       }
 
-      // Cafe24 환경에서는 더 보수적인 설정 사용
+      // 환경에 따른 설정 조정
       socketRef.current = io(`${apiUrl}/chat`, {
         auth: {
           token: token
@@ -96,14 +84,14 @@ export const useWebSocket = ({
         query: {
           token: token
         },
-        transports: ['polling'], // 프로덕션에서는 polling만 사용 (WebSocket 문제 회피)
+        transports: isCafe24 ? ['polling'] : ['websocket', 'polling'], // Cafe24에서는 polling만, 그 외는 websocket 우선
         autoConnect: true,
-        reconnection: false, // 자동 재연결 비활성화 (수동 관리)
-        timeout: 10000, // 타임아웃 시간 단축
+        reconnection: false, // 수동으로 재연결 관리
+        timeout: isCafe24 ? 15000 : 10000, // Cafe24에서는 타임아웃 더 길게
         forceNew: true,
-        upgrade: false, // 업그레이드 완전히 비활성화
+        upgrade: !isCafe24, // Cafe24에서는 업그레이드 비활성화
         rememberUpgrade: false,
-        withCredentials: true, // 쿠키 전송 허용
+        withCredentials: true,
         extraHeaders: {
           'Access-Control-Allow-Origin': '*'
         }
@@ -140,11 +128,11 @@ export const useWebSocket = ({
         });
         setIsConnected(false);
         
-        // 연결 오류 시 즉시 HTTP 폴링으로 전환
+        // 연결 오류 시 재시도 로직
         reconnectAttemptsRef.current++;
         
         if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-          console.log('Socket.IO 연결 포기. HTTP 폴링으로 전환합니다.');
+          console.log(`Socket.IO ${maxReconnectAttempts}회 연결 실패. HTTP 폴링으로 전환합니다.`);
           setUseHttpFallback(true);
           
           if (socketRef.current) {
@@ -152,12 +140,15 @@ export const useWebSocket = ({
             socketRef.current = null;
           }
         } else {
-          // 짧은 지연 후 재시도
+          // 재시도 전 지연
+          const retryDelay = Math.pow(2, reconnectAttemptsRef.current) * 1000; // 지수 백오프: 2s, 4s, 8s
+          console.log(`${retryDelay/1000}초 후 Socket.IO 재연결 시도 (${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
+          
           setTimeout(() => {
             if (!useHttpFallback && reconnectAttemptsRef.current < maxReconnectAttempts) {
               connect();
             }
-          }, 2000);
+          }, retryDelay);
         }
       });
 
@@ -234,12 +225,8 @@ export const useWebSocket = ({
 
   // 초기 연결은 별도 useEffect로 분리
   useEffect(() => {
-    // Cafe24 환경이 아닌 경우에만 Socket.IO 시도
-    if (!isCafe24) {
-      connect();
-    } else {
-      console.log('Cafe24 환경 감지. HTTP 폴링 모드로 시작합니다.');
-    }
+    // 모든 환경에서 Socket.IO 먼저 시도
+    connect();
   }, []); // 빈 dependency array로 한 번만 실행
 
   // conversationId 변경 시 재입장
