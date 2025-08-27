@@ -55,20 +55,17 @@ export const useWebSocket = ({
     // Socket.IO 서버 URL 구성
     let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const isCafe24 = apiUrl.includes('cafe24.com');
+    let socketPath = '/socket.io/'; // 기본 경로
     
-    // Socket.IO 연결 시도 (모든 환경에서)
     if (isCafe24) {
-      // cafe24 환경에서는 /api/api 형태로 구성 (의도된 구조)
-      if (!apiUrl.includes('/api/api')) {
-        if (apiUrl.endsWith('/api')) {
-          apiUrl = apiUrl + '/api';
-        } else {
-          apiUrl = apiUrl.replace(/\/$/, '') + '/api/api';
-        }
-      }
+      // cafe24 환경에서는 /api/api/socket.io/ 경로 사용
+      socketPath = '/api/api/socket.io/';
+      // API URL은 기본 도메인 사용 (path로 경로 지정)
+      apiUrl = apiUrl.replace(/\/api.*$/, ''); // /api 이후 제거
     }
     
     console.log('Socket.IO 연결 시도:', `${apiUrl}/chat`);
+    console.log('Socket.IO 경로:', socketPath);
     
     try {
       // 기존 연결이 있다면 정리
@@ -78,6 +75,7 @@ export const useWebSocket = ({
 
       // 환경에 따른 설정 조정
       socketRef.current = io(`${apiUrl}/chat`, {
+        path: socketPath, // Socket.IO 경로 명시적 지정
         auth: {
           token: token
         },
