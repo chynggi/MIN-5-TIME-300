@@ -23,7 +23,7 @@ const API_BASE_URL = (() => {
 })();
 
 class NotificationService {
-  private baseUrl = `${API_BASE_URL}/api/v1/notifications`;
+  private baseUrl = `${API_BASE_URL}/v1/notifications`;
 
   private async makeRequest<T>(
     endpoint: string, 

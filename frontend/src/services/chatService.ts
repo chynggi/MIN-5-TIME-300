@@ -41,7 +41,7 @@ class ChatService {
    * 대화 목록 조회
    */
   async getConversations(): Promise<Conversation[]> {
-    const response = await fetch(`${API_BASE}/api/v1/chat/conversations`, {
+    const response = await fetch(`${API_BASE}/v1/chat/conversations`, {
       headers: this.getAuthHeaders(),
     });
 
@@ -56,7 +56,7 @@ class ChatService {
    * 1:1 대화 생성 또는 기존 대화 찾기
    */
   async createOrGetConversation(recipientId: string): Promise<Conversation> {
-    const response = await fetch(`${API_BASE}/api/v1/chat/conversations`, {
+    const response = await fetch(`${API_BASE}/v1/chat/conversations`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ recipientId }),
@@ -87,7 +87,7 @@ class ChatService {
     }
 
     const response = await fetch(
-      `${API_BASE}/api/v1/chat/conversations/${conversationId}/messages?${params}`,
+      `${API_BASE}/v1/chat/conversations/${conversationId}/messages?${params}`,
       {
         headers: this.getAuthHeaders(),
       }
@@ -108,7 +108,7 @@ class ChatService {
     messageData: SendMessageRequest
   ): Promise<Message> {
     const response = await fetch(
-      `${API_BASE}/api/v1/chat/conversations/${conversationId}/messages`,
+      `${API_BASE}/v1/chat/conversations/${conversationId}/messages`,
       {
         method: 'POST',
         headers: this.getAuthHeaders(),
@@ -132,7 +132,7 @@ class ChatService {
     upToMessageId: string
   ): Promise<void> {
     const response = await fetch(
-      `${API_BASE}/api/v1/chat/conversations/${conversationId}/read`,
+      `${API_BASE}/v1/chat/conversations/${conversationId}/read`,
       {
         method: 'POST',
         headers: this.getAuthHeaders(),
@@ -153,7 +153,7 @@ class ChatService {
     formData.append('file', file);
 
     const token = localStorage.getItem('token'); // 'accessToken' → 'token'으로 변경
-    const response = await fetch(`${API_BASE}/api/v1/upload/image`, {
+    const response = await fetch(`${API_BASE}/v1/upload/image`, {
       method: 'POST',
       headers: {
         'Authorization': token ? `Bearer ${token}` : '',

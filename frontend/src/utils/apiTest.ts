@@ -21,7 +21,8 @@ export const testApiUrlConstruction = () => {
       expected: {
         base: 'https://chynggi.cafe24.com',
         api: 'https://chynggi.cafe24.com/api/api/v1',
-        chat: 'https://chynggi.cafe24.com/api/api/chat'
+        chat: 'https://chynggi.cafe24.com/api/api/chat',
+        follow: 'https://chynggi.cafe24.com/api/follow'
       }
     },
     {
@@ -30,7 +31,8 @@ export const testApiUrlConstruction = () => {
       expected: {
         base: 'https://chynggi.cafe24.com/api',
         api: 'https://chynggi.cafe24.com/api/api/v1',
-        chat: 'https://chynggi.cafe24.com/api/api/chat'
+        chat: 'https://chynggi.cafe24.com/api/api/chat',
+        follow: 'https://chynggi.cafe24.com/api/follow'
       }
     },
     {
@@ -39,7 +41,8 @@ export const testApiUrlConstruction = () => {
       expected: {
         base: 'https://chynggi.cafe24.com/api/api',
         api: 'https://chynggi.cafe24.com/api/api/v1',
-        chat: 'https://chynggi.cafe24.com/api/api/chat'
+        chat: 'https://chynggi.cafe24.com/api/api/chat',
+        follow: 'https://chynggi.cafe24.com/api/follow'
       }
     }
   ];
@@ -52,13 +55,12 @@ export const testApiUrlConstruction = () => {
     console.log(`입력: ${testCase.env}`);
     
     // 각 구성 방식 테스트
-    const results = {
-      base: testCase.env,
-      api: constructApiUrl(testCase.env),
-      chat: constructChatUrl(testCase.env)
-    };
-    
-    console.log('결과:');
+        const results = {
+          base: testCase.env,
+          api: constructApiUrl(testCase.env),
+          chat: constructChatUrl(testCase.env),
+          follow: constructFollowUrl(testCase.env)
+        };    console.log('결과:');
     Object.entries(results).forEach(([key, value]) => {
       const expected = testCase.expected[key as keyof typeof testCase.expected];
       const status = value === expected ? '✅' : '❌';
@@ -116,28 +118,84 @@ export const testApiConnection = async () => {
   console.log('\n🌐 실제 API 연결 테스트');
   console.log('='.repeat(50));
   
-  const apiUrl = constructApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001');
+  // NotificationService 테스트
+  console.log('\n📧 알림 서비스 테스트');
+  const notificationUrl = constructNotificationUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001');
+  console.log(`알림 URL: ${notificationUrl}`);
+  
+  // ChatService 테스트  
+  console.log('\n💬 채팅 서비스 테스트');
+  const chatUrl = constructChatApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001');
+  console.log(`채팅 API URL: ${chatUrl}`);
   
   try {
-    console.log(`연결 시도: ${apiUrl}/health`);
+    console.log(`연결 시도: ${notificationUrl}`);
     
-    const response = await fetch(`${apiUrl}/health`, {
+    const response = await fetch(notificationUrl, {
       method: 'GET',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer test-token'
       }
     });
     
-    if (response.ok) {
+    console.log(`응답 상태: ${response.status} ${response.statusText}`);
+    
+    if (response.status === 401) {
+      console.log('✅ API 서버 연결 성공 (인증 필요)');
+    } else if (response.ok) {
       console.log('✅ API 서버 연결 성공');
-      const data = await response.text();
-      console.log('응답:', data);
     } else {
-      console.log(`❌ API 서버 연결 실패: ${response.status} ${response.statusText}`);
+      console.log(`⚠️ API 서버 응답: ${response.status} ${response.statusText}`);
     }
   } catch (error) {
     console.log('❌ API 서버 연결 오류:', error);
   }
+};
+
+// NotificationService URL 구성 함수
+const constructNotificationUrl = (baseUrl: string): string => {
+  let url = baseUrl;
+  
+  if (url.includes('cafe24.com')) {
+    if (!url.includes('/api/api')) {
+      if (url.endsWith('/api')) {
+        url = url + '/api';
+      } else {
+        url = url.replace(/\/$/, '') + '/api/api';
+      }
+    }
+  }
+  return url + '/v1/notifications?limit=10';
+};
+
+// ChatService URL 구성 함수  
+const constructChatApiUrl = (baseUrl: string): string => {
+  let url = baseUrl;
+  
+  if (url.includes('cafe24.com')) {
+    if (!url.includes('/api/api')) {
+      if (url.endsWith('/api')) {
+        url = url + '/api';
+      } else {
+        url = url.replace(/\/$/, '') + '/api/api';
+      }
+    }
+  }
+  return url + '/v1/chat/conversations';
+};
+
+// Follow URL 구성 함수 (follow-api.ts와 동일한 로직)
+const constructFollowUrl = (baseUrl: string): string => {
+  let url = baseUrl;
+  
+  if (url.includes('cafe24.com')) {
+    // cafe24 환경에서는 /api 형태로만 구성 (follow는 v1 없음)
+    if (!url.includes('/api')) {
+      url = url.replace(/\/$/, '') + '/api';
+    }
+  }
+  return url + '/follow';
 };
 
 // 브라우저 콘솔에서 실행할 수 있는 전체 테스트
