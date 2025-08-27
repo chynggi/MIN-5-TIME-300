@@ -53,13 +53,13 @@ export const useWebSocket = ({
     }
 
     // Socket.IO 서버 URL 구성
-    let apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    let apiUrl = process.env.SOCKET_URL || 'http://localhost:3001';
     const isCafe24 = apiUrl.includes('cafe24.com');
     let socketPath = '/socket.io/'; // 기본 경로
     
     if (isCafe24) {
-      // cafe24 환경에서는 /api/api/socket.io/ 경로 사용
-      socketPath = '/api/api/socket.io/';
+      // cafe24 환경에서는 /api/socket.io/ 경로 사용
+      socketPath = '/api/socket.io/';
       // API URL은 기본 도메인 사용 (path로 경로 지정)
       apiUrl = apiUrl.replace(/\/api.*$/, ''); // /api 이후 제거
     }
