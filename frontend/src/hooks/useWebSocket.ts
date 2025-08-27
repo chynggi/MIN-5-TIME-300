@@ -41,6 +41,9 @@ export const useWebSocket = ({
     // Socket.IO 서버 URL 구성
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     
+    // HTTPS 환경에서는 WSS 프로토콜 사용
+    const socketUrl = apiUrl.replace(/^http/, 'ws').replace(/^https/, 'wss');
+    
     console.log('Socket.IO 연결 시도:', `${apiUrl}/chat`);
     
     try {
@@ -49,6 +52,9 @@ export const useWebSocket = ({
         socketRef.current.disconnect();
       }
 
+      // Cafe24 환경에서는 더 보수적인 설정 사용
+      const isProduction = apiUrl.includes('cafe24.com') || apiUrl.includes('https');
+      
       socketRef.current = io(`${apiUrl}/chat`, {
         auth: {
           token: token
@@ -56,11 +62,15 @@ export const useWebSocket = ({
         query: {
           token: token
         },
-        transports: ['websocket', 'polling'], // WebSocket을 우선으로 하되 폴백 지원
+        transports: isProduction ? ['polling'] : ['polling', 'websocket'], // 프로덕션에서는 polling만 사용
         autoConnect: true,
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 1000,
+        timeout: 20000, // 타임아웃 시간 증가
+        forceNew: true, // 새로운 연결 강제
+        upgrade: !isProduction, // 프로덕션에서는 업그레이드 비활성화
+        rememberUpgrade: false, // 업그레이드 상태 기억하지 않음
       });
 
       socketRef.current.on('connect', () => {

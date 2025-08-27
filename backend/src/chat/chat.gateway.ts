@@ -21,9 +21,15 @@ interface AuthenticatedSocket extends Socket {
 @WebSocketGateway({ 
   namespace: '/chat', 
   cors: { 
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: [
+      process.env.FRONTEND_URL || 'http://localhost:3000',
+      'https://chynggi.cafe24.com',
+      'http://chynggi.cafe24.com'
+    ],
     credentials: true 
-  } 
+  },
+  transports: ['polling', 'websocket'],
+  allowEIO3: true
 })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(ChatGateway.name);
