@@ -18,6 +18,7 @@ export const useHttpPolling = ({
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const lastMessageIdRef = useRef<string | null>(null);
   const isPollingRef = useRef(false);
+  const isActiveRef = useRef(false); // 폴링 활성화 상태 추적
 
   // API URL 구성
   const getApiUrl = useCallback(() => {
@@ -47,7 +48,7 @@ export const useHttpPolling = ({
 
   // 새 메시지 폴링
   const pollMessages = useCallback(async () => {
-    if (!conversationId || isPollingRef.current) return;
+    if (!conversationId || isPollingRef.current || !isActiveRef.current) return;
     
     isPollingRef.current = true;
     
@@ -78,16 +79,20 @@ export const useHttpPolling = ({
           }
         });
         
-        if (!isConnected) {
+        if (!isConnected && isActiveRef.current) {
           setIsConnected(true);
         }
       } else {
         console.error('메시지 폴링 실패:', response.status);
-        setIsConnected(false);
+        if (isActiveRef.current) {
+          setIsConnected(false);
+        }
       }
     } catch (error) {
       console.error('HTTP 폴링 오류:', error);
-      setIsConnected(false);
+      if (isActiveRef.current) {
+        setIsConnected(false);
+      }
     } finally {
       isPollingRef.current = false;
     }
@@ -95,12 +100,26 @@ export const useHttpPolling = ({
 
   // 폴링 시작
   const startPolling = useCallback(() => {
+    if (!conversationId) return;
+    
+    // 이미 활성화된 경우 중복 방지
+    if (isActiveRef.current && pollingRef.current) {
+      console.log('HTTP 폴링이 이미 실행 중입니다.');
+      return;
+    }
+    
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
     
+    isActiveRef.current = true;
     console.log('HTTP 폴링 시작:', conversationId);
-    pollingRef.current = setInterval(pollMessages, pollingInterval);
+    
+    pollingRef.current = setInterval(() => {
+      if (isActiveRef.current) {
+        pollMessages();
+      }
+    }, pollingInterval);
     
     // 즉시 한 번 실행
     pollMessages();
@@ -108,6 +127,8 @@ export const useHttpPolling = ({
 
   // 폴링 중지
   const stopPolling = useCallback(() => {
+    isActiveRef.current = false;
+    
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
