@@ -78,7 +78,7 @@ export async function generateDailyQuestion(
 
   const apiKey = "AIzaSyBkWDNDNRMh-fDUQl2mQuzSXRfo-lizBaA"; // Gemini API 키 (실제 사용 시 환경 변수 등에서 가져와야 함)
                       // Canvas 환경에서는 빈 문자열로 두면 자동으로 처리됩니다.
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{ role: "user", parts: [{ text: fullPrompt }] }],

@@ -285,3 +285,48 @@ npm run start:dev
 ---
 
 이제 1:1 채팅의 백엔드 구조가 완전히 준비되었습니다! 🎉
+
+---
+
+## 🔄 Vector DB (Pinecone) 연동 리팩터링 요약
+
+최근 변경 사항으로 벡터 삽입/검색 로직이 캡슐화되었습니다.
+
+### 주요 변경
+- `VectorDbService`에 `upsert`, `query`, `delete` 퍼블릭 메서드 + 재시도 로직(withRetry) 추가
+- 서비스 외부에서 `this.vectorDbService['pinecone']` 직접 접근 제거 (캡슐화)
+- `DiaryService`, `CommunityService` → `vectorDbService.upsert()` 사용
+- 임베딩 실패 / Pinecone 비활성 상태 시 graceful no-op + Logger 경고
+- 일기/공개 일기/커뮤니티 일기 삭제 시 벡터 삭제(`delete`) 호출 추가
+- 메타데이터 확장: `visibility`, `modelVersion`
+
+### 사용 예
+```ts
+await this.vectorDbService.upsert([
+  { id: diary.id, values: embedding, metadata: { userId, type: 'diary', createdAt } }
+]);
+
+const matches = await this.vectorDbService.query({
+  vector: embedding,
+  topK: 5,
+  filter: { type: 'diary' },
+});
+```
+
+### 향후 권장
+- 댓글(피드백) 개별 삭제시 벡터 삭제 로직 연동
+- 메타데이터 표준화 (`source`, `language`, `modelVersion` 고정 상수화)
+- 대량 생성(배치) 시 upsert 버퍼링 및 주기적 flush
+- 지표 수집 (성공/실패 카운터, latency histogram)
+- ConfigModule 주입형 전환 (테스트/런타임 분리)
+
+### 환경 변수 가이드
+필요 변수:
+```
+PINECONE_API_KEY=...
+PINECONE_INDEX=...
+GEMINI_API_KEY=...
+```
+미설정 시 VectorDbService는 비활성 모드로 동작하며 upsert/query/delete 호출은 무시됩니다.
+
+이 리팩터로 벡터 연동이 서비스 레이어에서 안전하고 테스트하기 쉬운 형태로 개선되었습니다.

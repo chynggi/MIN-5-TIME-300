@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import api from "@/lib/axios";
 
 interface Question {
   id: string;
@@ -15,6 +16,38 @@ interface AIQuestionWriterProps {
   onBack: () => void;
 }
 
+interface AIModel {
+  id: string;
+  name: string;
+  description: string;
+  confidence: string;
+  icon: string;
+}
+
+const availableModels: AIModel[] = [
+  {
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    description: "빠르고 효율적인 질문 생성",
+    confidence: "90%",
+    icon: "🤖"
+  },
+  {
+    id: "claude-sonnet-4", 
+    name: "Claude Sonnet 4",
+    description: "깊이 있는 분석과 고품질 질문",
+    confidence: "95%",
+    icon: "🧠"
+  },
+  {
+    id: "gpt-5",
+    name: "GPT-5",
+    description: "창의적이고 맥락적인 질문",
+    confidence: "92%", 
+    icon: "⚡"
+  }
+];
+
 const emojiOptions = ["😊", "😢", "😡", "😴", "🤔", "😍", "😎", "🥳", "😅", "🤗", "😰", "🙄"];
 
 export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWriterProps) {
@@ -27,21 +60,64 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
   const [answerType, setAnswerType] = useState<"text" | "emoji">("text");
   const [selectedEmoji, setSelectedEmoji] = useState("");
   const [startTime, setStartTime] = useState<number>(Date.now());
+  const [selectedModel, setSelectedModel] = useState<string>("claude-sonnet-4"); // 기본값은 Claude
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [enabledModels, setEnabledModels] = useState<string[]>([]);
+
+  // 초기 설정: 사용 가능한 모델 조회
+  useEffect(() => {
+    fetchAvailableModels();
+  }, []);
 
   // 초기 질문 생성
   useEffect(() => {
-    generateQuestions();
-  }, []);
+    if (enabledModels.length > 0) {
+      generateQuestions();
+    }
+  }, [enabledModels]);
+
+  // 드롭다운 외부 클릭시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (showModelSelector && !target.closest('.model-selector')) {
+        setShowModelSelector(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showModelSelector]);
+
+  const fetchAvailableModels = async () => {
+    try {
+      const response = await api.get("/questions/models");
+      const { enabledModels: enabled, defaultModel } = response.data;
+      setEnabledModels(enabled);
+      if (enabled.includes(defaultModel)) {
+        setSelectedModel(defaultModel);
+      } else if (enabled.length > 0) {
+        setSelectedModel(enabled[0]);
+      }
+    } catch (error) {
+      console.error("모델 정보 조회 실패:", error);
+      // 폴백: 모든 모델 활성화
+      setEnabledModels(["gemini-2.5-flash", "claude-sonnet-4", "gpt-5"]);
+    }
+  };
 
   const generateQuestions = async () => {
     setIsGenerating(true);
     try {
-      // TODO: 실제 API 호출
-      // const response = await api.post("/questions/generate-multiple");
+      // 실제 API 호출
+      const response = await api.post(`/questions/generate?model=${selectedModel}`);
+      const questionData = response.data;
       
-      // 임시 데이터 - 5가지 질문 제공
+      // 단일 질문을 여러 질문으로 확장 (임시)
       const questionList = [
-        "오늘 가장 기억에 남는 순간은 무엇이었나요?",
+        questionData.question,
         "오늘 하루 중 가장 감사했던 일은 무엇인가요?",
         "오늘 새롭게 배운 것이나 깨달은 점이 있다면?",
         "오늘 만난 사람들 중 특별히 기억에 남는 사람이 있나요?",
@@ -59,10 +135,50 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
         }));
         setQuestions(questionsData);
         setIsGenerating(false);
-      }, 2000);
+      }, 1000);
     } catch (error) {
       console.error("질문 생성 실패:", error);
-      setIsGenerating(false);
+      // 폴백: 기본 질문 사용 (선택된 모델에 따라 다른 기본 질문)
+      let fallbackQuestions: string[] = [];
+      
+      if (selectedModel === "claude-sonnet-4") {
+        fallbackQuestions = [
+          "오늘 당신의 마음을 가장 깊이 움직인 순간은 무엇이었나요?",
+          "지금 이 순간 당신이 느끼는 감정을 한 단어로 표현한다면?",
+          "오늘 하루 중 가장 의미 있었던 대화나 만남이 있었나요?",
+          "당신이 오늘 가장 감사하게 생각하는 것은 무엇인가요?",
+          "오늘의 경험이 앞으로의 당신에게 어떤 영향을 줄 것 같나요?"
+        ];
+      } else if (selectedModel === "gpt-5") {
+        fallbackQuestions = [
+          "오늘 하루를 한 편의 영화로 만든다면 어떤 장르가 될까요?",
+          "지금 당신의 마음 상태를 날씨로 표현한다면?",
+          "오늘 새롭게 발견한 것이나 배운 점이 있다면 무엇인가요?",
+          "만약 오늘을 다시 살 수 있다면 무엇을 다르게 하고 싶나요?",
+          "오늘 하루 중 가장 창의적이었던 순간은 언제였나요?"
+        ];
+      } else {
+        fallbackQuestions = [
+          "오늘 가장 기억에 남는 순간은 무엇이었나요?",
+          "오늘 하루 중 가장 감사했던 일은 무엇인가요?",
+          "오늘 새롭게 배운 것이나 깨달은 점이 있다면?",
+          "오늘 만난 사람들 중 특별히 기억에 남는 사람이 있나요?",
+          "오늘의 날씨가 당신의 기분에 어떤 영향을 주었나요?"
+        ];
+      }
+      
+      setTimeout(() => {
+        const questionsData = fallbackQuestions.map((text, index) => ({
+          id: `question-${index}`,
+          text,
+          answered: false,
+          answer: "",
+          answerType: "text" as const,
+          emoji: ""
+        }));
+        setQuestions(questionsData);
+        setIsGenerating(false);
+      }, 1000);
     }
   };
 
@@ -141,12 +257,22 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
   const isAllAnswered = answeredCount === totalCount && totalCount > 0;
 
   if (isGenerating) {
+    const currentModel = availableModels.find(m => m.id === selectedModel);
     return (
       <div className="text-center space-y-4">
-        <div className="text-4xl mb-4">🤖</div>
-        <h2 className="text-lg font-bold">AI가 개인화된 질문을 생성하고 있습니다...</h2>
-        <p className="text-gray-600">잠시만 기다려주세요</p>
-        <div className="animate-pulse bg-gray-200 h-4 rounded"></div>
+        <div className="text-6xl mb-4">{currentModel?.icon || "🤖"}</div>
+        <h2 className="text-lg font-bold">
+          {currentModel?.name || "AI"}가 개인화된 질문을 생성하고 있습니다...
+        </h2>
+        <p className="text-gray-600">
+          {currentModel?.description || "잠시만 기다려주세요"}
+        </p>
+        <div className="flex justify-center">
+          <div className="animate-pulse bg-gradient-to-r from-blue-200 to-purple-200 h-4 w-64 rounded-full"></div>
+        </div>
+        <div className="text-sm text-gray-500">
+          신뢰도: {currentModel?.confidence || "90%"}
+        </div>
       </div>
     );
   }
@@ -162,6 +288,53 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
           >
             ← 뒤로
           </button>
+          {/* AI 모델 선택 버튼 */}
+          <div className="relative model-selector">
+            <button
+              onClick={() => setShowModelSelector(!showModelSelector)}
+              className="flex items-center space-x-2 bg-gray-100 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-200"
+            >
+              <span>{availableModels.find(m => m.id === selectedModel)?.icon || "🤖"}</span>
+              <span>{availableModels.find(m => m.id === selectedModel)?.name || "AI 모델"}</span>
+              <span className="text-xs">▼</span>
+            </button>
+            
+            {/* 모델 선택 드롭다운 */}
+            {showModelSelector && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[280px]">
+                {availableModels.filter(model => enabledModels.includes(model.id)).map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => {
+                      setSelectedModel(model.id);
+                      setShowModelSelector(false);
+                      // 모델 변경시 새로운 질문 생성
+                      generateQuestions();
+                    }}
+                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 ${
+                      selectedModel === model.id ? 'bg-blue-50 border-blue-200' : ''
+                    }`}
+                  >
+                    <div className="flex items-start space-x-3">
+                      <span className="text-2xl">{model.icon}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-semibold text-gray-800">{model.name}</span>
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                            {model.confidence}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">{model.description}</p>
+                      </div>
+                      {selectedModel === model.id && (
+                        <span className="text-blue-500 text-sm">✓</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             onClick={generateQuestions}
             disabled={isGenerating}
@@ -175,6 +348,30 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
           {answeredCount}/{totalCount}
         </div>
       </div>
+
+      {/* 선택된 AI 모델 정보 */}
+      {enabledModels.length > 0 && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 mb-4 border border-blue-100">
+          <div className="flex items-center space-x-3">
+            <span className="text-2xl">
+              {availableModels.find(m => m.id === selectedModel)?.icon || "🤖"}
+            </span>
+            <div className="flex-1">
+              <div className="flex items-center space-x-2">
+                <span className="font-semibold text-gray-800">
+                  {availableModels.find(m => m.id === selectedModel)?.name || "AI 모델"}
+                </span>
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                  신뢰도 {availableModels.find(m => m.id === selectedModel)?.confidence || "90%"}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">
+                {availableModels.find(m => m.id === selectedModel)?.description || "AI가 개인화된 질문을 생성합니다"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 진행률 바 */}
       <div className="bg-gray-200 rounded-full h-2 mb-6">

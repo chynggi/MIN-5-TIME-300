@@ -75,7 +75,7 @@ export async function generateDailyQuestion(
   const fullPrompt = `${SYSTEM_INSTRUCTIONS}\n\n${userPrompt}`;
 
   const apiKey = process.env.GEMINI_API_KEY || '';
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const payload = {
     contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
