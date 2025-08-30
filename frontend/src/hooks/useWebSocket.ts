@@ -53,7 +53,7 @@ export const useWebSocket = ({
     }
 
     // Socket.IO 서버 URL 구성
-    let apiUrl = process.env.SOCKET_URL || 'http://localhost:3001';
+    let apiUrl = 'https://chynggi.cafe24.com/api/api/v1'
     const isCafe24 = apiUrl.includes('cafe24.com');
     let socketPath = '/socket.io/'; // 기본 경로
     
