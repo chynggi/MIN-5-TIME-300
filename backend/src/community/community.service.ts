@@ -90,12 +90,11 @@ export class CommunityService {
         },
       });
       commentId = comment.id;
-      // 댓글 임베딩 및 Pinecone upsert
+      // 댓글 임베딩 및 Pinecone upsert (VectorDbService 래퍼)
       try {
         const embedding = await this.vectorDbService.getCombinedEmbedding([dto.content]);
         if (embedding) {
-          const index = this.vectorDbService['pinecone'].index(this.vectorDbService['indexName']);
-          await index.upsert([
+          await this.vectorDbService.upsert([
             {
               id: comment.id,
               values: embedding,
@@ -104,6 +103,8 @@ export class CommunityService {
                 type: 'feedback',
                 journalId: id,
                 createdAt: comment.createdAt?.toISOString?.() ?? new Date().toISOString(),
+                visibility: diary.isPublic ? 'public' : 'private',
+                modelVersion: 'gemini-embedding-001',
               },
             },
           ]);
@@ -226,6 +227,8 @@ export class CommunityService {
     const diary = await this.prisma.journal.findUnique({ where: { id } });
     if (!diary || !diary.isPublic) throw new NotFoundException('질문을 찾을 수 없습니다.');
     if (diary.userId !== userId) throw new ForbiddenException('삭제 권한이 없습니다.');
+    // 관련된 feedback 벡터(댓글)와 일기 벡터 삭제 (feedback은 journalId filter 기반이므로 별도 관리 필요 - 여기서는 일기 id만 제거)
+    try { await this.vectorDbService.delete([id]); } catch (e) {}
     await this.prisma.journal.delete({ where: { id } });
     return { success: true };
   }

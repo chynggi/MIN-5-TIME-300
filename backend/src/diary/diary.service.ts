@@ -232,12 +232,11 @@ export class DiaryService {
       },
     });
 
-    // 일기 저장 후 임베딩 생성 및 Pinecone upsert
+    // 일기 저장 후 임베딩 생성 및 Pinecone upsert (VectorDbService 래퍼 사용)
     try {
       const embedding = await this.vectorDbService.getCombinedEmbedding([diary.content]);
       if (embedding) {
-        const index = this.vectorDbService['pinecone'].index(this.vectorDbService['indexName']);
-        await index.upsert([
+        await this.vectorDbService.upsert([
           {
             id: diary.id,
             values: embedding,
@@ -245,6 +244,8 @@ export class DiaryService {
               userId,
               type: 'diary',
               createdAt: diary.createdAt.toISOString(),
+              visibility: diary.isPublic ? 'public' : 'private',
+              modelVersion: 'gemini-embedding-001',
             },
           },
         ]);
@@ -315,16 +316,15 @@ export class DiaryService {
       embedding = await this.vectorDbService.getCombinedEmbedding(texts);
     }
     if (!embedding) return [];
-    // Pinecone에서 유사 일기 검색 (type: 'diary')
-    const index = this.vectorDbService['pinecone'].index(this.vectorDbService['indexName']);
-    const queryResult = await index.query({
+    // Pinecone에서 유사 일기 검색 (type: 'diary') -> VectorDbService.query 사용
+    const matches = await this.vectorDbService.query({
       vector: embedding,
       topK: limit,
       includeMetadata: true,
       filter: { type: 'diary' },
     });
     // 일기 ID 추출 및 DB 조회
-    const ids = (queryResult.matches || []).map((m: any) => m.id);
+    const ids = (matches || []).map((m: any) => m.id);
     if (!ids.length) return [];
     const diaries = await this.prisma.journal.findMany({
       where: { id: { in: ids } },
@@ -437,7 +437,8 @@ export class DiaryService {
     if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
     if (diary.userId !== userId) throw new ForbiddenException('삭제 권한이 없습니다.');
     if (!diary.isPublic) throw new ForbiddenException('공개 일기만 삭제할 수 있습니다.');
-    
+    // DB 삭제 전에 벡터 삭제 시도 (실패해도 진행)
+    try { await this.vectorDbService.delete([id]); } catch (e) {}
     await this.prisma.journal.delete({ where: { id } });
     return { success: true };
   }

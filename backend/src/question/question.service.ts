@@ -1,11 +1,20 @@
 import { Injectable, Inject, ForbiddenException } from '@nestjs/common';
 import { TodayQuestionDto } from './dto/today-question.dto';
 import { VoteQuestionDto } from './dto/vote-question.dto';
-import { generateDailyQuestion, UserProfile, RecentJournal, MetaInfo } from './gemini-question.service';
 import { PrismaService } from '../prisma.service';
 import { ProfileService } from '../profile/profile.service';
 import { DiaryService } from '../diary/diary.service';
 import { VectorDbService } from '../vector-db/vector-db.service';
+import { QuestionGeneratorFactory } from './generators/question-generator.factory';
+import { 
+  AIModel, 
+  QuestionGenerationRequest, 
+  QuestionGenerationResponse,
+  UserProfile, 
+  RecentJournal, 
+  MetaInfo,
+  PersonaAndGoals 
+} from './interfaces/question-generator.interface';
 
 @Injectable()
 export class QuestionService {
@@ -13,7 +22,7 @@ export class QuestionService {
     private readonly prisma: PrismaService,
     private readonly profileService: ProfileService,
     private readonly diaryService: DiaryService,
-    private readonly vectorDbService: VectorDbService, // 추가
+    private readonly vectorDbService: VectorDbService,
   ) {}
 
   async getToday(req: any): Promise<TodayQuestionDto> {
@@ -32,8 +41,9 @@ export class QuestionService {
     };
   }
 
-  async generate(req: any): Promise<TodayQuestionDto> {
+  async generate(req: any, preferredModel?: AIModel): Promise<TodayQuestionDto> {
     const userId = req.user.userId;
+    
     // 1. 사용자 프로필 정보
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -43,6 +53,7 @@ export class QuestionService {
       },
     });
     if (!user) throw new ForbiddenException('유저 정보 없음');
+    
     const userProfile: UserProfile = {
       mbti: user.mbti ?? '',
       interests: user.interests.map(i => i.interest),
@@ -72,7 +83,7 @@ export class QuestionService {
     else if (hours >= 12 && hours < 18) timeOfDay = 'afternoon';
     else if (hours >= 18 && hours < 22) timeOfDay = 'evening';
     else timeOfDay = 'night';
-    // 반응 메타는 간단히 빈 배열로 대체(추후 확장)
+    
     const metaInfo: MetaInfo = {
       dayOfWeek: days[now.getDay()],
       timeOfDay,
@@ -82,18 +93,119 @@ export class QuestionService {
       },
     };
 
-    // 4. Gemini API 호출 (벡터 DB 기반 트렌드 포함)
-    const questionText = await generateDailyQuestion(
+    // 4. 벡터 DB 기반 트렌드 토픽 조회
+    let trendTopics: string[] = [];
+    try {
+      trendTopics = await this.vectorDbService.getWeeklyTrendTopics(userId, 2);
+    } catch (error) {
+      console.log('벡터 DB 트렌드 조회 실패:', error);
+    }
+
+    // 5. 페르소나/목표 정보 (추후 확장)
+    const personaAndGoals: PersonaAndGoals = {
+      persona: undefined, // 추후 persona 필드 추가시 구현
+      goals: [], // 추후 goals 테이블 추가시 구현
+    };
+
+    // 6. AI 모델 선택 및 폴백 시스템
+    const selectedModel = preferredModel || QuestionGeneratorFactory.getDefaultModel();
+    
+    // 7. 질문 생성 요청 준비
+    const questionRequest: QuestionGenerationRequest = {
       userProfile,
       recentJournals,
       metaInfo,
       userId,
-      this.vectorDbService
-    );
+      personaAndGoals,
+      trendTopics,
+    };
+    
+    // 8. 다중 모델 폴백으로 질문 생성 시도
+    const response = await this.generateWithFallback(questionRequest, selectedModel);
+
     return {
-      id: 'gemini-q-' + Date.now(),
-      question: questionText,
+      id: `${response.modelUsed}-q-${Date.now()}`,
+      question: response.question,
       createdAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * 다중 모델 폴백으로 질문 생성
+   */
+  private async generateWithFallback(
+    request: QuestionGenerationRequest, 
+    preferredModel: AIModel
+  ): Promise<QuestionGenerationResponse> {
+    // 안정성 순으로 모델 목록 가져오기
+    const modelsByStability = QuestionGeneratorFactory.getModelsByStability();
+    
+    // 사용자가 선택한 모델을 최우선으로, 나머지는 안정성 순
+    const modelsToTry = [
+      preferredModel,
+      ...modelsByStability.filter(model => model !== preferredModel)
+    ];
+
+    let lastError: Error | null = null;
+
+    for (const modelId of modelsToTry) {
+      try {
+        console.log(`${modelId} 모델로 질문 생성 시도...`);
+        const generator = QuestionGeneratorFactory.getGenerator(modelId);
+        const response = await generator.generateQuestion(request);
+        
+        if (response.question && response.question.trim().length > 0) {
+          console.log(`${modelId} 모델로 질문 생성 성공`);
+          return response;
+        }
+      } catch (error) {
+        console.log(`${modelId} 모델 실패:`, error.message);
+        lastError = error;
+        
+        // 특정 오류는 다른 모델로 재시도하지 않음
+        if (error.message.includes('API key') || error.message.includes('unauthorized')) {
+          console.log(`${modelId}: API 키 문제로 건너뜀`);
+          continue;
+        }
+      }
+    }
+
+    // 모든 모델 실패시 기본 질문 반환
+    console.log('모든 AI 모델 실패. 기본 질문 사용');
+    return {
+      question: this.getEmergencyQuestion(request.metaInfo.dayOfWeek),
+      confidence: 0.5,
+      modelUsed: 'fallback',
+      fallbackUsed: true,
+    };
+  }
+
+  /**
+   * 긴급 상황용 기본 질문
+   */
+  private getEmergencyQuestion(dayOfWeek: string): string {
+    const emergencyQuestions: { [key: string]: string } = {
+      monday: '새로운 한 주, 어떤 마음으로 시작하시나요?',
+      tuesday: '오늘 하루 중 가장 인상 깊었던 순간은?',
+      wednesday: '이번 주 중반, 지금 기분은 어떠신가요?',
+      thursday: '오늘 새롭게 깨달은 것이 있다면?',
+      friday: '이번 주를 돌아보며 느끼는 감정은?',
+      saturday: '주말을 맞아 하고 싶은 일은?',
+      sunday: '오늘 하루 어떻게 보내셨나요?',
+    };
+    return emergencyQuestions[dayOfWeek.toLowerCase()] || '오늘 하루 어떠셨나요?';
+  }
+
+  // 사용 가능한 AI 모델 목록 조회
+  async getAvailableModels(): Promise<{
+    models: string[];
+    defaultModel: string;
+    enabledModels: string[];
+  }> {
+    return {
+      models: QuestionGeneratorFactory.getAvailableModels(),
+      defaultModel: QuestionGeneratorFactory.getDefaultModel(),
+      enabledModels: QuestionGeneratorFactory.getEnabledModels(),
     };
   }
 }
