@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 // 기본 제공 이미지들 (예시)
 const defaultImages = [
   "/images/default1.jpg",
@@ -30,7 +30,7 @@ interface SpotifyTrack {
   };
 }
 
-export default function NewDiaryPage() {
+function NewDiaryContent() {
   const router = useRouter();
   
   // Current view state
@@ -381,4 +381,14 @@ export default function NewDiaryPage() {
   }
 
   return null;
+}
+
+// Next.js App Router: Page-level component using useSearchParams must wrap it in <Suspense>
+// to allow the router to handle streaming/dynamic params without a CSR bailout warning.
+export default function NewDiaryPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <NewDiaryContent />
+    </Suspense>
+  );
 }
