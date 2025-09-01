@@ -2,8 +2,8 @@
 import { useState, useEffect, Suspense } from "react";
 // 기본 제공 이미지들 (예시)
 const defaultImages = [
-  "/images/default1.jpg",
-  "/images/default2.jpg",
+  "/images/def/default1.jpg",
+  "/images/def/default2.jpg",
 ];
 import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/axios";
