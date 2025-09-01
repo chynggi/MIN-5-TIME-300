@@ -317,11 +317,14 @@ function NewDiaryContent() {
   if (currentView === "ai-question") {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
-        <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
-          <AIQuestionWriter 
-            onComplete={handleAIQuestionComplete}
-            onBack={() => setCurrentView("main")}
-          />
+        {/* 폭 확장: 모바일 padding, 데스크탑 중앙 정렬 + 넓은 컨테이너 */}
+        <div className="mx-auto w-full px-3 md:px-6 max-w-6xl">
+          <div className="bg-white/70 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-4 md:p-6 min-h-[720px] flex flex-col">
+            <AIQuestionWriter 
+              onComplete={handleAIQuestionComplete}
+              onBack={() => setCurrentView("main")}
+            />
+          </div>
         </div>
       </div>
     );
