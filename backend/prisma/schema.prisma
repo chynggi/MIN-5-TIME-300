@@ -14,7 +14,7 @@ model User {
   id               String   @id @default(uuid())
   email            String   @unique
   passwordHash     String
-  username         String
+  username         String   @unique
   mbti             String?
   bio              String?
   location         String?
@@ -105,6 +105,7 @@ model Journal {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   diaryDate       DateTime @default(now()) // 일기 작성 날짜 (사용자가 지정, 기본값은 현재 시각)
+  isRetrospective Boolean  @default(false) // 과거 날짜 회고 작성 여부
   isPublic        Boolean  @default(false)
   emotionScore    Int
   emotion         String?           // 감정 이모지 저장
@@ -117,6 +118,7 @@ model Journal {
   feedbackLogs    FeedbackLog[]
   lat        Float?   // 위도
   lng        Float?   // 경도
+  embedding   Float[]  // 임베딩(768차원) 저장: 재계산 비용 절감
 }
 
 

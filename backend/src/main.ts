@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { join } from 'path';
 import * as express from 'express';
 
@@ -10,9 +10,20 @@ async function bootstrap() {
   
   // Validation Pipe 설정
   app.useGlobalPipes(new ValidationPipe({
-    transform: true, // 자동 타입 변환 활성화
-    whitelist: true, // DTO에 정의되지 않은 속성 제거
-    forbidNonWhitelisted: true, // 허용되지 않은 속성 전달 시 에러
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    // 400 발생 시 어떤 필드가 문제인지 콘솔에 자세히 출력
+    exceptionFactory: (errors) => {
+      const simplified = errors.map(err => ({
+        property: err.property,
+        constraints: err.constraints,
+        value: err.value,
+        children: err.children?.length ? err.children : undefined,
+      }));
+      console.error('\n[Validation Error] Incoming request validation failed:', JSON.stringify(simplified, null, 2));
+      return new BadRequestException(simplified);
+    }
   }));
   
   // CORS 설정

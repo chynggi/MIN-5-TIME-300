@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req } from '@nestjs/common';
+import { Body, Controller, Post, Req, Get, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
@@ -23,5 +23,10 @@ export class AuthController {
   async logout(@Req() req): Promise<LogoutResponseDto> {
     // 실제 구현에서는 JWT 토큰 블랙리스트 처리 등 필요
     return this.authService.logout(req);
+  }
+
+  @Get('username/check')
+  async checkUsername(@Query('username') username: string): Promise<{ available: boolean }> {
+    return this.authService.checkUsername(username);
   }
 }

@@ -216,6 +216,9 @@ const SignupPage = () => {
   const [selectedInterestCategories, setSelectedInterestCategories] = useState<string[]>([]);
   const [lifestyleCategoryIndex, setLifestyleCategoryIndex] = useState(0);
   const [selectedLifestyleCategories, setSelectedLifestyleCategories] = useState<string[]>([]);
+  // 카테고리 검색 상태
+  const [interestSearch, setInterestSearch] = useState("");
+  const [lifestyleSearch, setLifestyleSearch] = useState("");
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -238,9 +241,33 @@ const SignupPage = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [stepErrors, setStepErrors] = useState<{ [key: string]: string }>({});
+  // 닉네임 실시간 상태 (중복 여부 등 확장을 대비)
+  const [usernameStatus, setUsernameStatus] = useState<{ validFormat: boolean; isEmailFormat: boolean }>({ validFormat: true, isEmailFormat: false });
+  const [usernameAvailability, setUsernameAvailability] = useState<{ loading: boolean; available: boolean | null; error?: string }>({ loading: false, available: null });
+  // 마지막으로 성공/실패 여부와 무관하게 중복 확인을 수행한 username 캐시
+  const [lastCheckedUsername, setLastCheckedUsername] = useState<string | null>(null);
+  const usernameCheckApi = useApi<{ available: boolean }>("get", "/username/check");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    // 닉네임 특별 처리
+    if (name === 'username') {
+      // 입력값 그대로 두되 후속 검증 상태만 갱신
+      const usernameRaw = value;
+      const isEmailLike = /[^\s@]+@[^\s@]+\.[^\s@]+/.test(usernameRaw);
+      // 영문만 허용 (요구사항: 영문만) - 빈 문자열은 일단 허용 (required는 별도)
+      const alphaOnlyRegex = /^[A-Za-z]*$/; // 부분 입력 허용
+      const validFormat = alphaOnlyRegex.test(usernameRaw);
+      setUsernameStatus({ validFormat, isEmailFormat: isEmailLike });
+      setForm({ ...form, [name]: usernameRaw });
+      // 기존 에러 제거 또는 재설정
+      if (stepErrors.username) {
+        const newErrors = { ...stepErrors };
+        delete newErrors.username;
+        setStepErrors(newErrors);
+      }
+      return;
+    }
     setForm({ ...form, [name]: value });
     
     // 해당 필드의 에러 제거
@@ -260,7 +287,10 @@ const SignupPage = () => {
         if (!form.email.trim()) errors.email = "이메일을 입력해주세요.";
         else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errors.email = "올바른 이메일 형식을 입력해주세요.";
         
-        if (!form.username.trim()) errors.username = "닉네임을 입력해주세요.";
+  if (!form.username.trim()) errors.username = "닉네임을 입력해주세요.";
+  else if (!usernameStatus.validFormat) errors.username = "닉네임은 영문 알파벳만 사용할 수 있습니다.";
+  else if (usernameStatus.isEmailFormat) errors.username = "이메일 형식은 닉네임으로 사용할 수 없습니다.";
+  else if (!usernameAvailability.loading && usernameAvailability.available === false) errors.username = "이미 사용 중인 닉네임입니다.";
         
         if (!form.password) errors.password = "비밀번호를 입력해주세요.";
         else if (form.password.length < 6) errors.password = "비밀번호는 6자 이상이어야 합니다.";
@@ -350,6 +380,37 @@ const SignupPage = () => {
       }
     }
   };
+
+  // 닉네임 중복 검사 (debounce 500ms)
+  React.useEffect(() => {
+    // 입력이 없거나 형식이 유효하지 않으면 초기화
+    if (!form.username || !usernameStatus.validFormat || usernameStatus.isEmailFormat) {
+      setUsernameAvailability({ loading: false, available: null });
+      setLastCheckedUsername(null);
+      return;
+    }
+    // 캐시된 값과 동일하면 재요청 생략
+    if (lastCheckedUsername === form.username) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setUsernameAvailability(prev => ({ ...prev, loading: true, error: undefined }));
+      try {
+        const res = await usernameCheckApi.request(undefined, { params: { username: form.username } });
+        if (!cancelled) {
+          setUsernameAvailability({ loading: false, available: res.available });
+          setLastCheckedUsername(form.username);
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setUsernameAvailability({ loading: false, available: null, error: err?.response?.data?.message || '확인 실패' });
+          setLastCheckedUsername(form.username); // 오류도 캐시 (사용자 입력 변경 전 재시도 방지)
+        }
+      }
+    }, 500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [form.username, usernameStatus.validFormat, usernameStatus.isEmailFormat, usernameCheckApi, lastCheckedUsername]);
+
+  // username 입력 변경 시 캐시 처리: 이미 onChange에서 form.username이 바뀌면 effect dependency로 lastCheckedUsername와 다르면 재검사 준비됨
 
   // 라이프스타일 카테고리 선택/해제
   const toggleLifestyleCategory = (categoryName: string) => {
@@ -564,6 +625,20 @@ const SignupPage = () => {
                   }`}
                 />
                 {stepErrors.username && <span className="text-red-500 text-xs mt-1">{stepErrors.username}</span>}
+                {!stepErrors.username && form.username && !usernameStatus.validFormat && (
+                  <span className="text-red-500 text-xs mt-1">영문 알파벳만 입력 가능합니다.</span>
+                )}
+                {!stepErrors.username && form.username && usernameStatus.isEmailFormat && usernameStatus.validFormat && (
+                  <span className="text-red-500 text-xs mt-1">이메일 형식은 닉네임으로 사용할 수 없습니다.</span>
+                )}
+                {!stepErrors.username && form.username && usernameStatus.validFormat && !usernameStatus.isEmailFormat && (
+                  <span className="text-xs mt-1">
+                    {usernameAvailability.loading && <span className="text-gray-500">중복 확인 중...</span>}
+                    {!usernameAvailability.loading && usernameAvailability.available === true && <span className="text-green-600">사용 가능한 닉네임입니다.</span>}
+                    {!usernameAvailability.loading && usernameAvailability.available === false && <span className="text-red-500">이미 사용 중인 닉네임입니다.</span>}
+                    {usernameAvailability.error && <span className="text-orange-500">확인 오류: {usernameAvailability.error}</span>}
+                  </span>
+                )}
               </div>
               
               <div className="flex flex-col">
@@ -605,40 +680,47 @@ const SignupPage = () => {
                 className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
               />
               
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  name="height"
-                  placeholder="신장(cm)"
-                  value={form.height}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-                />
-                <input
-                  type="text"
-                  name="weight"
-                  placeholder="몸무게(kg)"
-                  value={form.weight}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
-                />
-                <div className="flex flex-col">
-                  <select
-                    name="gender"
-                    value={form.gender}
-                    onChange={handleChange}
-                    required
-                    className={`w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-100 outline-none transition ${
-                      stepErrors.gender ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-blue-500'
-                    }`}
-                  >
-                    <option value="">성별</option>
-                    <option value="male">남성</option>
-                    <option value="female">여성</option>
-                    <option value="other">기타</option>
-                  </select>
-                  {stepErrors.gender && <span className="text-red-500 text-xs mt-1 whitespace-nowrap">{stepErrors.gender}</span>}
+              <div className="md:col-span-2">
+                <div className="grid grid-cols-3 gap-2 md:gap-4">
+                  <div className="col-span-3 sm:col-span-1">
+                    <input
+                      type="text"
+                      name="height"
+                      placeholder="신장 (cm)"
+                      value={form.height}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 md:py-4 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm md:text-base"
+                    />
+                  </div>
+                  <div className="col-span-3 sm:col-span-1">
+                    <input
+                      type="text"
+                      name="weight"
+                      placeholder="몸무게 (kg)"
+                      value={form.weight}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 md:py-4 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm md:text-base"
+                    />
+                  </div>
+                  <div className="col-span-3 sm:col-span-1 flex flex-col">
+                    <select
+                      name="gender"
+                      value={form.gender}
+                      onChange={handleChange}
+                      required
+                      className={`w-full px-4 py-3 md:py-4 rounded-lg border focus:ring-2 focus:ring-blue-100 outline-none transition text-sm md:text-base ${
+                        stepErrors.gender ? 'border-red-500 focus:border-red-500' : 'border-gray-300 focus:border-blue-500'
+                      }`}
+                    >
+                      <option value="">성별</option>
+                      <option value="male">남성</option>
+                      <option value="female">여성</option>
+                      <option value="other">기타</option>
+                    </select>
+                    {stepErrors.gender && <span className="text-red-500 text-xs mt-1 whitespace-nowrap">{stepErrors.gender}</span>}
+                  </div>
                 </div>
+                <div className="mt-1 text-[10px] md:text-xs text-gray-500 px-1">정확한 매칭을 위해 키/몸무게/성별 정보를 입력해주세요. (선택 사항 가능)</div>
               </div>
               
               <div className="flex flex-col">
@@ -889,7 +971,36 @@ const SignupPage = () => {
           )}
           {step === 2 && (
             <div className="flex flex-col gap-6 items-center">
-              <div className="text-lg font-semibold text-blue-700 mb-4">관심사 카테고리 선택</div>
+              <div className="text-lg font-semibold text-blue-700 mb-2">관심사 카테고리 선택</div>
+              {/* 검색 인풋 */}
+              <div className="w-full max-w-2xl mb-2">
+                <input
+                  type="text"
+                  value={interestSearch}
+                  onChange={(e) => setInterestSearch(e.target.value)}
+                  placeholder="카테고리 검색..."
+                  className="w-full px-3 py-2 rounded-md border border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
+                  aria-label="관심사 카테고리 검색"
+                />
+              </div>
+              {/* 선택된 카테고리 칩 */}
+              {selectedInterestCategories.length > 0 && (
+                <div className="flex flex-wrap gap-2 w-full max-w-2xl mb-2" aria-label="선택된 관심사 카테고리" role="list">
+                  {selectedInterestCategories.map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      role="listitem"
+                      aria-label={`${cat} 선택 해제`}
+                      className="px-2 py-1 bg-blue-600 text-white rounded-full text-[11px] flex items-center gap-1 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      onClick={() => toggleInterestCategory(cat)}
+                    >
+                      <span>{cat}</span>
+                      <span aria-hidden>×</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="text-sm text-gray-600 mb-4 text-center">
                 관심 있는 카테고리를 클릭하면 바로 세부 관심사를 선택할 수 있습니다.
                 {form.interests.length > 0 && (
@@ -898,23 +1009,24 @@ const SignupPage = () => {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-2xl">
-                {INTEREST_CATEGORIES.map((category) => {
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 w-full max-w-3xl" role="list" aria-label="관심사 카테고리 목록">
+                {INTEREST_CATEGORIES.filter(c => c.name.toLowerCase().includes(interestSearch.toLowerCase())).map((category) => {
                   const selected = selectedInterestCategories.includes(category.name);
                   return (
                     <button
                       type="button"
                       key={category.name}
-                      className={`px-4 py-6 rounded-xl font-medium border-2 transition transform hover:scale-105 ${
-                        selected 
-                          ? "bg-blue-500 text-white border-blue-700 shadow-lg" 
+                      className={`px-2 py-3 rounded-lg border text-[11px] leading-tight flex flex-col items-center gap-1 transition focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                        selected
+                          ? "bg-blue-500 text-white border-blue-600 shadow"
                           : "bg-white text-blue-700 border-blue-200 hover:bg-blue-50"
                       }`}
+                      aria-pressed={selected}
+                      aria-label={`관심사 카테고리: ${category.name}${selected ? ' (선택됨)' : ''}`}
                       onClick={() => toggleInterestCategory(category.name)}
                     >
-                      <div className="text-2xl mb-2">{CATEGORY_ICONS[category.name as keyof typeof CATEGORY_ICONS]}</div>
-                      <div className="text-lg font-bold mb-1">{category.name}</div>
-                      <div className="text-xs opacity-80">{category.items.length}개 항목</div>
+                      <span className="text-xl">{CATEGORY_ICONS[category.name as keyof typeof CATEGORY_ICONS]}</span>
+                      <span className="font-semibold truncate w-full text-center">{category.name}</span>
                     </button>
                   );
                 })}
@@ -992,15 +1104,15 @@ const SignupPage = () => {
               {selectedInterestCategories.includes(INTEREST_CATEGORIES[interestCategoryIndex].name) && (
                 <div className="bg-blue-50 rounded-xl p-3 flex flex-col items-center w-full max-w-lg">
                   <div className="font-bold text-blue-700 mb-2">{INTEREST_CATEGORIES[interestCategoryIndex].name}</div>
-                  <div className="grid grid-cols-1 gap-2 w-full">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 w-full text-xs">
                     {INTEREST_CATEGORIES[interestCategoryIndex].items.map((item) => {
                       const selected = form.interests.some((i) => i.category === INTEREST_CATEGORIES[interestCategoryIndex].name && i.item === item);
                       return (
                         <button
                           type="button"
                           key={item}
-                          className={`w-full px-3 py-2 rounded-lg text-sm font-medium border transition ${
-                            selected ? "bg-blue-500 text-white border-blue-700" : "bg-white text-blue-700 border-blue-200 hover:bg-blue-100"
+                          className={`w-full px-2 py-1 rounded-md border text-[11px] leading-tight transition ${
+                            selected ? "bg-blue-500 text-white border-blue-600" : "bg-white text-blue-700 border-blue-200 hover:bg-blue-100"
                           }`}
                           onClick={() => toggleInterest(INTEREST_CATEGORIES[interestCategoryIndex].name, item)}
                         >
@@ -1009,6 +1121,20 @@ const SignupPage = () => {
                       );
                     })}
                   </div>
+                  {form.interests.length > 0 && (
+                    <div className="flex gap-2 mt-3 w-full">
+                      <button
+                        type="button"
+                        className="flex-1 py-2 rounded-md bg-gray-300 text-gray-800 text-xs font-semibold hover:bg-gray-400"
+                        onClick={() => setStep(2)}
+                      >카테고리 목록</button>
+                      <button
+                        type="button"
+                        className="flex-1 py-2 rounded-md bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700"
+                        onClick={() => setStep(4)}
+                      >다음 단계</button>
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -1033,7 +1159,36 @@ const SignupPage = () => {
           )}
           {step === 4 && (
             <div className="flex flex-col gap-6 items-center">
-              <div className="text-lg font-semibold text-orange-700 mb-4">라이프스타일 카테고리 선택</div>
+              <div className="text-lg font-semibold text-orange-700 mb-2">라이프스타일 카테고리 선택</div>
+              {/* 검색 인풋 */}
+              <div className="w-full max-w-lg mb-2">
+                <input
+                  type="text"
+                  value={lifestyleSearch}
+                  onChange={(e) => setLifestyleSearch(e.target.value)}
+                  placeholder="카테고리 검색..."
+                  className="w-full px-3 py-2 rounded-md border border-orange-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-100 outline-none text-sm"
+                  aria-label="라이프스타일 카테고리 검색"
+                />
+              </div>
+              {/* 선택된 라이프스타일 카테고리 칩 */}
+              {selectedLifestyleCategories.length > 0 && (
+                <div className="flex flex-wrap gap-2 w-full max-w-lg mb-2" aria-label="선택된 라이프스타일 카테고리" role="list">
+                  {selectedLifestyleCategories.map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      role="listitem"
+                      aria-label={`${cat} 선택 해제`}
+                      className="px-2 py-1 bg-orange-500 text-white rounded-full text-[11px] flex items-center gap-1 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                      onClick={() => toggleLifestyleCategory(cat)}
+                    >
+                      <span>{cat}</span>
+                      <span aria-hidden>×</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="text-sm text-gray-600 mb-4 text-center">
                 관심 있는 라이프스타일 카테고리를 클릭하면 바로 세부 라이프스타일을 선택할 수 있습니다.
                 {form.lifestyle.length > 0 && (
@@ -1042,23 +1197,24 @@ const SignupPage = () => {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-2 gap-3 w-full max-w-lg">
-                {LIFESTYLE_CATEGORIES.map((category) => {
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 w-full max-w-2xl" role="list" aria-label="라이프스타일 카테고리 목록">
+                {LIFESTYLE_CATEGORIES.filter(c => c.name.toLowerCase().includes(lifestyleSearch.toLowerCase())).map((category) => {
                   const selected = selectedLifestyleCategories.includes(category.name);
                   return (
                     <button
                       type="button"
                       key={category.name}
-                      className={`px-4 py-6 rounded-xl font-medium border-2 transition transform hover:scale-105 ${
-                        selected 
-                          ? "bg-orange-500 text-white border-orange-700 shadow-lg" 
+                      className={`px-2 py-3 rounded-lg border text-[11px] leading-tight flex flex-col items-center gap-1 transition focus:outline-none focus:ring-2 focus:ring-orange-300 ${
+                        selected
+                          ? "bg-orange-500 text-white border-orange-600 shadow"
                           : "bg-white text-orange-700 border-orange-200 hover:bg-orange-50"
                       }`}
+                      aria-pressed={selected}
+                      aria-label={`라이프스타일 카테고리: ${category.name}${selected ? ' (선택됨)' : ''}`}
                       onClick={() => toggleLifestyleCategory(category.name)}
                     >
-                      <div className="text-2xl mb-2">{LIFESTYLE_CATEGORY_ICONS[category.name as keyof typeof LIFESTYLE_CATEGORY_ICONS]}</div>
-                      <div className="text-lg font-bold mb-1">{category.name}</div>
-                      <div className="text-xs opacity-80">{category.items.length}개 항목</div>
+                      <span className="text-xl">{LIFESTYLE_CATEGORY_ICONS[category.name as keyof typeof LIFESTYLE_CATEGORY_ICONS]}</span>
+                      <span className="font-semibold truncate w-full text-center">{category.name}</span>
                     </button>
                   );
                 })}
@@ -1136,15 +1292,15 @@ const SignupPage = () => {
               {selectedLifestyleCategories.includes(LIFESTYLE_CATEGORIES[lifestyleCategoryIndex].name) && (
                 <div className="bg-orange-50 rounded-xl p-3 flex flex-col items-center w-full max-w-lg">
                   <div className="font-bold text-orange-700 mb-2">{LIFESTYLE_CATEGORIES[lifestyleCategoryIndex].name}</div>
-                  <div className="grid grid-cols-1 gap-2 w-full">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 w-full text-xs">
                     {LIFESTYLE_CATEGORIES[lifestyleCategoryIndex].items.map((item) => {
                       const selected = form.lifestyle.some((i) => i.category === LIFESTYLE_CATEGORIES[lifestyleCategoryIndex].name && i.item === item);
                       return (
                         <button
                           type="button"
                           key={item}
-                          className={`w-full px-3 py-2 rounded-lg text-sm font-medium border transition ${
-                            selected ? "bg-orange-500 text-white border-orange-700" : "bg-white text-orange-700 border-orange-200 hover:bg-orange-100"
+                          className={`w-full px-2 py-1 rounded-md border text-[11px] leading-tight transition ${
+                            selected ? "bg-orange-500 text-white border-orange-600" : "bg-white text-orange-700 border-orange-200 hover:bg-orange-100"
                           }`}
                           onClick={() => toggleLifestyle(LIFESTYLE_CATEGORIES[lifestyleCategoryIndex].name, item)}
                         >
@@ -1153,6 +1309,20 @@ const SignupPage = () => {
                       );
                     })}
                   </div>
+                  {form.lifestyle.length > 0 && (
+                    <div className="flex gap-2 mt-3 w-full">
+                      <button
+                        type="button"
+                        className="flex-1 py-2 rounded-md bg-gray-300 text-gray-800 text-xs font-semibold hover:bg-gray-400"
+                        onClick={() => setStep(4)}
+                      >카테고리 목록</button>
+                      <button
+                        type="button"
+                        className="flex-1 py-2 rounded-md bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700"
+                        onClick={() => setStep(6)}
+                      >다음 단계</button>
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -1176,40 +1346,251 @@ const SignupPage = () => {
             </div>
           )}
           {step === 6 && (
-            <div className="flex flex-col items-center md:items-start w-full max-w-lg mx-auto">
-              <label className="block font-semibold mb-1 text-gray-700">프로필 컬러</label>
-              <div className="flex flex-wrap gap-2 justify-center mb-2">
+            <div className="flex flex-col items-center md:items-start w-full max-w-xl mx-auto">
+              <label className="block font-semibold mb-2 text-gray-700">프로필 컬러</label>
+              {/* 프리셋 팔레트 */}
+              <div className="flex flex-wrap gap-2 justify-center mb-4">
                 {PROFILE_COLORS.map((color) => (
                   <button
                     key={color}
                     type="button"
-                    className={`w-8 h-8 rounded-full border-2 transition ${form.profileColor === color ? "border-black scale-110" : "border-gray-200"}`}
+                    aria-label={`프리셋 색상 ${color} 선택`}
+                    className={`w-8 h-8 rounded-full border-2 transition focus:outline-none focus:ring-2 focus:ring-blue-300 ${form.profileColor === color ? "border-black scale-110" : "border-gray-200"}`}
                     style={{ background: color }}
                     onClick={() => setForm({ ...form, profileColor: color })}
                   />
                 ))}
               </div>
-              <div className="text-xs text-gray-500 text-center mb-4">선택: <span style={{ color: form.profileColor }}>{form.profileColor}</span></div>
+              {/* 사용자 정의 색상 - color input */}
+              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-gray-700">직접 선택</span>
+                  <input
+                    type="color"
+                    value={form.profileColor}
+                    onChange={(e) => setForm({ ...form, profileColor: e.target.value })}
+                    aria-label="컬러 피커"
+                    className="w-16 h-16 p-0 border border-gray-300 rounded cursor-pointer"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-gray-700">HEX 코드</span>
+                  <input
+                    type="text"
+                    value={form.profileColor}
+                    onChange={(e) => {
+                      const val = e.target.value.trim();
+                      if (/^#?[0-9A-Fa-f]{0,6}$/.test(val.replace('#',''))) {
+                        const withHash = val.startsWith('#') ? val : ('#' + val);
+                        setForm({ ...form, profileColor: withHash });
+                      }
+                    }}
+                    placeholder="#RRGGBB"
+                    aria-label="HEX 색상 입력"
+                    className="px-3 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
+                  />
+                </div>
+              </div>
+              {/* RGBA 직접 입력 + 히스토리 + 대비 + 색약 시뮬레이션 */}
+              {(() => {
+                const HISTORY_KEY = 'profileColorHistoryV1';
+                const MAX_HISTORY = 8;
+                const clamp = (n:number,min=0,max=255)=> Math.min(max,Math.max(min,n));
+                const parseHex = (hex:string) => {
+                  let h = hex.replace('#','');
+                  if (h.length === 3) h = h.split('').map(c=>c+c).join('');
+                  if (![6,8].includes(h.length)) return null;
+                  const r = parseInt(h.slice(0,2),16);
+                  const g = parseInt(h.slice(2,4),16);
+                  const b = parseInt(h.slice(4,6),16);
+                  const a = h.length===8? parseInt(h.slice(6,8),16):255;
+                  return {r,g,b,a};
+                };
+                const toHex = (r:number,g:number,b:number,a?:number, includeAlpha=true) => {
+                  const h = [r,g,b].map(v=>clamp(v).toString(16).padStart(2,'0')).join('');
+                  const ah = clamp(a??255).toString(16).padStart(2,'0');
+                  return '#'+h + (includeAlpha? ah:'');
+                };
+                const parsed = parseHex(form.profileColor) || {r:0,g:0,b:0,a:255};
+                const {r,g,b,a} = parsed;
+                // 명암비 계산 (WCAG)
+                const relativeLuminance = (c:number) => {
+                  const cs = c/255;
+                  return cs <= 0.03928 ? cs/12.92 : Math.pow((cs+0.055)/1.055, 2.4);
+                };
+                const lum = 0.2126*relativeLuminance(r) + 0.7152*relativeLuminance(g) + 0.0722*relativeLuminance(b);
+                const contrastWith = (bgLum:number, fgLum:number) => (Math.max(bgLum, fgLum) + 0.05)/(Math.min(bgLum, fgLum) + 0.05);
+                const contrastBlack = contrastWith(lum,0);
+                const contrastWhite = contrastWith(1, lum);
+                const recommendedText = contrastBlack > contrastWhite ? '#000000' : '#FFFFFF';
+                const recommendedContrast = Math.max(contrastBlack, contrastWhite);
+                const wcagLevel = (() => {
+                  if (recommendedContrast >= 7) return 'AAA';
+                  if (recommendedContrast >= 4.5) return 'AA';
+                  if (recommendedContrast >= 3) return 'AA Large';
+                  return 'Low';
+                })();
+                // 색약 시뮬레이션 (간단한 LMS 변환 근사)
+                const simulate = (type:string, r:number,g:number,b:number) => {
+                  // 변환 행렬 근사 (sRGB -> LMS)
+                  const sr = r/255, sg = g/255, sb = b/255;
+                  const L = 0.31399022*sr + 0.63951294*sg + 0.04649755*sb;
+                  const M = 0.15537241*sr + 0.75789446*sg + 0.08670142*sb;
+                  const S = 0.01775239*sr + 0.10944209*sg + 0.87256922*sb;
+                  let l=L,m=M,s=S;
+                  if (type==='protan') { l = m; } // 단순화
+                  if (type==='deutan') { m = l; }
+                  if (type==='tritan') { s = (l+m)/2; }
+                  // 역변환 (근사)
+                  let R = 5.47221206*l -4.6419601*m + 0.16963708*s;
+                  let G = -1.1252419*l +2.29317094*m -0.1678952*s;
+                  let B = 0.02980165*l -0.19318073*m +1.16364789*s;
+                  const to255 = (x:number)=> clamp(Math.round(x*255));
+                  return `rgb(${to255(R)},${to255(G)},${to255(B)})`;
+                };
+                const history: string[] = (() => {
+                  if (typeof window === 'undefined') return [];
+                  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]') as string[]; } catch { return []; }
+                })();
+                const updateRgba = (nr:number, ng:number, nb:number, na:number) => {
+                  const hex = toHex(nr,ng,nb,na,true);
+                  setForm({...form, profileColor: hex});
+                };
+                const handleChannelInput = (channel:'r'|'g'|'b'|'a') => (e:React.ChangeEvent<HTMLInputElement>) => {
+                  const val = e.target.value === '' ? '' : e.target.value;
+                  if (val === '') { return; }
+                  if (!/^\d{1,3}$/.test(val)) return;
+                  const num = clamp(parseInt(val,10));
+                  updateRgba(channel==='r'?num:r, channel==='g'?num:g, channel==='b'?num:b, channel==='a'?num:a);
+                };
+                const handleKeyAdjust = (channel:'r'|'g'|'b'|'a') => (e:React.KeyboardEvent<HTMLInputElement>) => {
+                  if (['ArrowUp','ArrowDown'].includes(e.key)) {
+                    e.preventDefault();
+                    const deltaBase = e.shiftKey ? 10 : 1;
+                    const delta = e.key==='ArrowUp'? deltaBase : -deltaBase;
+                    const nv = clamp((channel==='r'?r:channel==='g'?g:channel==='b'?b:a)+delta,0, channel==='a'?255:255);
+                    updateRgba(channel==='r'?nv:r, channel==='g'?nv:g, channel==='b'?nv:b, channel==='a'?nv:a);
+                  }
+                };
+                const saveHistory = () => {
+                  if (!/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(form.profileColor)) return;
+                  if (history[0] === form.profileColor) return;
+                  const updated = [form.profileColor, ...history.filter(c=>c!==form.profileColor)].slice(0,MAX_HISTORY);
+                  localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+                };
+                return (
+                  <div className="w-full flex flex-col gap-4 mb-6" aria-label="RGBA 입력" role="group">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full border shadow-inner" style={{ background: form.profileColor }} aria-label="현재 선택 색상 미리보기" />
+                      <div className="text-xs text-gray-600 font-mono select-all">{form.profileColor}</div>
+                      <button type="button" onClick={saveHistory} className="px-2 py-1 rounded bg-gray-200 text-gray-700 text-xs hover:bg-gray-300" aria-label="현재 색상 히스토리에 저장">저장</button>
+                    </div>
+                    {/* HEX / RGBA 입력 */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
+                      <div className="col-span-2 md:col-span-1 flex flex-col gap-1">
+                        <label className="text-[11px] font-medium">HEX (6/8)</label>
+                        <input
+                          type="text"
+                          value={form.profileColor}
+                          onChange={(e)=>{
+                            const val = e.target.value.trim();
+                            if (/^#?[0-9A-Fa-f]{0,8}$/.test(val.replace('#',''))) {
+                              const withHash = val.startsWith('#')?val:'#'+val;
+                              setForm({...form, profileColor: withHash});
+                            }
+                          }}
+                          onBlur={()=>{ if (/^#[0-9A-Fa-f]{6}$/.test(form.profileColor)) { setForm({...form, profileColor: form.profileColor+ 'FF'});} }}
+                          placeholder="#RRGGBB or #RRGGBBAA"
+                          className="px-2 py-1 rounded border text-xs font-mono"
+                          aria-label="HEX 색상"
+                        />
+                      </div>
+                      {(['r','g','b','a'] as const).map(ch => (
+                        <div key={ch} className="flex flex-col gap-1">
+                          <label className="text-[11px] font-medium uppercase" htmlFor={`col-${ch}`}>{ch}</label>
+                          <input
+                            id={`col-${ch}`}
+                            type="number"
+                            min={0}
+                            max={255}
+                            value={ch==='r'?r:ch==='g'?g:ch==='b'?b:a}
+                            onChange={handleChannelInput(ch)}
+                            onKeyDown={handleKeyAdjust(ch)}
+                            className="px-2 py-1 rounded border text-xs font-mono w-full"
+                            aria-label={`${ch.toUpperCase()} 채널 값`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {/* 대비 정보 */}
+                    <div className="text-[11px] text-gray-600 flex flex-wrap gap-x-4 gap-y-1">
+                      <span>추천 텍스트 색상: <span className="font-mono" style={{color:recommendedText}}>{recommendedText}</span></span>
+                      <span>명암비: {recommendedContrast.toFixed(2)} : 1</span>
+                      <span>WCAG: {wcagLevel}</span>
+                    </div>
+                    {/* 색약 시뮬레이션 */}
+                    <div className="flex flex-col gap-2">
+                      <div className="text-[11px] font-medium text-gray-700">색약 모드 미리보기</div>
+                      <div className="flex gap-3">
+                        {[
+                          {k:'정상', c: form.profileColor},
+                          {k:'Protan', c: simulate('protan',r,g,b)},
+                          {k:'Deutan', c: simulate('deutan',r,g,b)},
+                          {k:'Tritan', c: simulate('tritan',r,g,b)},
+                        ].map(({k,c}) => (
+                          <div key={k} className="flex flex-col items-center gap-1">
+                            <div className="w-8 h-8 rounded-full border" style={{background:c}} title={k} aria-label={`${k} 시뮬레이션`} />
+                            <span className="text-[10px] text-gray-500">{k}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* 히스토리 */}
+                    {history.length > 0 && (
+                      <div>
+                        <div className="text-[11px] font-medium text-gray-700 mb-1">최근 사용</div>
+                        <div className="flex flex-wrap gap-2">
+                          {history.map(c => (
+                            <button
+                              key={c}
+                              type="button"
+                              aria-label={`최근 색상 ${c} 선택`}
+                              className={`w-7 h-7 rounded-full border ${form.profileColor===c?'ring-2 ring-blue-400 border-black':'border-gray-300'}`}
+                              style={{background:c}}
+                              onClick={()=> setForm({...form, profileColor:c})}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              <p className="text-[11px] text-gray-500 leading-relaxed mb-2">
+                프리셋 / 컬러 피커 / HEX / RGBA 숫자 입력으로 색을 설정하세요. Shift+방향키로 10단위 조정.
+              </p>
             </div>
           )}
           {/* 하단 버튼/상태 */}
-          <div className="flex gap-2 mt-4 md:mt-8">
-            {step > 0 && (
-              <button type="button" onClick={() => setStep(step - 1)} className="flex-1 py-3 rounded-lg bg-gray-200 text-gray-700 font-semibold text-lg shadow hover:bg-gray-300 transition">이전</button>
-            )}
-            {step < steps.length - 1 && (
-              <button type="button" onClick={handleNextStep} className="flex-1 py-3 rounded-lg bg-blue-600 text-white font-semibold text-lg shadow hover:bg-blue-700 transition">다음</button>
-            )}
-            {step === steps.length - 1 && (
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 py-3 rounded-lg bg-blue-600 text-white font-semibold text-lg shadow hover:bg-blue-700 transition disabled:opacity-60"
-              >
-                {loading ? "가입 중..." : "회원가입"}
-              </button>
-            )}
-          </div>
+          {![3,5].includes(step) && (
+            <div className="flex gap-2 mt-4 md:mt-8">
+              {step > 0 && (
+                <button type="button" onClick={() => setStep(step - 1)} className="flex-1 py-3 rounded-lg bg-gray-200 text-gray-700 font-semibold text-lg shadow hover:bg-gray-300 transition">이전</button>
+              )}
+              {step < steps.length - 1 && (
+                <button type="button" onClick={handleNextStep} className="flex-1 py-3 rounded-lg bg-blue-600 text-white font-semibold text-lg shadow hover:bg-blue-700 transition">다음</button>
+              )}
+              {step === steps.length - 1 && (
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 py-3 rounded-lg bg-blue-600 text-white font-semibold text-lg shadow hover:bg-blue-700 transition disabled:opacity-60"
+                >
+                  {loading ? "가입 중..." : "회원가입"}
+                </button>
+              )}
+            </div>
+          )}
           {error && <div className="text-red-500 text-sm text-center">{error}</div>}
           {success && <div className="text-green-600 text-sm text-center">회원가입이 완료되었습니다! 로그인 해주세요.</div>}
           <div className="text-center text-sm mt-2">

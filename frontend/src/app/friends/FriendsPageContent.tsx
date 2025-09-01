@@ -1,14 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FriendSearch from "@/components/FriendSearch";
 import { socialApi } from "@/services/social-api";
-import { ChatList } from "@/components/chat/ChatList";
 import { 
   Tab, 
   FriendWithDiary, 
   SocialFriendsResponse 
 } from "@/types/social.dto";
+import { useNotifications } from "@/context/NotificationContext";
+import { AuthContext } from "@/context/AuthContext";
 
 export default function FriendsPageContent() {
   const [tab, setTab] = useState<Tab>('mutual');
@@ -17,10 +18,12 @@ export default function FriendsPageContent() {
   const [error, setError] = useState("");
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
-  const [isChatListOpen, setIsChatListOpen] = useState(false);
+  // 채팅 리스트 관련 상태/컴포넌트 제거 (전역 보라색 채팅 아이콘 삭제 요구)
   
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { unreadCount } = useNotifications();
+  const { isAuthenticated } = useContext(AuthContext);
 
   // URL의 탭 파라미터 동기화
   useEffect(() => {
@@ -168,34 +171,47 @@ export default function FriendsPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 상단 고정 채팅 버튼 */}
-      <div className="fixed top-4 right-4 z-30">
-        <button
-          onClick={() => setIsChatListOpen(true)}
-          className="bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-700 transition-colors"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-4.906-1.455L3 21l2.455-5.094A8.959 8.959 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
-          </svg>
-        </button>
-      </div>
-
-      {/* 채팅방 목록 모달 */}
-      <ChatList 
-        isOpen={isChatListOpen} 
-        onClose={() => setIsChatListOpen(false)} 
-      />
+      {/* 전역 보라색 채팅 아이콘 및 ChatList 모달 제거됨 */}
 
       {/* 헤더 */}
       <div className="bg-white shadow-sm p-4">
-        <div className="max-w-md mx-auto flex items-center justify-between">
+        <div className="max-w-md mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
               <span className="text-sm">⏰</span>
             </div>
             <h1 className="text-xl font-bold">5MIN</h1>
           </div>
-          <FriendSearch />
+          <div className="flex items-center gap-2">
+            <FriendSearch />
+            {isAuthenticated && (
+              <button
+                onClick={() => router.push('/notifications')}
+                className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
+                aria-label="알림"
+              >
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-3-3V9a6 6 0 10-12 0v5l-3 3h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                  />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

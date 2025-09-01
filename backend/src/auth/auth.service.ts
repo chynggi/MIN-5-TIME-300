@@ -17,6 +17,9 @@ export class AuthService {
   async signup(dto: SignupDto): Promise<AuthResponseDto> {
     const exists = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (exists) throw new ConflictException('이미 가입된 이메일입니다.');
+    // 닉네임(username) 중복 검사
+    const usernameExists = await this.prisma.user.findUnique({ where: { username: dto.username } });
+    if (usernameExists) throw new ConflictException('이미 사용 중인 닉네임입니다.');
     
     const hash = await bcrypt.hash(dto.password, 10);
     
@@ -97,5 +100,11 @@ export class AuthService {
       success: true,
       message: '로그아웃 성공',
     };
+  }
+
+  async checkUsername(username: string): Promise<{ available: boolean }> {
+    if (!username) return { available: false };
+    const user = await this.prisma.user.findUnique({ where: { username } });
+    return { available: !user };
   }
 }

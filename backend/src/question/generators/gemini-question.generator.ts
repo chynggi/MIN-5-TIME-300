@@ -49,6 +49,11 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
       const response = await this.genai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: fullPrompt,
+        config: {
+          thinkingConfig: {
+            thinkingBudget: 0, // Disables thinking
+          },
+        },
       });
 
       // 응답에서 텍스트 추출

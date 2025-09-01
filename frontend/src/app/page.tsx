@@ -29,25 +29,49 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-100 to-blue-300">
-      <div className="flex flex-col md:flex-row items-center justify-center gap-12 w-full max-w-4xl p-8 md:p-16 bg-white/80 rounded-2xl shadow-2xl mt-24 mb-12">
-        <div className="flex flex-col items-center md:items-start gap-6 flex-1">
-          <img src="/file.svg" alt="로고" className="w-20 h-20 mb-2" />
-          <h1 className="text-3xl md:text-5xl font-bold text-blue-700 mb-2">MIN-5-TIME</h1>
-          <p className="text-center md:text-left text-gray-700 text-base md:text-xl mb-4">
-            5분의 기록, 나를 바꾸는 시간<br />
-            감정 일기, 커뮤니티, 통계, 친구와의 소통까지 한 번에!
-          </p>
-          <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-            <a href="/login" className="w-full md:w-auto py-3 px-8 rounded-lg bg-blue-600 text-white font-semibold text-lg text-center shadow hover:bg-blue-700 transition">로그인</a>
-            <a href="/signup" className="w-full md:w-auto py-3 px-8 rounded-lg border border-blue-600 text-blue-700 font-semibold text-lg text-center bg-white hover:bg-blue-50 transition">회원가입</a>
+    <div className="relative min-h-screen w-full overflow-hidden">
+      {/* 풀스크린 반응형 배경 이미지 (모바일/데스크탑 분리) */}
+      <picture>
+        {/* 데스크탑용 (md 이상) */}
+        <source srcSet="/Main-desktop.webp" media="(min-width: 768px)" />
+        {/* 모바일 기본 */}
+        <img
+          src="/Main.webp"
+          alt="메인 일러스트"
+          className="absolute inset-0 w-full h-full object-cover"
+          draggable={false}
+          fetchPriority="high"
+        />
+      </picture>
+
+      {/* 어두운/그라데이션 오버레이 (텍스트 대비 향상 대비 여유) */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/20 to-black/60 pointer-events-none" />
+
+      {/* 콘텐츠 래퍼 (필요시 향후 안내 문구 추가 가능) */}
+      <div className="relative z-10 flex flex-col justify-end min-h-screen">
+        {/* 하단 버튼 패널 - 모바일 앱 safe area 느낌 */}
+        <div className="mt-auto px-4 pb-6 pt-8">
+          <div className="backdrop-blur-md bg-white/15 border border-white/20 rounded-2xl shadow-lg overflow-hidden">
+            <div className="grid grid-cols-2">
+              <a
+                href="/login"
+                className="py-4 text-center font-semibold text-sm md:text-base text-white bg-blue-600/90 hover:bg-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400 transition"
+                aria-label="로그인 페이지로 이동"
+              >
+                로그인
+              </a>
+              <a
+                href="/signup"
+                className="py-4 text-center font-semibold text-sm md:text-base text-white bg-gray-900/80 hover:bg-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-400 transition"
+                aria-label="회원가입 페이지로 이동"
+              >
+                회원가입
+              </a>
+            </div>
           </div>
-        </div>
-        <div className="hidden md:block flex-1">
-          <img src="/main-illustration.svg" alt="메인 일러스트" className="w-full max-w-xs mx-auto" />
+          <p className="text-center text-[10px] text-white/60 mt-4 tracking-wide">© 2025 WITH ME</p>
         </div>
       </div>
-      <footer className="mt-auto mb-4 text-gray-400 text-xs">© 2025 MIN-5-TIME</footer>
     </div>
   );
 }

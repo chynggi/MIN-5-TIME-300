@@ -4,6 +4,7 @@ export class DiaryListItemDto {
   createdAt: string;
   updatedAt: string;
   diaryDate: string; // 일기 날짜 필드 추가
+  isRetrospective?: boolean; // 회고 작성 여부
   isPublic: boolean;
   emotionScore: number;
   emotion?: string; // 감정 이모지 필드 추가
@@ -33,6 +34,7 @@ export class DiaryDetailResponseDto {
   createdAt: string;
   updatedAt: string;
   diaryDate: string; // 일기 날짜 필드 추가
+  isRetrospective?: boolean; // 회고 작성 여부
   isPublic: boolean;
   emotionScore: number;
   emotion?: string; // 감정 이모지 필드 추가

@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MIN-5-TIME",
+  title: "WITH ME",
   description: "5분 일기 애플리케이션",
 };
 

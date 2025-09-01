@@ -4,21 +4,20 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
 import { diaryApi } from "@/services/diary-api";
-import { ChatList } from "@/components/chat/ChatList";
 
 interface DiaryPreview { id: string; content: string; createdAt: string; question: string; emotion?: string; likes?: number; username?: string; }
-interface FriendPreview { id: string; username: string; avatar?: string; isOnline?: boolean; hasTodayDiary?: boolean; }
+interface FriendTodayDiary { diaryId: string; userId: string; username: string; profileImageUrl?: string; emotion?: string | null; createdAt: string; }
 interface CalendarDay { date: number; emotion?: string; hasEntry: boolean; isLocked?: boolean; diaryId?: string; emotionScore?: number; }
 
 export default function DashboardPage() {
   const [diaries, setDiaries] = useState<DiaryPreview[]>([]);
   const [popularDiary, setPopularDiary] = useState<DiaryPreview | null>(null);
-  const [friends, setFriends] = useState<FriendPreview[]>([]);
+  const [friendsTodayDiaries, setFriendsTodayDiaries] = useState<FriendTodayDiary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarData, setCalendarData] = useState<CalendarDay[]>([]);
-  const [isChatListOpen, setIsChatListOpen] = useState(false);
+  // 전역 보라색 채팅 아이콘 제거: ChatList import/state 삭제
   const router = useRouter();
 
   // 감정 이모지 매핑
@@ -135,13 +134,13 @@ export default function DashboardPage() {
     setLoading(true);
     Promise.all([
       api.get("/diaries").then(res => res.data.diaries.slice(0, 3)).catch(() => []),
-      api.get("/friends").then(res => res.data.friends.slice(0, 5)).catch(() => []),
-      // 가장 최근에 작성된 일기 중 인기 있는 일기 가져오기
+      // 맞팔 친구들 오늘 공개 일기
+      diaryApi.getFriendsTodayDiaries().then(res => res.items).catch(() => []),
       api.get("/diaries?sort=popularity&limit=1").then(res => res.data.diaries[0] || null).catch(() => null),
     ])
-      .then(([d, f, popular]) => {
+      .then(([d, friendsToday, popular]) => {
         setDiaries(d);
-        setFriends(f);
+        setFriendsTodayDiaries(friendsToday);
         setPopularDiary(popular);
       })
       .catch(() => setError("대시보드 데이터를 불러오지 못했습니다."))
@@ -149,71 +148,38 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 to-pink-50">
-      {/* 상단 고정 채팅 버튼 */}
-      <div className="fixed top-4 right-4 z-30">
-        <button
-          onClick={() => setIsChatListOpen(true)}
-          className="bg-purple-600 text-white p-3 rounded-full shadow-lg hover:bg-purple-700 transition-colors"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-4.906-1.455L3 21l2.455-5.094A8.959 8.959 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
-          </svg>
-        </button>
-      </div>
-
-      {/* 채팅방 목록 모달 */}
-      <ChatList 
-        isOpen={isChatListOpen} 
-        onClose={() => setIsChatListOpen(false)} 
-      />
+    <div className="flex flex-col space-y-6">
+      {/* 전역 채팅 아이콘 및 ChatList 모달 제거됨 */}
 
       {/* 메인 콘텐츠 */}
-      <div className="flex-1 p-4 space-y-6">
-        {/* 친구들 일기 스토리 섹션 */}
+      <div className="flex-1 space-y-6">
+        {/* 오늘의 일기 (맞팔 친구들 오늘 공개 일기) - 없으면 안내 문구 */}
         <section className="bg-white rounded-xl shadow p-4">
           <div className="flex justify-between items-center mb-3">
             <h2 className="font-bold text-lg">오늘의 일기</h2>
             <Link href="/friends" className="text-blue-600 text-sm">더보기</Link>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {friends.length === 0 ? (
-              // 기본 친구 아바타들 (당일 일기를 작성한 친구들)
-              Array.from({length: 3}).map((_, i) => (
-                <div key={i} className="flex-shrink-0 text-center">
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-lg border-4 ${
-                    i === 0 ? 'border-pink-400 bg-green-200' : 
-                    i === 1 ? 'border-orange-400 bg-orange-200' : 
-                    'border-blue-400 bg-blue-200'
-                  } relative`}>
-                    👤
-                    {/* 새 일기 알림 점 */}
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
+          {friendsTodayDiaries.length === 0 ? (
+            <div className="text-sm text-gray-500 py-4 text-center">오늘의 일기가 없습니다.</div>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {friendsTodayDiaries.map(friend => (
+                <div key={friend.diaryId} className="flex-shrink-0 text-center cursor-pointer group" 
+                     onClick={() => { window.location.href = `/diary/${friend.diaryId}`; }}>
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center text-lg border-4 border-pink-400 relative bg-gray-100 overflow-hidden">
+                    {friend.profileImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={friend.profileImageUrl} alt={friend.username} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xl">👤</span>
+                    )}
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white" title="오늘 새 일기"></div>
                   </div>
-                  <p className="text-xs mt-1 text-gray-700 font-medium">
-                    {i === 0 ? '민수' : i === 1 ? '지영' : '현우'}
-                  </p>
+                  <p className="text-xs mt-1 text-gray-700 font-medium truncate w-16" title={friend.username}>{friend.username}</p>
                 </div>
-              ))
-            ) : (
-              friends.filter(friend => friend.hasTodayDiary).map((friend, i) => (
-                <div key={friend.id} className="flex-shrink-0 text-center cursor-pointer" 
-                     onClick={() => {
-                       // 친구의 오늘 일기 보기
-                       console.log(`View ${friend.username}'s today diary`);
-                     }}>
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-lg border-4 border-pink-400 relative ${
-                    friend.isOnline ? 'bg-green-200' : 'bg-gray-200'
-                  }`}>
-                    {friend.avatar || '👤'}
-                    {/* 새 일기 알림 점 */}
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white"></div>
-                  </div>
-                  <p className="text-xs mt-1 text-gray-700 font-medium">{friend.username}</p>
-                </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* 캘린더 섹션 */}
@@ -257,7 +223,7 @@ export default function DashboardPage() {
               const isFuture = currentDateObj > todayObj;
               
               return (
-                <div key={index} className="aspect-square">
+                <div key={index} className="aspect-square relative">
                   <button
                     className={`w-full h-full rounded-lg flex flex-col items-center justify-center text-xs transition-all ${
                       isToday 
@@ -278,8 +244,11 @@ export default function DashboardPage() {
                         // 작성된 일기가 있으면 해당 일기 상세 페이지로 이동
                         window.location.href = `/diary/${day.diaryId}`;
                       } else {
-                        // 일기가 없으면 새 일기 작성 페이지로 이동
-                        window.location.href = '/diary/new';
+                        // 일기가 없으면 새 일기 작성 페이지로 이동 (날짜 전달)
+                        const year = currentDate.getFullYear();
+                        const month = currentDate.getMonth();
+                        const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day.date).padStart(2,'0')}`;
+                        window.location.href = `/diary/new?date=${dateStr}`;
                       }
                     }}
                     disabled={day.isLocked}
@@ -299,6 +268,12 @@ export default function DashboardPage() {
                     
                     {isToday && !day.hasEntry && (
                       <span className="text-xs text-blue-600 mt-1">오늘</span>
+                    )}
+                    {/* 회고 배지: 과거 날짜 + hasEntry + createdAt이 아닌 과거에 저장된 것으로 서버에서 isRetrospective 제공 시 */}
+                    {day.hasEntry && (day as any).isRetrospective && (
+                      <span className="absolute top-1 right-1 bg-pink-600 text-white text-[9px] px-1.5 py-0.5 rounded-full leading-none font-semibold">
+                        회고
+                      </span>
                     )}
                   </button>
                 </div>

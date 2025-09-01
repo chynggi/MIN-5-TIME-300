@@ -7,18 +7,21 @@ import { ProfileResponse } from '../types/api';
 
 interface AuthContextType {
   user: ProfileResponse | null;
+  isAuthenticated: boolean; // 토큰 존재 여부 (user 로드 전 초기 단계 포함)
   login: (token: string) => void;
   logout: () => void;
 }
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
+  isAuthenticated: false,
   login: () => {},
   logout: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<ProfileResponse | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   const loadUser = async () => {
     try {
@@ -30,14 +33,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (token) {
+      setIsAuthenticated(true); // 토큰만 존재해도 인증상태로 간주 (user 비동기 로드 전)
       loadUser();
+    } else {
+      setIsAuthenticated(false);
     }
   }, []);
 
   const login = (token: string) => {
     localStorage.setItem('token', token);
+    setIsAuthenticated(true);
     loadUser();
   };
 
@@ -47,10 +54,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {}
     localStorage.removeItem('token');
     setUser(null);
+    setIsAuthenticated(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

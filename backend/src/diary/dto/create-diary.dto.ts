@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsBooleanString, IsNumberString } from 'class-validator';
 
 export class CreateDiaryDto {
   @IsString()
@@ -9,7 +9,8 @@ export class CreateDiaryDto {
   questionId?: string;
 
   @IsOptional()
-  isPublic?: any; // FormData에서 문자열로 전달되므로 any 타입 사용
+  @IsBooleanString()
+  isPublic?: string; // 'true' | 'false'
 
   @IsOptional()
   @IsString()
@@ -27,11 +28,14 @@ export class CreateDiaryDto {
   @IsString()
   mediaType?: string;
 
-  writingDuration: any; // FormData에서 문자열로 전달되므로 any 타입 사용
+  @IsNumberString()
+  writingDuration: string; // FormData에서 문자열로 전달
   
   @IsOptional()
-  lat?: any;
+  @IsNumberString()
+  lat?: string;
 
   @IsOptional()
-  lng?: any;
+  @IsNumberString()
+  lng?: string;
 }

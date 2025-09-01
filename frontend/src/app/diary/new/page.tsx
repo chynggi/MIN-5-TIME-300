@@ -4,10 +4,8 @@ import { useState, useEffect } from "react";
 const defaultImages = [
   "/images/default1.jpg",
   "/images/default2.jpg",
-  "/images/default3.jpg",
-  "/images/default4.jpg",
 ];
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/axios";
 import Link from "next/link";
 import { SpotifyTrack as SpotifyTrackType, DiarySettings as DiarySettingsType } from "@/types/diary";
@@ -49,7 +47,30 @@ export default function NewDiaryPage() {
   const [content, setContent] = useState("");
   const [questionId, setQuestionId] = useState("");
   const [startTime, setStartTime] = useState<number>(Date.now());
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]); // 일기 날짜 선택
+  // 선택된 일기 날짜 (캘린더에서 넘어온 date query 사용, 없으면 오늘)
+  const searchParams = useSearchParams();
+  const initialDateParam = searchParams?.get('date');
+  const todayStr = new Date().toISOString().split('T')[0];
+  const parseValidDate = (d?: string | null) => {
+    if (!d) return todayStr;
+    // YYYY-MM-DD 형식 검사
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return todayStr;
+    const dt = new Date(d + 'T00:00:00');
+    if (isNaN(dt.getTime())) return todayStr;
+    // 미래 날짜 방지
+    const today = new Date();
+    const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    if (dt > todayMid) return todayStr; // 미래면 오늘로 대체
+    return d;
+  };
+  const [selectedDate, setSelectedDate] = useState<string>(parseValidDate(initialDateParam));
+
+  // query가 바뀌는 경우(클라이언트 내 네비게이션) 동기화
+  useEffect(() => {
+    const newParam = searchParams?.get('date');
+    const validated = parseValidDate(newParam);
+    setSelectedDate(validated);
+  }, [searchParams]);
   
   // Settings
   const [diarySettings, setDiarySettings] = useState({
@@ -119,11 +140,13 @@ export default function NewDiaryPage() {
       // 작성 시간 계산 (초 단위)
       const writingDuration = Math.floor((Date.now() - startTime) / 1000);
       
-      const formData = new FormData();
-      formData.append("content", content);
-      formData.append("emotion", emotion); // 감정 이모지 추가
-      formData.append("diaryDate", selectedDate); // 일기 날짜 추가
-      formData.append("writingDuration", writingDuration.toString());
+    const formData = new FormData();
+    // 백엔드 DTO에는 title 필드가 없으므로 제목을 내용 앞에 합쳐 저장 (구분자 사용)
+    const combinedContent = title ? `[제목] ${title}\n\n${content}` : content;
+    formData.append("content", combinedContent);
+    formData.append("emotion", emotion); // 감정 이모지 추가
+    formData.append("diaryDate", selectedDate); // 선택된 (혹은 기본) 일기 날짜 사용
+    formData.append("writingDuration", writingDuration.toString());
       
       // isPublic 설정 (postVisibility가 "private"가 아니면 public으로 설정)
       const isPublic = diarySettings.postVisibility !== "private";
@@ -132,12 +155,11 @@ export default function NewDiaryPage() {
       if (questionId) formData.append("questionId", questionId);
       if (image) {
         formData.append("file", image); // 백엔드에서 'file'로 받음
-      } else if (preview) {
-        // 기본 이미지는 URL로 전달
-        formData.append("defaultImageUrl", preview);
       }
-      if (voiceRecord) formData.append("voice", voiceRecord);
-      if (selectedMusic) formData.append("musicData", JSON.stringify(selectedMusic));
+      // defaultImageUrl / voice / musicData 는 현재 백엔드 DTO에 없으므로 전송 생략
+      // (추후 서버 확장 시 필드명 합의 필요)
+      // if (voiceRecord) { ... 업로드 미지원 }
+      // if (selectedMusic) { ... 메타데이터 별도 API 고려 }
 
       const response = await api.post("/diaries", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -150,8 +172,15 @@ export default function NewDiaryPage() {
         throw new Error("저장 실패");
       }
     } catch (err: any) {
-      console.error("일기 저장 오류:", err);
-      setError(err.response?.data?.message || "일기 저장에 실패했습니다. 다시 시도해주세요.");
+      console.error("일기 저장 오류:", err?.response?.data || err);
+      const serverMsg = err?.response?.data?.message;
+      if (serverMsg) {
+        setError(`저장 실패: ${serverMsg}`);
+      } else if (err?.response?.status === 400) {
+        setError("요청 형식이 올바르지 않습니다. 필수 항목을 다시 확인해주세요.");
+      } else {
+        setError("일기 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      }
     } finally {
       setLoading(false);
     }
@@ -162,17 +191,9 @@ export default function NewDiaryPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
         <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
-          <div className="flex items-center justify-between mb-4">
+          {/* 상단 날짜 설정 섹션 제거됨 (요청사항) */}
+          <div className="mb-4">
             <h1 className="text-xl font-bold text-gray-800">오늘의 일기</h1>
-            <div className="flex flex-col items-end">
-              <span className="text-sm text-gray-500 mb-1">일기 날짜</span>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="text-sm text-gray-700 border border-gray-200 rounded px-2 py-1"
-              />
-            </div>
           </div>
 
 

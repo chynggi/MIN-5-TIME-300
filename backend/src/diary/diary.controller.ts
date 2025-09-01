@@ -29,6 +29,15 @@ export class DiaryController {
     return this.diaryService.getDiaries(req, query);
   }
 
+  /**
+   * 오늘 작성된 맞팔 친구들의 공개 일기 목록
+   * GET /api/v1/diaries/friends/today
+   */
+  @Get('friends/today')
+  async getFriendsTodayDiaries(@Req() req) {
+    return this.diaryService.getFriendsTodayDiaries(req);
+  }
+
   @Get(':id')
   async getDiary(@Req() req, @Param('id') id: string): Promise<DiaryDetailResponseDto> {
     return this.diaryService.getDiary(req, id);
@@ -42,6 +51,13 @@ export class DiaryController {
     @Body() dto: CreateDiaryDto,
     @UploadedFile() file?: Multer.File,
   ): Promise<{ id: string; content: string; createdAt: string; isPublic: boolean; question: string; mediaUrl?: string; mediaType?: string }> {
+    // 디버깅: 들어온 FormData 필드 로그
+    try {
+      console.log('[CreateDiary] raw body dto:', dto);
+      if (file) {
+        console.log('[CreateDiary] uploaded file:', { originalname: file.originalname, mimetype: file.mimetype, size: file.size });
+      }
+    } catch (e) { /* ignore */ }
     return this.diaryService.createDiary(req, dto, file);
   }
 

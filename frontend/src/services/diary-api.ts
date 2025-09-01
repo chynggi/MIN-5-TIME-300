@@ -4,6 +4,8 @@ export interface DiaryItem {
   id: string;
   content: string;
   createdAt: string;
+  diaryDate?: string; // 일기 날짜
+  isRetrospective?: boolean; // 회고 작성 여부
   isPublic: boolean;
   emotionScore?: number;
   mediaUrl?: string;
@@ -21,6 +23,8 @@ export interface DiaryDetailResponse {
   id: string;
   content: string;
   createdAt: string;
+  diaryDate?: string;
+  isRetrospective?: boolean;
   isPublic: boolean;
   emotionScore?: number;
   mediaUrl?: string;
@@ -62,6 +66,11 @@ export const diaryApi = {
   // 오늘의 질문 조회
   getTodayQuestion: (): Promise<TodayQuestionResponse> => {
     return apiRequest('/diaries/today-question');
+  },
+
+  // 오늘 작성된 맞팔 친구들의 공개 일기 목록
+  getFriendsTodayDiaries: (): Promise<{ items: { diaryId: string; userId: string; username: string; profileImageUrl?: string; emotion?: string | null; createdAt: string }[] }> => {
+    return apiRequest('/diaries/friends/today');
   },
 
   // 일기 생성

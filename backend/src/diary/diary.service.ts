@@ -17,6 +17,63 @@ export class DiaryService {
     private readonly fileUploadService: FileUploadService,
   ) {}
 
+  /**
+   * 오늘 날짜에 작성된 '맞팔(서로 팔로우)' 친구들의 일기 목록을 반환
+   * - 서로 팔로우 관계: follow (A->B, B->A 모두 ACTIVE, deletedAt null)
+   * - 오늘 범위: 로컬(서버) 기준 자정~자정. (UTC 기준으로 처리 시 timezone 고려 필요)
+   *   여기서는 서버 시간대 사용. 00:00 ~ 23:59:59.999
+   * - 공개 범위: 친구가 일기를 isPublic=true 로 공개한 경우만 노출 (혹은 향후 friends-only 정책 추가 시 수정)
+   * 반환 항목: diaryId, userId, username, profileImageUrl, emotion, createdAt
+   */
+  async getFriendsTodayDiaries(req: any) {
+    const userId = req.user.userId;
+
+    // 오늘 시작/끝 시간 계산
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    // 1) 내가 팔로우하는 ACTIVE followee 목록
+    const following = await this.prisma.follow.findMany({
+      where: { followerId: userId, status: 'ACTIVE', deletedAt: null },
+      select: { followeeId: true }
+    });
+    if (!following.length) return { items: [] };
+    const followingIds = following.map(f => f.followeeId);
+
+    // 2) 나를 팔로우하는 ACTIVE follower 중에서 상호관계 (맞팔)만 추출
+    const followers = await this.prisma.follow.findMany({
+      where: { followeeId: userId, status: 'ACTIVE', deletedAt: null, followerId: { in: followingIds } },
+      select: { followerId: true }
+    });
+    const mutualIds = followers.map(f => f.followerId);
+    if (!mutualIds.length) return { items: [] };
+
+    // 3) 오늘 작성된 공개 일기 조회 (isPublic=true)
+    const diaries = await this.prisma.journal.findMany({
+      where: {
+        userId: { in: mutualIds },
+        isPublic: true,
+        diaryDate: { gte: start, lte: end },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { id: true, username: true, profileImageUrl: true } }
+      }
+    });
+
+    const items = diaries.map(d => ({
+      diaryId: d.id,
+      userId: d.user.id,
+      username: d.user.username,
+      profileImageUrl: d.user.profileImageUrl,
+      emotion: d.emotion ?? null,
+      createdAt: d.createdAt.toISOString(),
+    }));
+
+    return { items };
+  }
+
   async getTodayQuestion(req: any): Promise<TodayQuestionResponseDto> {
     // 동적 Gemini 질문 생성
     const userId = req.user.userId;
@@ -115,6 +172,7 @@ export class DiaryService {
         createdAt: d.createdAt.toISOString(),
         updatedAt: d.updatedAt.toISOString(),
         diaryDate: d.diaryDate.toISOString(), // 일기 날짜 포함
+        isRetrospective: (d as any).isRetrospective ?? undefined,
         isPublic: d.isPublic,
         emotionScore: d.emotionScore,
         emotion: d.emotion ?? undefined, // 감정 이모지 포함
@@ -163,6 +221,7 @@ export class DiaryService {
       createdAt: diary.createdAt.toISOString(),
       updatedAt: diary.updatedAt.toISOString(),
       diaryDate: diary.diaryDate.toISOString(), // 일기 날짜 포함
+  isRetrospective: (diary as any).isRetrospective ?? undefined,
       isPublic: diary.isPublic,
       emotionScore: diary.emotionScore,
       emotion: diary.emotion ?? undefined, // 감정 이모지 포함
@@ -211,13 +270,22 @@ export class DiaryService {
     
     // FormData로 전달된 문자열 값들을 올바른 타입으로 변환
     const isPublic = (dto.isPublic as any) === true || (dto.isPublic as any) === 'true';
-    const writingDuration = typeof (dto.writingDuration as any) === 'string' 
-      ? parseInt((dto.writingDuration as any), 10) 
-      : dto.writingDuration;
+    // writingDuration은 DTO에서 문자열(@IsNumberString)로 들어오므로 확실하게 number로 파싱
+    const writingDurationParsed = (() => {
+      const n = parseInt(dto.writingDuration as any, 10);
+      if (Number.isNaN(n) || n < 0) return 0; // 방어적 기본값
+      return n;
+    })();
     
     // diaryDate 처리 - 전달되면 사용, 없으면 현재 시각
     const diaryDate = dto.diaryDate ? new Date(dto.diaryDate) : new Date();
     
+    // createdAt도 과거 회고 작성 시 diaryDate로 고정 (미래는 이미 필터됨)
+    // Prisma에서는 createdAt default(now()) 대신 명시적으로 넣을 수 있음
+    const nowMid = new Date();
+    const todayMid = new Date(nowMid.getFullYear(), nowMid.getMonth(), nowMid.getDate());
+    const useCustomCreatedAt = diaryDate <= todayMid; // 과거/오늘만 허용
+
     const diary = await this.prisma.journal.create({
       data: {
         userId,
@@ -225,9 +293,10 @@ export class DiaryService {
         isPublic,
         emotion: dto.emotion, // 감정 이모지 저장
         diaryDate, // 일기 날짜 저장
+        ...(useCustomCreatedAt ? { createdAt: diaryDate } : {}),
         mediaUrl,
         mediaType,
-        writingDuration,
+  writingDuration: writingDurationParsed,
         emotionScore: 0,
       },
     });
@@ -236,6 +305,9 @@ export class DiaryService {
     try {
       const embedding = await this.vectorDbService.getCombinedEmbedding([diary.content]);
       if (embedding) {
+        // DB 저장 (prisma generate 후 embedding 필드 인식, 현재는 any 캐스팅 가능)
+        (this.prisma as any).journal.update({ where: { id: diary.id }, data: { embedding } })
+          .catch((err: any) => console.warn('임베딩 DB 저장 실패:', err.message));
         await this.vectorDbService.upsert([
           {
             id: diary.id,

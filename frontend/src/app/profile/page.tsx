@@ -442,7 +442,7 @@ export default function ProfilePage() {
             const isFuture = currentLocalDate > todayLocalDate;
             
             return (
-              <div key={index} style={{ aspectRatio: '1' }}>
+              <div key={index} style={{ aspectRatio: '1', position: 'relative' }}>
                 <button
                   style={{
                     width: '100%',
@@ -489,7 +489,10 @@ export default function ProfilePage() {
                       router.push(`/diary/${day.diaryId}`);
                     } else {
                       console.log('➡️ 일기가 없으므로 새 일기 작성 페이지로 이동');
-                      router.push('/diary/new');
+                      const year = currentDate.getFullYear();
+                      const month = currentDate.getMonth();
+                      const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day.date).padStart(2,'0')}`;
+                      router.push(`/diary/new?date=${dateStr}`);
                     }
                   }}
                 >
@@ -506,6 +509,10 @@ export default function ProfilePage() {
                   )}
                   {isToday && !day.hasEntry && (
                     <span style={{ fontSize: '10px', color: '#2563eb', marginTop: '4px' }}>오늘</span>
+                  )}
+                  {/* 회고 배지 (서버 isRetrospective 필드가 프론트 day 매핑 시 들어온다고 가정) */}
+                  {day.hasEntry && (day as any).isRetrospective && (
+                    <span style={{ position: 'absolute', top: '3px', right: '3px', background: '#db2777', color: '#fff', fontSize: '9px', padding: '2px 4px', borderRadius: '9999px', lineHeight: 1 }}>회고</span>
                   )}
                 </button>
               </div>
