@@ -7,6 +7,7 @@ import api from '@/lib/axios';
 import BlockButton from '@/components/follow/BlockButton';
 import { followApi } from '@/services/follow-api';
 import { chatService } from '@/services/chatService';
+import { getRealtimeSocket, disconnectRealtimeSocket } from '@/lib/realtimeSocket';
 
 interface UserProfile {
   id: string;
@@ -142,6 +143,7 @@ export default function UserProfilePage() {
       try {
         const res = await api.get('/profile');
         setCurrentUser({ username: res.data.username });
+        (window as any)._myProfileUserId = res.data.id; // 본인 ID 저장
       } catch (e) {
         console.error('현재 사용자 정보 조회 실패', e);
       }
@@ -197,6 +199,33 @@ export default function UserProfilePage() {
       generateCalendarData();
     }
   }, [currentDate, profile]);
+
+  // 실시간 소켓 구독: 조회 대상 사용자 프로필 카운터
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+    const targetUserId = profile?.id;
+    if (targetUserId) {
+      socket.emit('profile.subscribe', { userId: targetUserId });
+    }
+    socket.on('profile.counters.update', (data: any) => {
+      if (!profile) return;
+      if (data.userId === profile.id) {
+        setProfile(prev => prev ? {
+          ...prev,
+          followerCount: data.followerCount !== undefined ? data.followerCount : prev.followerCount,
+          followingCount: data.followingCount !== undefined ? data.followingCount : prev.followingCount,
+          diaryCount: data.diaryCount !== undefined ? data.diaryCount : prev.diaryCount,
+        } : prev);
+      }
+    });
+    return () => {
+      if (targetUserId) {
+        socket.emit('profile.unsubscribe', { userId: targetUserId });
+      }
+      socket.off('profile.counters.update');
+      // 다른 페이지에서도 사용할 수 있으므로 disconnect는 여기서 하지 않음
+    };
+  }, [profile?.id]);
 
   const handleStatsClick = (type: 'followers' | 'following') => {
     // 달력 조회 권한이 있을 때만 팔로워/팔로잉 목록 보기 가능

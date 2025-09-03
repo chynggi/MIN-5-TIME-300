@@ -175,43 +175,35 @@ export default function FriendsPageContent() {
 
       {/* 헤더 */}
       <div className="bg-white shadow-sm p-4">
-        <div className="max-w-md mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-              <span className="text-sm">⏰</span>
-            </div>
-            <h1 className="text-xl font-bold">5MIN</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <FriendSearch />
-            {isAuthenticated && (
-              <button
-                onClick={() => router.push('/notifications')}
-                className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
-                aria-label="알림"
+        <div className="max-w-md mx-auto flex items-center justify-end gap-2">
+          <FriendSearch />
+          {isAuthenticated && (
+            <button
+              onClick={() => router.push('/notifications')}
+              className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
+              aria-label="알림"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
               >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 17h5l-3-3V9a6 6 0 10-12 0v5l-3 3h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                  />
-                </svg>
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 17h5l-3-3V9a6 6 0 10-12 0v5l-3 3h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
 

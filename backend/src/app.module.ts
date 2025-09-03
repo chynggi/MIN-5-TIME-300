@@ -9,6 +9,7 @@ import { FriendModule } from './friend/friend.module';
 import { FollowModule } from './follow/follow.module';
 import { SocialModule } from './social/social.module';
 import { ChatModule } from './chat/chat.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { StatisticsModule } from './statistics/statistics.module';
 import { NotificationModule } from './notification/notification.module';
 import { PrismaModule } from './prisma.module';
@@ -33,6 +34,7 @@ import { JwtModule } from '@nestjs/jwt';
     StatisticsModule,
     NotificationModule,
     UsersModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [AppService, ChatGateway],

@@ -8,6 +8,7 @@ import { TodayQuestionResponseDto } from './dto/today-question-response.dto';
 import { PrismaService } from '../prisma.service';
 import { VectorDbService } from '../vector-db/vector-db.service';
 import { FileUploadService } from '../common/services/file-upload.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 @Injectable()
 export class DiaryService {
@@ -15,6 +16,7 @@ export class DiaryService {
     private readonly prisma: PrismaService,
     private readonly vectorDbService: VectorDbService,
     private readonly fileUploadService: FileUploadService,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   /**
@@ -521,7 +523,7 @@ export class DiaryService {
       // 임베딩/업서트 실패 시 무시 (로깅 등 추가 가능)
     }
 
-    return {
+    const result = {
       id: diary.id,
       content: diary.content,
       createdAt: diary.createdAt.toISOString(),
@@ -532,6 +534,21 @@ export class DiaryService {
       lat: (diary as any).lat ?? null,
       lng: (diary as any).lng ?? null,
     };
+
+    // 일기 작성 후 최신 일기 수 카운트 및 실시간 전송 (비동기, 실패해도 throw 아님)
+    this.prisma.journal.count({ where: { userId } })
+      .then(count => {
+        this.realtimeGateway.emitProfileCountersUpdate({
+          userId,
+          diaryCount: count,
+        });
+      })
+      .catch(err => {
+        // eslint-disable-next-line no-console
+        console.error('실시간 diaryCount 전송 실패', err.message);
+      });
+
+    return result;
   }
 
   async rateDiary(req: any, id: string, dto: RateDiaryDto): Promise<{ id: string; emotionScore: number; updatedAt: string }> {

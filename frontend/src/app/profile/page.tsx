@@ -7,6 +7,7 @@ import { profileApi } from '../../services/profile-api';
 import { followApi } from '../../services/follow-api';
 import { diaryApi } from '../../services/diary-api';
 import { statisticsApi } from '../../services/statistics-api';
+import { getRealtimeSocket, disconnectRealtimeSocket } from '@/lib/realtimeSocket';
 import { ProfileResponse } from '../../types/api';
 import { setAuthToken, testConnection } from '../../lib/api';
 import { authApi } from '../../services/auth-api';
@@ -176,6 +177,32 @@ export default function ProfilePage() {
     loadFriendStats();
     loadDiaryStats();
     loadLPGScore();
+    // 실시간 소켓 연결
+    const socket = getRealtimeSocket();
+    socket.on('connect', () => {
+      // 자신의 프로필 자동 구독(게이트웨이에서 join 됨) + 명시적 재구독
+      if ((window as any)._myProfileUserId) {
+        socket.emit('profile.subscribe', { userId: (window as any)._myProfileUserId });
+      }
+    });
+    socket.on('profile.counters.update', (data: any) => {
+      setProfile(prev => {
+        if (!prev) return prev;
+        if (data.userId && data.userId === (window as any)._myProfileUserId) {
+          return {
+            ...prev,
+            followerCount: data.followerCount !== undefined ? data.followerCount : prev.followerCount,
+            followingCount: data.followingCount !== undefined ? data.followingCount : prev.followingCount,
+            diaryCount: data.diaryCount !== undefined ? data.diaryCount : prev.diaryCount,
+          };
+        }
+        return prev;
+      });
+    });
+    return () => {
+      socket.off('profile.counters.update');
+      disconnectRealtimeSocket();
+    };
   }, []);
 
   useEffect(() => {
@@ -200,6 +227,13 @@ export default function ProfilePage() {
         mbti: profileData.mbti || 'INFJ',
         profileImageUrl: profileData.profileImageUrl,
       }));
+      // 전역에 사용자 ID 기억 (간단한 공유)
+      (window as any)._myProfileUserId = profileData.id;
+      // 연결되어 있다면 구독 보장
+      try {
+        const socket = getRealtimeSocket();
+        socket.emit('profile.subscribe', { userId: profileData.id });
+      } catch {}
     } catch (err: any) {
       console.error('프로필 로드 실패:', err);
       if (err.message?.includes('인증이 필요합니다')) {

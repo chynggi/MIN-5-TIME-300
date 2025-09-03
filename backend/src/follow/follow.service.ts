@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationService } from '../notification/notification.service';
 import { FollowStatus } from '@prisma/client';
 import { 
@@ -13,7 +14,8 @@ import {
 export class FollowService {
   constructor(
     private prisma: PrismaService,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private realtimeGateway: RealtimeGateway,
   ) {}
 
   /**
@@ -102,9 +104,10 @@ export class FollowService {
         });
       }
 
-      // 공개 계정인 경우 즉시 카운터 업데이트
+      // 공개 계정인 경우 즉시 카운터 업데이트 및 실시간 브로드캐스트
       if (status === FollowStatus.ACTIVE) {
         await this.updateFollowCounters(tx, followerId, followeeId, 'increment');
+        await this.broadcastCounters([followerId, followeeId]);
       }
 
       // 알림 생성
@@ -155,6 +158,7 @@ export class FollowService {
       // 활성 상태였던 경우에만 카운터 감소
       if (existingFollow.status === FollowStatus.ACTIVE) {
         await this.updateFollowCounters(tx, followerId, followeeId, 'decrement');
+        await this.broadcastCounters([followerId, followeeId]);
       }
     });
   }
@@ -198,8 +202,9 @@ export class FollowService {
         }
       });
 
-      // 카운터 업데이트
-      await this.updateFollowCounters(tx, followerId, followeeId, 'increment');
+  // 카운터 업데이트 및 브로드캐스트
+  await this.updateFollowCounters(tx, followerId, followeeId, 'increment');
+  await this.broadcastCounters([followerId, followeeId]);
 
       // 팔로우 승인 알림 생성
       await this.notificationService.handleFollowEvent(followeeId, followerId, 'accept');
@@ -238,6 +243,24 @@ export class FollowService {
       where: { id: followRequest.id },
       data: { deletedAt: new Date() }
     });
+  }
+
+  /**
+   * 주어진 사용자 ID 배열에 대해 최신 팔로워/팔로잉 카운터를 계산하여 실시간 전송
+   */
+  private async broadcastCounters(userIds: string[]) {
+    const unique = Array.from(new Set(userIds));
+    for (const uid of unique) {
+      const [followerCount, followingCount] = await Promise.all([
+        this.prisma.follow.count({ where: { followeeId: uid, status: FollowStatus.ACTIVE, deletedAt: null } }),
+        this.prisma.follow.count({ where: { followerId: uid, status: FollowStatus.ACTIVE, deletedAt: null } }),
+      ]);
+      this.realtimeGateway.emitProfileCountersUpdate({
+        userId: uid,
+        followerCount,
+        followingCount,
+      });
+    }
   }
 
   /**
