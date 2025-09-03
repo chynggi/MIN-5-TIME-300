@@ -23,7 +23,9 @@ const API_BASE_URL = (() => {
 })();
 
 class NotificationService {
-  private baseUrl = `${API_BASE_URL}/v1/notifications`;
+  // NOTE: 백엔드 NotificationController가 @Controller('api/v1/notifications') 로 선언되어 있으므로
+  // 여기 baseUrl 또한 /api/v1 로 맞춰야 함. (기존 잘못된 경로: /v1/notifications)
+  private baseUrl = `${API_BASE_URL}/api/v1/notifications`;
 
   private async makeRequest<T>(
     endpoint: string, 

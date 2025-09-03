@@ -97,21 +97,10 @@ export class StatisticsService {
         writingQuality: r.writingQuality,
       })),
     };
-    // 피드백 품질 통계
-    const feedbackCount = await this.prisma.feedbackLog.count({ where: { userId } });
-    const recentFeedbacks = await this.prisma.feedbackLog.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-    });
-    // 예시: 부적절/차단 피드백(자동 필터 활용)
-    const bannedWords = ['욕설', '비속어', '금칙어'];
-    const inappropriateCount = await this.prisma.feedbackLog.count({
-      where: {
-        userId,
-        OR: bannedWords.map(word => ({ content: { contains: word } })),
-      },
-    });
+    // (Removed) 피드백 품질 통계: FeedbackLog 제거됨
+    const feedbackCount = 0;
+    const recentFeedbacks: any[] = [];
+    const inappropriateCount = 0;
     return {
       ...dashboard,
       feedbackStats: {

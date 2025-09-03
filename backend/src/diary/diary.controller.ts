@@ -30,6 +30,17 @@ export class DiaryController {
   }
 
   /**
+   * 공개 일기 목록 (커뮤니티 지도 등에서 사용)
+   * GET /api/v1/diaries/public
+   * - 인증 필요 (팔로우/친구 관계 정책 적용 전 기본 보호)
+   * - 추후 캐싱/페이징 가능
+   */
+  @Get('public')
+  async getPublicDiaries(@Req() req, @Query() query) {
+    return this.diaryService.getPublicDiaries(req, query);
+  }
+
+  /**
    * 오늘 작성된 맞팔 친구들의 공개 일기 목록
    * GET /api/v1/diaries/friends/today
    */
@@ -50,7 +61,7 @@ export class DiaryController {
     @Req() req,
     @Body() dto: CreateDiaryDto,
     @UploadedFile() file?: Multer.File,
-  ): Promise<{ id: string; content: string; createdAt: string; isPublic: boolean; question: string; mediaUrl?: string; mediaType?: string }> {
+  ): Promise<{ id: string; content: string; createdAt: string; isPublic: boolean; question: string; mediaUrl?: string; mediaType?: string; lat?: number | null; lng?: number | null }> {
     // 디버깅: 들어온 FormData 필드 로그
     try {
       console.log('[CreateDiary] raw body dto:', dto);
@@ -79,37 +90,15 @@ export class DiaryController {
     return this.diaryService.searchSimilarDiaries(req, text, limit);
   }
 
-  // ==== 공개 일기 관리 엔드포인트들 (Community2 통합) ====
 
-  /**
-   * 공개 일기 목록 조회
-   */
-  @Get('public')
-  async getPublicDiaries(@Req() req, @Query() query) {
-    return this.diaryService.getPublicDiaries(req, query);
+  // === Reactions (Like) ===
+  @Post(':id/like')
+  async toggleLike(@Req() req, @Param('id') id: string) {
+    return this.diaryService.toggleLike(req, id);
   }
 
-  /**
-   * 공개 일기 생성
-   */
-  @Post('public')
-  async createPublicDiary(@Req() req, @Body() dto: any) {
-    return this.diaryService.createPublicDiary(req, dto);
-  }
-
-  /**
-   * 공개 일기 수정
-   */
-  @Put('public/:id')
-  async updatePublicDiary(@Req() req, @Param('id') id: string, @Body() dto: any) {
-    return this.diaryService.updatePublicDiary(req, id, dto);
-  }
-
-  /**
-   * 공개 일기 삭제
-   */
-  @Delete('public/:id')
-  async deletePublicDiary(@Req() req, @Param('id') id: string) {
-    return this.diaryService.deletePublicDiary(req, id);
+  @Get(':id/like')
+  async getLikeStatus(@Req() req, @Param('id') id: string) {
+    return this.diaryService.getLikeStatus(req, id);
   }
 }

@@ -20,6 +20,7 @@ model User {
   location         String?
   birthDate        String?
   gender           String?  // 성별 필드 추가
+  profileColor     String?  // 사용자 지정 프로필 배경색 (hex or css color)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   isActive         Boolean  @default(true)
@@ -47,11 +48,11 @@ model User {
   conversationParticipants ConversationParticipant[]
   friendsRequested Friend[]         @relation("FriendsRequested")
   friendsReceived  Friend[]         @relation("FriendsReceived")
-  communityComments CommunityComment[]
+  // (Removed) communityComments CommunityComment[]
   journalReactions JournalReaction[]
   notificationSettings NotificationSettings?
   persona          UserPersona?
-  feedbackLogs     FeedbackLog[]
+  // (Removed) feedbackLogs FeedbackLog[]
   privacySettings PrivacySettings?
   blockedUsers    UserBlock[]      @relation("BlockedUsers")
   blockedByUsers  UserBlock[]      @relation("BlockedByUsers")
@@ -114,8 +115,8 @@ model Journal {
   writingDuration Int
   question        JournalQuestion?
   reactions       JournalReaction[]
-  communityComments CommunityComment[]
-  feedbackLogs    FeedbackLog[]
+  // (Removed) communityComments CommunityComment[]
+  // (Removed) feedbackLogs FeedbackLog[]
   lat        Float?   // 위도
   lng        Float?   // 경도
   embedding   Float[]  // 임베딩(768차원) 저장: 재계산 비용 절감
@@ -139,6 +140,8 @@ model JournalReaction {
   // User.journalReactions와 연결
   reactionType String
   createdAt    DateTime @default(now())
+
+  @@unique([journalId, userId, reactionType])
 }
 
 model RecordScore {
@@ -152,17 +155,6 @@ model RecordScore {
   periodEnd         DateTime
 }
 
-model FeedbackLog {
-  id        String   @id @default(uuid())
-  user      User     @relation(fields: [userId], references: [id])
-  userId    String
-  journal   Journal  @relation(fields: [journalId], references: [id])
-  journalId String
-  comment   CommunityComment? @relation(fields: [commentId], references: [id])
-  commentId String?
-  content   String
-  createdAt DateTime @default(now())
-}
 
 model Friend {
   id           String   @id @default(uuid())
@@ -260,17 +252,6 @@ enum MessageDeliveryStatus {
   READ
 }
 
-model CommunityComment {
-  id           String   @id @default(uuid())
-  journal      Journal  @relation(fields: [journalId], references: [id])
-  journalId    String
-  user         User     @relation(fields: [userId], references: [id])
-  userId       String
-  content      String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  feedbackLogs FeedbackLog[]
-}
 
 
 model NotificationSettings {

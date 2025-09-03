@@ -1,22 +1,39 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
 import { diaryApi } from "@/services/diary-api";
 
-interface DiaryPreview { id: string; content: string; createdAt: string; question: string; emotion?: string; likes?: number; username?: string; }
+interface DiaryPreview { 
+  id: string; 
+  content: string; 
+  createdAt: string; 
+  question: string; 
+  emotion?: string; 
+  emotionScore?: number; // 감정 점수 fallback
+  likes?: number; 
+  username?: string; 
+  liked?: boolean; // 현재 사용자 좋아요 여부
+  mediaUrl?: string;
+  mediaType?: string; // 'image' | 'audio' | 'spotify' 등
+}
 interface FriendTodayDiary { diaryId: string; userId: string; username: string; profileImageUrl?: string; emotion?: string | null; createdAt: string; }
 interface CalendarDay { date: number; emotion?: string; hasEntry: boolean; isLocked?: boolean; diaryId?: string; emotionScore?: number; }
 
 export default function DashboardPage() {
   const [diaries, setDiaries] = useState<DiaryPreview[]>([]);
-  const [popularDiary, setPopularDiary] = useState<DiaryPreview | null>(null);
+  // Top 10 인기 일기 (배너형)
+  const [popularDiaries, setPopularDiaries] = useState<DiaryPreview[]>([]);
   const [friendsTodayDiaries, setFriendsTodayDiaries] = useState<FriendTodayDiary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarData, setCalendarData] = useState<CalendarDay[]>([]);
+  // 자동 가로 스크롤 관련
+  const [showScrollHint, setShowScrollHint] = useState(true); // 초기 힌트 (스크롤바 제거 후 첫 이동 시 사라짐)
+  const bannerRef = useRef<HTMLDivElement | null>(null);
+  const [autoScrollPaused, setAutoScrollPaused] = useState(false);
   // 전역 보라색 채팅 아이콘 제거: ChatList import/state 삭제
   const router = useRouter();
 
@@ -30,6 +47,16 @@ export default function DashboardPage() {
     tired: "😴",
     stressed: "😰",
     grateful: "🙏"
+  };
+
+  // 감정 fallback 계산
+  const computeEmotionFromScore = (score?: number) => {
+    if (score == null) return '';
+    if (score >= 8) return '😊';
+    if (score >= 6) return '🤩';
+    if (score >= 4) return '😌';
+    if (score >= 2) return '😢';
+    return '😠';
   };
 
   // 캘린더 데이터 생성 (실제 DB 연동)
@@ -134,18 +161,68 @@ export default function DashboardPage() {
     setLoading(true);
     Promise.all([
       api.get("/diaries").then(res => res.data.diaries.slice(0, 3)).catch(() => []),
-      // 맞팔 친구들 오늘 공개 일기
       diaryApi.getFriendsTodayDiaries().then(res => res.items).catch(() => []),
-      api.get("/diaries?sort=popularity&limit=1").then(res => res.data.diaries[0] || null).catch(() => null),
+      api.get("/diaries?sort=popularity&limit=10").then(res => res.data.diaries || []).catch(() => []),
     ])
-      .then(([d, friendsToday, popular]) => {
+      .then(async ([d, friendsToday, popularList]) => {
         setDiaries(d);
         setFriendsTodayDiaries(friendsToday);
-        setPopularDiary(popular);
+        // 각 인기 일기에 대해 좋아요 상태 병렬 조회 (가능 하면)
+        try {
+          const withLikeStates = await Promise.all(popularList.map(async (pd: any) => {
+            try {
+              const likeRes = await api.get(`/diaries/${pd.id}/like`);
+              return { ...pd, liked: likeRes.data.liked, likes: likeRes.data.likeCount };
+            } catch {
+              return pd;
+            }
+          }));
+          setPopularDiaries(withLikeStates);
+        } catch {
+          setPopularDiaries(popularList);
+        }
       })
       .catch(() => setError("대시보드 데이터를 불러오지 못했습니다."))
       .finally(() => setLoading(false));
   }, []);
+
+  // 좋아요 토글 (Optimistic)
+  const togglePopularLike = async (id: string) => {
+    setPopularDiaries(prev => prev.map(d => d.id === id ? { ...d, liked: !d.liked, likes: (d.likes || 0) + (d.liked ? -1 : 1) } : d));
+    try {
+      const res = await api.post(`/diaries/${id}/like`);
+      setPopularDiaries(prev => prev.map(d => d.id === id ? { ...d, liked: res.data.liked, likes: res.data.likeCount } : d));
+    } catch {
+      // 실패 시 롤백
+      setPopularDiaries(prev => prev.map(d => d.id === id ? { ...d, liked: !d.liked, likes: (d.likes || 0) + (d.liked ? 1 : -1) } : d));
+    }
+  };
+
+  // 스크롤 힌트 감지
+  const handleBannerScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    if (el.scrollLeft > 16) setShowScrollHint(false);
+  };
+
+  // 자동 스크롤 (부드럽게 순환)
+  useEffect(() => {
+    if (!bannerRef.current) return;
+    let raf: number;
+    const speed = 0.4; // px per frame 정도 (약 24px/s @60fps)
+    const step = () => {
+      if (!autoScrollPaused && bannerRef.current) {
+        const el = bannerRef.current;
+        el.scrollLeft += speed;
+        // 끝 근처 도달 시 처음으로 자연스럽게 이동 (무한 루프 효과)
+        if (el.scrollWidth - el.clientWidth - el.scrollLeft < 1) {
+          el.scrollLeft = 0;
+        }
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [bannerRef, autoScrollPaused, popularDiaries.length]);
 
   return (
     <div className="flex flex-col space-y-6">
@@ -282,94 +359,91 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 가장 인기 있는 일기 배너 */}
-        <section className="bg-gradient-to-r from-pink-200 to-pink-300 rounded-xl shadow p-4">
-          <h2 className="font-bold text-lg mb-3 text-gray-800">🔥 가장 인기 있는 일기</h2>
-          {popularDiary && (
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-200 rounded-full flex items-center justify-center">
-                    👤
+        {/* Top10 인기 일기 배너 (광고식/말풍선 스타일) */}
+        <section className="relative bg-gradient-to-r from-pink-200 to-pink-300 rounded-xl shadow p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-lg text-gray-800">🔥 인기 일기 Top 10</h2>
+            <Link href="/diaries?sort=popularity" className="text-sm text-pink-700 font-medium hover:underline">전체보기</Link>
+          </div>
+          {popularDiaries.length === 0 && (
+            <div className="bg-white/60 rounded-lg p-6 text-center text-sm text-gray-600">아직 인기 일기가 없습니다. 첫 번째 감정 일기를 남겨보세요!</div>
+          )}
+          {popularDiaries.length > 0 && (
+            <div
+              ref={bannerRef}
+              className="relative flex gap-4 overflow-x-auto no-scrollbar pr-4 py-1"
+              onScroll={handleBannerScroll}
+              onMouseEnter={() => setAutoScrollPaused(true)}
+              onMouseLeave={() => setAutoScrollPaused(false)}
+              onTouchStart={() => setAutoScrollPaused(true)}
+              onTouchEnd={() => setAutoScrollPaused(false)}
+              style={{ scrollBehavior: 'auto', maxHeight: 190 }}
+            >
+              {/* Gradient Scroll Hint */}
+              {showScrollHint && <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-pink-200 to-transparent hidden sm:block" />}
+              {popularDiaries.map((d, idx) => {
+                const created = new Date(d.createdAt);
+                const timeStr = created.toLocaleTimeString('ko-KR', { hour12: false });
+                const displayEmotion = d.emotion || computeEmotionFromScore(d.emotionScore);
+                return (
+                  <div key={d.id} className="flex-shrink-0 w-56 group">
+                    <button
+                      onClick={() => window.location.href = `/diary/${d.id}`}
+                      className="relative w-full text-left"
+                    >
+                      {/* 말풍선 본체 */}
+                      <div className="rounded-2xl bg-emerald-200 px-4 pt-3 pb-4 shadow hover:shadow-md transition-all h-[170px] flex flex-col justify-between group/bubble" title={d.content}>
+                        <div className="flex items-start gap-2">
+                          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-inner text-sm">{(d.username || '익명').slice(0,1)}</div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 text-[11px] text-gray-700 font-medium">
+                              <span>{timeStr}</span>
+                              <span className="flex items-center gap-1 text-gray-600">
+                                {/* 이미지 (mediaType === image 또는 파일 확장자) */}
+                                {(d.mediaType === 'image' || /\.(png|jpe?g|gif|webp)$/i.test(d.mediaUrl || '')) && (
+                                  <span title="첨부 이미지">📷</span>
+                                )}
+                                {/* 음성 (mediaType === audio) */}
+                                {(d.mediaType === 'audio' || /\.(mp3|m4a|wav|ogg)$/i.test(d.mediaUrl || '')) && (
+                                  <span title="음성 메시지">🔊</span>
+                                )}
+                                {/* Spotify 링크 (content 내 spotify 혹은 mediaType === 'spotify') */}
+                                {((d.mediaType === 'spotify') || /open\.spotify\.com/.test(d.content)) && (
+                                  <span title="Spotify 음악">🎧</span>
+                                )}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[12px] font-semibold text-gray-800 line-clamp-2">{d.question}</p>
+                          </div>
+                        </div>
+                        <p className="mt-2 text-[11px] text-gray-700 line-clamp-2 flex-1" title={d.content}>{d.content}</p>
+                        <div className="mt-2 flex items-center justify-between text-[11px] text-gray-600">
+                          <span className="flex items-center gap-1">
+                            {displayEmotion && <span className="text-base leading-none">{emotionEmojis[displayEmotion] || displayEmotion}</span>}
+                            <span>{d.username || '익명'}</span>
+                          </span>
+                          <button 
+                            type="button"
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePopularLike(d.id); }}
+                            className={`flex items-center gap-1 font-medium transition text-[11px] ${d.liked ? 'text-rose-600' : 'text-pink-600 hover:text-rose-500'}`}
+                            title={d.liked ? '좋아요 취소' : '좋아요'}
+                          >
+                            {d.liked ? '💖' : '❤️'} {d.likes ?? 0}
+                          </button>
+                        </div>
+                        <span className="absolute -top-2 -left-2 bg-pink-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">{idx + 1}</span>
+                      </div>
+                      {/* 꼬리 */}
+                      <div className="absolute -bottom-2 left-6 w-5 h-5 rotate-45 bg-emerald-200"></div>
+                    </button>
                   </div>
-                  <div>
-                    <span className="font-medium text-gray-800">{popularDiary.username || '익명'}</span>
-                    <p className="text-xs text-gray-500">
-                      {new Date(popularDiary.createdAt).toLocaleDateString('ko-KR')}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  {/* 음성 메시지 아이콘 */}
-                  <button className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                    🎤
-                  </button>
-                  <span className="text-sm text-gray-600">❤️ {popularDiary.likes || 12}</span>
-                </div>
-              </div>
-              
-              <div className="mb-2">
-                <h3 className="font-semibold text-gray-800 mb-1">{popularDiary.question}</h3>
-                <p className="text-gray-700 text-sm line-clamp-2">{popularDiary.content}</p>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {popularDiary.emotion && (
-                    <span className="text-lg">{emotionEmojis[popularDiary.emotion] || '😊'}</span>
-                  )}
-                  <span className="text-xs text-gray-500">감정 일기</span>
-                </div>
-                <button 
-                  className="text-blue-600 text-sm font-medium hover:text-blue-700"
-                  onClick={() => window.location.href = `/diary/${popularDiary.id}`}
-                >
-                  자세히 보기
-                </button>
-              </div>
+                );
+              })}
             </div>
           )}
-          
-          {!popularDiary && (
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-200 rounded-full flex items-center justify-center">
-                    👤
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-800">지영</span>
-                    <p className="text-xs text-gray-500">2일 전</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  {/* 음성 메시지 아이콘 */}
-                  <button className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                    🎤
-                  </button>
-                  <span className="text-sm text-gray-600">❤️ 15</span>
-                </div>
-              </div>
-              
-              <div className="mb-2">
-                <h3 className="font-semibold text-gray-800 mb-1">오늘 가장 감사했던 일은?</h3>
-                <p className="text-gray-700 text-sm line-clamp-2">
-                  친구들과 함께한 점심시간이 정말 즐거웠어요. 함께 웃고 이야기하며 스트레스가 모두 날아갔습니다...
-                </p>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🙏</span>
-                  <span className="text-xs text-gray-500">감정 일기</span>
-                </div>
-                <button className="text-blue-600 text-sm font-medium hover:text-blue-700">
-                  자세히 보기
-                </button>
-              </div>
-            </div>
+          {/* 모바일 드래그 힌트 */}
+          {showScrollHint && popularDiaries.length > 0 && (
+            <div className="sm:hidden mt-2 text-center text-[11px] text-pink-700 animate-pulse">옆으로 드래그해서 더 보기 →</div>
           )}
         </section>
       </div>

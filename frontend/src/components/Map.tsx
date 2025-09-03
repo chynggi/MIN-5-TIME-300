@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from 'next/navigation';
 
 const containerStyle = {
   width: "100%",
@@ -13,6 +14,7 @@ export interface DiaryPin {
   profileImageUrl?: string;
   content?: string;
   username?: string;
+  profileColor?: string | null;
 }
 
 interface MapProps {
@@ -20,6 +22,8 @@ interface MapProps {
 }
 
 export default function Map({ pins }: MapProps) {
+  const router = useRouter();
+  const DEFAULT_CENTER = { lat: 37.5665, lng: 126.9780 }; // 서울
   const [center, setCenter] = useState<{ lat: number; lng: number } | null>(null);
   const mapRef = useRef<HTMLDivElement | null>(null);
   // 타입 정의가 없으므로 any로 참조 보관
@@ -31,6 +35,9 @@ export default function Map({ pins }: MapProps) {
   const [searchError, setSearchError] = useState("");
   const [locLoading, setLocLoading] = useState(false);
   const [locError, setLocError] = useState("");
+  // 지오로케이션 요청 식별 (Whale 등에서 비동기 race로 성공 후 에러 잔류 방지)
+  const geoRequestIdRef = useRef(0);
+  const lastSuccessIdRef = useRef(0);
 
   // 지오코더 서브모듈이 없더라도 동적으로 로드하여 사용 가능하도록 보장
   const ensureGeocoderLoaded = async (): Promise<void> => {
@@ -77,19 +84,40 @@ export default function Map({ pins }: MapProps) {
     });
   };
 
+  // 초기 자동 위치 요청: 권한이 이미 granted 일 때만 수행 (중복 prompt 방지)
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        },
-        () => {
-          setCenter({ lat: 37.5665, lng: 126.9780 }); // 기본값: 서울
+    let cancelled = false;
+    const init = async () => {
+      // Permissions API 지원 여부 확인
+      try {
+        if (navigator.permissions?.query) {
+          const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+          if (status.state === 'granted') {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => { if (!cancelled) setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+              () => { if (!cancelled) setCenter(DEFAULT_CENTER); }
+            );
+            return;
+          }
+          // prompt or denied 이면 사용자 상호작용(버튼)까지 대기
+          if (!cancelled) setCenter(DEFAULT_CENTER);
+        } else {
+          // Permissions API 미지원 → 기존 로직 (시도 후 실패 시 기본값)
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => { if (!cancelled) setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+              () => { if (!cancelled) setCenter(DEFAULT_CENTER); }
+            );
+          } else if (!cancelled) {
+            setCenter(DEFAULT_CENTER);
+          }
         }
-      );
-    } else {
-      setCenter({ lat: 37.5665, lng: 126.9780 });
-    }
+      } catch (e) {
+        if (!cancelled) setCenter(DEFAULT_CENTER);
+      }
+    };
+    init();
+    return () => { cancelled = true; };
   }, []);
 
   // Naver Maps 스크립트 로드
@@ -163,6 +191,32 @@ export default function Map({ pins }: MapProps) {
     });
 
     // 공개 일기 마커 + 정보창
+    // 현재 열린 InfoWindow 추적 및 지도 클릭 시 닫기 로직 추가
+  let openInfoWindow: any = null;
+  let openInfoWindowMarker: any = null; // 현재 열린 창의 마커
+  let suppressMapClickClose = false; // 마커 클릭 직후 1틱 방어
+  let lastInfoWindowRoot: HTMLElement | null = null; // 현재 열린 InfoWindow DOM root
+
+    // 지도 클릭하면 열린 창 닫기 (마커 클릭으로 열린 직후엔 1틱 suppress)
+    naver.maps.Event.addListener(map, 'click', (e: any) => {
+      // 클릭 지점이 InfoWindow 내부라면 닫지 않음
+      if (lastInfoWindowRoot && e?.domEvent?.target) {
+        const tgt = e.domEvent.target as HTMLElement;
+        if (lastInfoWindowRoot.contains(tgt)) return;
+      }
+      if (suppressMapClickClose) {
+        suppressMapClickClose = false;
+        return;
+      }
+      if (openInfoWindow) {
+        openInfoWindow.close();
+        openInfoWindow = null;
+        openInfoWindowMarker = null;
+        lastInfoWindowRoot = null;
+        document.body.classList.remove('map-infowindow-open');
+      }
+    });
+
     pins.forEach((pin) => {
       const marker = new naver.maps.Marker({
         position: new naver.maps.LatLng(pin.lat, pin.lng),
@@ -176,14 +230,54 @@ export default function Map({ pins }: MapProps) {
         title: '공개 일기',
       });
 
+      const truncated = (pin.content || '일기 내용을 불러올 수 없습니다.')
+        .replace(/\n+/g,' ')
+        .slice(0, 80) + ((pin.content || '').length > 80 ? '…' : '');
+
+      // profileColor가 유효한 hex 혹은 rgb 형식인지 간단 검증 (미흡하면 흰색 fallback)
+      const rawColor = (pin.profileColor || '').trim();
+      const validColor = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(rawColor)
+        ? rawColor
+        : (/^rgba?\(/.test(rawColor) ? rawColor : '#ffffff');
+      // 대비 텍스트 색상 계산 (hex 3/6 지원)
+      let textColor = '#111111';
+      try {
+        let r: number, g: number, b: number;
+        if (validColor.startsWith('#')) {
+          const hex = validColor.substring(1);
+          if (hex.length === 3) {
+            r = parseInt(hex[0] + hex[0], 16);
+            g = parseInt(hex[1] + hex[1], 16);
+            b = parseInt(hex[2] + hex[2], 16);
+          } else {
+            r = parseInt(hex.substring(0,2), 16);
+            g = parseInt(hex.substring(2,4), 16);
+            b = parseInt(hex.substring(4,6), 16);
+          }
+        } else {
+          // rgb/rgba 추출
+            const m = validColor.match(/rgba?\(([^)]+)\)/);
+            if (m) {
+              const parts = m[1].split(',').map(p=>parseInt(p.trim(),10));
+              r = parts[0]; g = parts[1]; b = parts[2];
+            } else { r=g=b=255; }
+        }
+        // WCAG luminance 기반 대비(단순)
+        const luminance = (0.2126*r + 0.7152*g + 0.0722*b)/255;
+        textColor = luminance > 0.6 ? '#111111' : '#ffffff';
+      } catch { /* fallback 유지 */ }
+
       const infoContent = `
-        <div class="p-2 max-w-xs">
-          <div class="flex items-center gap-2 mb-2">
-            <img src="${pin.profileImageUrl || '/default-profile.png'}" alt="프로필" class="w-8 h-8 rounded-full object-cover" />
-            <span class="font-semibold text-sm">${pin.username || '익명'}</span>
+        <div class="relative shadow-lg rounded-xl overflow-hidden max-w-[150px] border border-gray-200 backdrop-blur-sm select-none"
+             style="background:${validColor};">
+          <div class="p-3 flex flex-col items-center gap-2">
+            <div class="relative">
+              <img src="${pin.profileImageUrl || '/default-profile.png'}" alt="프로필" class="w-14 h-14 rounded-full object-cover ring-2 ring-white/40" />
+            </div>
+            <div class="w-full text-center">
+              <div class="font-medium text-xs break-all leading-snug" style="color:${textColor};">${pin.username || '익명'}</div>
+            </div>
           </div>
-          <p class="text-xs text-gray-700">${pin.content || '일기 내용을 불러올 수 없습니다.'}</p>
-          <button onclick="window.location.href='/community2/${pin.id}'" class="mt-2 text-xs bg-blue-500 text-white px-2 py-1 rounded">자세히 보기</button>
         </div>
       `;
       const infoWindow = new naver.maps.InfoWindow({
@@ -193,7 +287,31 @@ export default function Map({ pins }: MapProps) {
         disableAnchor: true,
       });
       naver.maps.Event.addListener(marker, 'click', () => {
+        suppressMapClickClose = true; // 바로 뒤 map click 으로 닫히지 않도록
+        // 동일 마커 재클릭 → 토글 닫기
+        if (openInfoWindow && openInfoWindow === infoWindow && openInfoWindowMarker === marker) {
+          openInfoWindow.close();
+          openInfoWindow = null;
+          openInfoWindowMarker = null;
+          lastInfoWindowRoot = null;
+          document.body.classList.remove('map-infowindow-open');
+          return;
+        }
+        if (openInfoWindow && openInfoWindow !== infoWindow) {
+          openInfoWindow.close();
+        }
         infoWindow.open(map, marker);
+        openInfoWindow = infoWindow;
+        openInfoWindowMarker = marker;
+        document.body.classList.add('map-infowindow-open');
+      });
+
+      // InfoWindow DOM 이 준비되면 a 태그에 SPA 내비게이션 바인딩
+      naver.maps.Event.addListener(infoWindow, 'domready', () => {
+        const el = infoWindow.getElement && infoWindow.getElement();
+        if (!el) return;
+        lastInfoWindowRoot = el as HTMLElement;
+        if (!el.dataset.infowindowRoot) el.dataset.infowindowRoot = '1';
       });
     });
 
@@ -253,28 +371,66 @@ export default function Map({ pins }: MapProps) {
       return;
     }
     setLocLoading(true);
+    const requestId = ++geoRequestIdRef.current;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        // 오래된 요청이면 무시
+        if (requestId < geoRequestIdRef.current) return;
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
-        // 지도 즉시 이동 (가능하면 panTo), 상태도 업데이트하여 원/마커 갱신
         const { naver } = window as any;
         if (naver && naver.maps && naverMapRef.current) {
           naverMapRef.current.setCenter(new naver.maps.LatLng(lat, lng));
         }
         setCenter({ lat, lng });
+        lastSuccessIdRef.current = requestId;
+        // 성공 시 에러 메시지 확실히 제거
+        setLocError("");
         setLocLoading(false);
       },
-      () => {
-        setLocError("현위치를 가져오지 못했습니다.");
-        setLocLoading(false);
+      (err) => {
+        (async () => {
+          // 더 최신 요청이 이미 진행 중이라면 이 에러는 무시
+          if (requestId < geoRequestIdRef.current && lastSuccessIdRef.current >= geoRequestIdRef.current) return;
+          let msg = "현재 위치를 불러오지 못했습니다.";
+          // Permissions API를 통해 실제 상태 재확인
+          try {
+            if (navigator.permissions && (navigator.permissions as any).query) {
+              const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+              if (status.state === 'denied') {
+                msg = "브라우저 위치 권한이 차단되었습니다. 사이트 권한 설정에서 '위치'를 허용 후 다시 시도하세요.";
+              } else if (status.state === 'prompt' && err?.code === 1) {
+                msg = "위치 사용 요청이 취소되었거나 허용되지 않았습니다. 다시 시도하여 권한을 허용해주세요.";
+              }
+            }
+          } catch (e) {
+            // Permissions API 미지원 or 실패는 무시
+          }
+
+          if (err?.code === 2) {
+            msg = "위치 센서 또는 네트워크 정보를 확인할 수 없습니다. (GPS 비활성화/실내/에뮬레이터 가능성)";
+          } else if (err?.code === 3) {
+            msg = "위치 응답이 지연되었습니다. 네트워크나 GPS 상태를 확인 후 다시 시도하세요.";
+          }
+          // 개발자 콘솔에 상세 로그
+          console.warn('[Geolocation error]', err);
+          setLocError(msg);
+          setLocLoading(false);
+        })();
       },
-      { enableHighAccuracy: true, timeout: 5000 }
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 }
     );
   };
 
   return (
     <div style={{ position: 'relative', ...containerStyle }}>
+      {/* body lock 시 안내용 (선택적으로 스타일 할 수 있음) */}
+      <style>{`
+        body.map-infowindow-open { overscroll-behavior: contain; touch-action: none; }
+        @media (max-width: 768px) {
+          body.map-infowindow-open { position: fixed; width:100%; }
+        }
+      `}</style>
       {/* 지도 */}
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
 

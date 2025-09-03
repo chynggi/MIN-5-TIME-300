@@ -13,6 +13,8 @@ export class DiaryListItemDto {
   question: string;
   lat?: number;
   lng?: number;
+  likes?: number; // 좋아요 수 (인기 정렬용)
+  username?: string; // 작성자 표시 (인기 목록 공용 사용)
 }
 
 export class DiaryListResponseDto {

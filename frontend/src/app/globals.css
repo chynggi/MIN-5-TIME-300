@@ -18,6 +18,16 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Hide scrollbar (cross browser) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Auto horizontal scroll (optional animation helper if needed later) */
+@keyframes auto-scroll-x {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 /* Mobile navigation safe area */
 .safe-area-bottom {
   padding-bottom: env(safe-area-inset-bottom);

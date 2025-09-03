@@ -5,7 +5,6 @@ import { AuthModule } from './auth/auth.module';
 import { ProfileModule } from './profile/profile.module';
 import { DiaryModule } from './diary/diary.module';
 import { QuestionModule } from './question/question.module';
-import { CommunityModule } from './community/community.module';
 import { FriendModule } from './friend/friend.module';
 import { FollowModule } from './follow/follow.module';
 import { SocialModule } from './social/social.module';
@@ -27,7 +26,6 @@ import { JwtModule } from '@nestjs/jwt';
     ProfileModule,
     DiaryModule,
     QuestionModule,
-    CommunityModule,
     FriendModule,
     FollowModule,
     SocialModule,

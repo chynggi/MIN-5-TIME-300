@@ -81,6 +81,40 @@ function NewDiaryContent() {
   
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // 위치 정보 상태
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'pending' | 'success' | 'denied' | 'error'>('idle');
+  const [shareLocation, setShareLocation] = useState<boolean>(true); // 기본적으로 위치 공유 ON (사용자 끌 수도 있게)
+
+  // 위치 자동 획득: 최초 렌더 후 한번만 (사용자가 공유를 원하지 않으면 skip)
+  useEffect(() => {
+    if (!shareLocation) return; // 사용자가 비활성화한 경우
+    if (!('geolocation' in navigator)) {
+      setLocationStatus('error');
+      return;
+    }
+    setLocationStatus('pending');
+    const watchId = navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLat(pos.coords.latitude);
+        setLng(pos.coords.longitude);
+        setLocationStatus('success');
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocationStatus('denied');
+        } else {
+          setLocationStatus('error');
+        }
+      },
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60_000 }
+    );
+    return () => {
+      // getCurrentPosition은 watchId 반환 안 함. cleanup 불필요.
+    };
+  // shareLocation이 true로 바뀌는 시점마다 재시도
+  }, [shareLocation]);
 
   const handleImageSelect = (file: File | null) => {
     setImage(file);
@@ -151,6 +185,11 @@ function NewDiaryContent() {
       // isPublic 설정 (postVisibility가 "private"가 아니면 public으로 설정)
       const isPublic = diarySettings.postVisibility !== "private";
       formData.append("isPublic", isPublic.toString());
+      // 위치 포함 (사용자가 허용했고 좌표가 존재하는 경우)
+      if (shareLocation && lat != null && lng != null) {
+        formData.append('lat', lat.toString());
+        formData.append('lng', lng.toString());
+      }
       
       if (questionId) formData.append("questionId", questionId);
       if (image) {
@@ -199,6 +238,41 @@ function NewDiaryContent() {
 
           {/* Image Upload Component */}
           <ImageUpload onImageSelect={handleImageSelect} preview={preview} />
+
+          {/* 위치 정보 표시/토글 */}
+          <div className="mt-4 mb-4 text-xs text-gray-600 bg-gray-50 rounded-lg p-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold">현재 위치 자동 저장</span>
+              <label className="flex items-center gap-1 cursor-pointer text-[11px]">
+                <input
+                  type="checkbox"
+                  className="accent-blue-600"
+                  checked={shareLocation}
+                  onChange={(e) => {
+                    setShareLocation(e.target.checked);
+                    if (e.target.checked && locationStatus === 'idle') {
+                      // 재시도 트리거: effect에서 처리
+                    }
+                  }}
+                />
+                <span>{shareLocation ? 'ON' : 'OFF'}</span>
+              </label>
+            </div>
+            {shareLocation && (
+              <div className="text-[11px] leading-relaxed">
+                {locationStatus === 'pending' && <span className="text-gray-500">위치 가져오는 중...</span>}
+                {locationStatus === 'success' && (
+                  <span className="text-green-600">위치 확인됨</span>
+                )}
+                {locationStatus === 'denied' && (
+                  <span className="text-red-500">브라우저에서 위치 권한이 거부되었습니다. (OFF로 전환하거나 브라우저 설정에서 허용 후 새로고침)</span>
+                )}
+                {locationStatus === 'error' && (
+                  <span className="text-orange-500">위치 정보를 가져오지 못했습니다. (네트워크/환경 문제)</span>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* 기본 이미지 선택 안내 및 UI */}
           {showDefaultImageSelect && (

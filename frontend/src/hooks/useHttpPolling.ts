@@ -61,7 +61,7 @@ export const useHttpPolling = ({
       }
 
       const response = await fetch(
-        `${apiUrl}/v1/chat/conversations/${conversationId}/messages?${params}`,
+        `${apiUrl}/api/v1/chat/conversations/${conversationId}/messages?${params}`,
         {
           headers: getAuthHeaders(),
         }
@@ -144,7 +144,7 @@ export const useHttpPolling = ({
     try {
       const apiUrl = getApiUrl();
       const response = await fetch(
-        `${apiUrl}/v1/chat/conversations/${conversationId}/messages`,
+        `${apiUrl}/api/v1/chat/conversations/${conversationId}/messages`,
         {
           method: 'POST',
           headers: getAuthHeaders(),
@@ -176,7 +176,7 @@ export const useHttpPolling = ({
     try {
       const apiUrl = getApiUrl();
       const response = await fetch(
-        `${apiUrl}/v1/chat/conversations/${conversationId}/read`,
+        `${apiUrl}/api/v1/chat/conversations/${conversationId}/read`,
         {
           method: 'POST',
           headers: getAuthHeaders(),

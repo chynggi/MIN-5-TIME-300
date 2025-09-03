@@ -147,6 +147,51 @@ export class DiaryService {
     const limit = Number(query.limit) || 10;
     const skip = (page - 1) * limit;
     const where: any = { userId };
+    // 인기 정렬(popularity): 공개 일기 중 좋아요 상위 (전체 사용자 기준)
+    if (query.sort === 'popularity' || query.sortBy === 'popularity') {
+      // 공개 일기만 대상 - 자신의 것이든 아니든? 프론트 요구는 Top10 전체 공개 인기
+      // 요청 사용자 구분 없이 공개 일기 전체.
+      const publicWhere: any = { isPublic: true };
+      // 기간 필터(선택적)
+      if (query.startDate && query.endDate) {
+        publicWhere.createdAt = { gte: new Date(query.startDate), lte: new Date(query.endDate) };
+      }
+      // 좋아요 수 집계 후 상위 limit
+      const popular = await this.prisma.journal.findMany({
+        where: publicWhere,
+        select: { id: true, content: true, createdAt: true, updatedAt: true, diaryDate: true, isRetrospective: true as any, isPublic: true, emotionScore: true, emotion: true, mediaUrl: true, mediaType: true, user: { select: { username: true } }, reactions: { select: { reactionType: true } } },
+        orderBy: [
+          { reactions: { _count: 'desc' } },
+          { createdAt: 'desc' },
+        ],
+        take: limit,
+        skip,
+      });
+      const totalCount = await this.prisma.journal.count({ where: publicWhere });
+      return {
+        diaries: popular.map(p => ({
+          id: p.id,
+          content: p.content,
+          createdAt: p.createdAt.toISOString(),
+          updatedAt: p.updatedAt.toISOString(),
+          diaryDate: p.diaryDate.toISOString(),
+          isRetrospective: (p as any).isRetrospective ?? undefined,
+          isPublic: p.isPublic,
+            emotionScore: p.emotionScore,
+          emotion: p.emotion ?? undefined,
+          mediaUrl: p.mediaUrl ?? undefined,
+          mediaType: p.mediaType ?? undefined,
+          question: '',
+          lat: (p as any).lat,
+          lng: (p as any).lng,
+          likes: p.reactions?.filter(r => r.reactionType === 'like').length || 0,
+          username: p.user?.username,
+        })),
+        totalCount,
+        page,
+        limit,
+      };
+    }
     if (query.startDate && query.endDate) {
       where.createdAt = {
         gte: new Date(query.startDate),
@@ -179,6 +224,111 @@ export class DiaryService {
         mediaUrl: d.mediaUrl ?? undefined,
         mediaType: d.mediaType ?? undefined,
         question: '', // 추후 질문 연동
+      })),
+      totalCount,
+      page,
+      limit,
+    };
+  }
+
+  /**
+   * 공개 일기 전체(혹은 최근 N개) 조회
+   * - 지도/커뮤니티 노출용: 최소 필드 + 위치(lat,lng) + 사용자 username
+   * - 페이징 query.page, query.limit 지원 (기본 1, 100)
+   * - 최신(updatedAt desc) 순
+   */
+  async getPublicDiaries(req: any, query: any) {
+    const page = Number(query.page) || 1;
+    const limit = Math.min(Number(query.limit) || 100, 200);
+    const skip = (page - 1) * limit;
+    const latestPerUser = query.latestPerUser === '1' || query.latestPerUser === 'true';
+
+    // 공개 + 위치가 있는 일기만 우선 (위치 없는 것도 필요하면 조건 제거)
+    const where: any = {
+      isPublic: true,
+      NOT: [ { lat: null }, { lng: null } ],
+    };
+
+    if (latestPerUser) {
+      // 사용자별 최신 공개 + 위치보유 일기 1개씩 (updatedAt desc)
+      // 1) 위치 있는 공개 일기 전체 id/updatedAt/userId 조회 (상한)
+      const candidates = await this.prisma.journal.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        take: 2000, // 안전 상한 (추후 cursor 전략 가능)
+        select: { id: true, userId: true, updatedAt: true }
+      });
+      const pickedMap = new Map<string, { id: string; updatedAt: Date }>();
+      for (const c of candidates) {
+        if (!pickedMap.has(c.userId)) {
+          pickedMap.set(c.userId, { id: c.id, updatedAt: c.updatedAt });
+        }
+      }
+      const pickedIds = Array.from(pickedMap.values()).map(v => v.id);
+      if (!pickedIds.length) {
+        return { diaries: [], totalCount: 0, page: 1, limit: pickedIds.length };
+      }
+      const rows = await this.prisma.journal.findMany({
+        where: { id: { in: pickedIds } },
+        // Prisma Client 재생성 전 profileColor 미존재 -> any 캐스팅 유지
+        include: { user: { select: { username: true, profileImageUrl: true, /* @ts-ignore */ profileColor: true } } as any }
+      });
+      // updatedAt desc 정렬 유지
+      rows.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      return {
+        diaries: rows.map(r => ({
+          id: r.id,
+          content: r.content,
+          createdAt: r.createdAt.toISOString(),
+          updatedAt: r.updatedAt.toISOString(),
+          isPublic: r.isPublic,
+          userId: r.userId,
+          lat: (r as any).lat,
+          lng: (r as any).lng,
+          username: (r as any).user?.username,
+          profileImageUrl: (r as any).user?.profileImageUrl || null,
+          profileColor: (r as any).user?.profileColor || null,
+        })),
+        totalCount: rows.length,
+        page: 1,
+        limit: rows.length,
+      };
+    }
+
+    const [rows, totalCount] = await Promise.all([
+      this.prisma.journal.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          content: true,
+          createdAt: true,
+          updatedAt: true,
+          isPublic: true,
+          lat: true as any,
+          lng: true as any,
+          userId: true,
+          user: { select: { username: true, profileImageUrl: true, /* @ts-ignore */ profileColor: true } } as any,
+        }
+      }),
+      this.prisma.journal.count({ where }),
+    ]);
+
+    return {
+      diaries: rows.map(r => ({
+        id: r.id,
+        content: r.content,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+        isPublic: r.isPublic,
+        userId: r.userId,
+        lat: (r as any).lat,
+        lng: (r as any).lng,
+        username: (r as any).user?.username,
+        profileImageUrl: (r as any).user?.profileImageUrl || null,
+        profileColor: (r as any).user?.profileColor || null,
       })),
       totalCount,
       page,
@@ -229,7 +379,7 @@ export class DiaryService {
       mediaType: diary.mediaType ?? undefined,
       question: '', // 추후 질문 연동
       writingDuration: diary.writingDuration,
-      reactions: [], // 추후 구현
+      reactions: [], // TODO: 상세 reaction 조회 필요 시 확장
       userId: diary.userId, // 소유자 ID 추가
       user: {
         id: diary.user.id,
@@ -238,11 +388,50 @@ export class DiaryService {
     };
   }
 
+  /**
+   * 좋아요 토글
+   * - 이미 like 존재 시 삭제
+   * - 없으면 생성
+   */
+  async toggleLike(req: any, id: string) {
+    const userId = req.user.userId;
+    const diary = await this.prisma.journal.findUnique({ where: { id } });
+    if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
+
+    const existing = await this.prisma.journalReaction.findUnique({
+      where: { journalId_userId_reactionType: { journalId: id, userId, reactionType: 'like' } } as any,
+    }).catch(() => null);
+
+    if (existing) {
+      await this.prisma.journalReaction.delete({ where: { id: existing.id } });
+      const likeCount = await this.prisma.journalReaction.count({ where: { journalId: id, reactionType: 'like' } });
+      return { liked: false, likeCount };
+    }
+
+    try {
+      await this.prisma.journalReaction.create({ data: { journalId: id, userId, reactionType: 'like' } });
+    } catch (e) {
+      // race condition 방지: unique 충돌 발생 시 재조회
+    }
+    const likeCount = await this.prisma.journalReaction.count({ where: { journalId: id, reactionType: 'like' } });
+    return { liked: true, likeCount };
+  }
+
+  /** 현재 좋아요 상태/카운트 조회 */
+  async getLikeStatus(req: any, id: string) {
+    const userId = req.user.userId;
+    const [liked, likeCount] = await Promise.all([
+      this.prisma.journalReaction.findFirst({ where: { journalId: id, userId, reactionType: 'like' } }).then(r => !!r),
+      this.prisma.journalReaction.count({ where: { journalId: id, reactionType: 'like' } }),
+    ]);
+    return { liked, likeCount };
+  }
+
   async createDiary(
     req: any,
     dto: CreateDiaryDto,
     file?: Multer.File,
-  ): Promise<{ id: string; content: string; createdAt: string; isPublic: boolean; question: string; mediaUrl?: string; mediaType?: string }> {
+  ): Promise<{ id: string; content: string; createdAt: string; isPublic: boolean; question: string; mediaUrl?: string; mediaType?: string; lat?: number | null; lng?: number | null }> {
     const userId = req.user.userId;
     let mediaUrl: string | undefined = undefined;
     let mediaType: string | undefined = undefined;
@@ -286,6 +475,10 @@ export class DiaryService {
     const todayMid = new Date(nowMid.getFullYear(), nowMid.getMonth(), nowMid.getDate());
     const useCustomCreatedAt = diaryDate <= todayMid; // 과거/오늘만 허용
 
+    // 위도/경도 문자열을 Float로 변환 (유효하지 않으면 undefined => Prisma null 저장)
+    const lat = dto.lat !== undefined && dto.lat !== null && dto.lat !== '' ? parseFloat(dto.lat) : undefined;
+    const lng = dto.lng !== undefined && dto.lng !== null && dto.lng !== '' ? parseFloat(dto.lng) : undefined;
+
     const diary = await this.prisma.journal.create({
       data: {
         userId,
@@ -296,8 +489,10 @@ export class DiaryService {
         ...(useCustomCreatedAt ? { createdAt: diaryDate } : {}),
         mediaUrl,
         mediaType,
-  writingDuration: writingDurationParsed,
+        writingDuration: writingDurationParsed,
         emotionScore: 0,
+        lat,
+        lng,
       },
     });
 
@@ -334,6 +529,8 @@ export class DiaryService {
       question: '', // 추후 질문 연동
       mediaUrl,
       mediaType,
+      lat: (diary as any).lat ?? null,
+      lng: (diary as any).lng ?? null,
     };
   }
 
@@ -407,111 +604,4 @@ export class DiaryService {
     return ids.map((id: string) => idToDiary[id]).filter(Boolean);
   }
 
-  // ==== 공개 일기 관리 메서드들 (Community2 통합) ====
-
-  /**
-   * 공개 일기 목록 조회
-   */
-  async getPublicDiaries(req: any, query: any) {
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 10;
-    const skip = (page - 1) * limit;
-    
-    const where: any = { isPublic: true };
-    
-    // MBTI 필터링
-    if (query.mbtiFilter) {
-      where.user = { mbti: query.mbtiFilter };
-    }
-    
-    // 정렬 기준
-    const orderBy = query.sortBy === 'popular'
-      ? { emotionScore: 'desc' as const }
-      : { createdAt: 'desc' as const };
-
-    const [diaries, totalCount] = await Promise.all([
-      this.prisma.journal.findMany({
-        where,
-        orderBy,
-        skip,
-        take: limit,
-        include: {
-          user: true,
-          communityComments: true,
-          reactions: true,
-        },
-      }),
-      this.prisma.journal.count({ where }),
-    ]);
-
-    return { diaries, totalCount, page, limit };
-  }
-
-  /**
-   * 공개 일기 생성 (기존 일기를 공개로 변경하거나 새로 생성)
-   */
-  async createPublicDiary(req: any, dto: any) {
-    const userId = req.user.userId;
-    
-    // 좌표 파싱
-    const lat = typeof dto.lat === 'number' ? dto.lat : (dto.lat != null ? Number(dto.lat) : null);
-    const lng = typeof dto.lng === 'number' ? dto.lng : (dto.lng != null ? Number(dto.lng) : null);
-    
-    const created = await this.prisma.journal.create({
-      data: {
-        content: dto.content,
-        userId,
-        isPublic: true,
-        emotionScore: 0,
-        writingDuration: dto.writingDuration || 1,
-        lat: Number.isFinite(lat) ? lat : null,
-        lng: Number.isFinite(lng) ? lng : null,
-      },
-    });
-    
-    return { id: created.id };
-  }
-
-  /**
-   * 공개 일기 수정
-   */
-  async updatePublicDiary(req: any, id: string, dto: any) {
-    const userId = req.user.userId;
-    const diary = await this.prisma.journal.findUnique({ where: { id } });
-    
-    if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
-    if (diary.userId !== userId) throw new ForbiddenException('수정 권한이 없습니다.');
-    if (!diary.isPublic) throw new ForbiddenException('공개 일기만 수정할 수 있습니다.');
-    
-    // 좌표 파싱
-    const lat = typeof dto.lat === 'number' ? dto.lat : (dto.lat != null ? Number(dto.lat) : undefined);
-    const lng = typeof dto.lng === 'number' ? dto.lng : (dto.lng != null ? Number(dto.lng) : undefined);
-    
-    await this.prisma.journal.update({
-      where: { id },
-      data: {
-        content: dto.content,
-        ...(lat !== undefined ? { lat: Number.isFinite(lat) ? (lat as number) : null } : {}),
-        ...(lng !== undefined ? { lng: Number.isFinite(lng) ? (lng as number) : null } : {}),
-      },
-    });
-    
-    return { success: true };
-  }
-
-  /**
-   * 공개 일기 삭제
-   */
-  async deletePublicDiary(req: any, id: string) {
-    const userId = req.user.userId;
-    const diary = await this.prisma.journal.findUnique({ where: { id } });
-    
-    if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
-    if (diary.userId !== userId) throw new ForbiddenException('삭제 권한이 없습니다.');
-    if (!diary.isPublic) throw new ForbiddenException('공개 일기만 삭제할 수 있습니다.');
-    // DB 삭제 전에 벡터 삭제 시도 (실패해도 진행)
-    try { await this.vectorDbService.delete([id]); } catch (e) {}
-    await this.prisma.journal.delete({ where: { id } });
-    return { success: true };
-  }
 }
