@@ -7,17 +7,8 @@ import {
   BlockResponseDto,
 } from '../types/follow.dto';
 
-const API_BASE_URL = (() => {
-  let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-  
-  if (url.includes('cafe24.com')) {
-    // cafe24 환경에서는 /api 형태로만 구성 (follow는 v1 없음)
-    if (!url.includes('/api')) {
-      url = url.replace(/\/$/, '') + '/api';
-    }
-  }
-  return url;
-})();
+import { API_BASE_V1 } from '@/lib/baseUrl';
+const API_BASE_URL = API_BASE_V1;
 
 class FollowApiService {
   private async request<T>(

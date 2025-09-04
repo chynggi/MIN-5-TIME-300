@@ -6,26 +6,12 @@ import {
   NotificationCounter 
 } from '@/types/notification';
 
-const API_BASE_URL = (() => {
-  let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-  
-  if (url.includes('cafe24.com')) {
-    // cafe24 환경에서는 /api/api 형태로 구성 (의도된 구조)
-    if (!url.includes('/api/api')) {
-      if (url.endsWith('/api')) {
-        url = url + '/api';
-      } else {
-        url = url.replace(/\/$/, '') + '/api/api';
-      }
-    }
-  }
-  return url;
-})();
+import { API_BASE_V1 } from '@/lib/baseUrl';
 
 class NotificationService {
   // NOTE: 백엔드 NotificationController가 @Controller('api/v1/notifications') 로 선언되어 있으므로
   // 여기 baseUrl 또한 /api/v1 로 맞춰야 함. (기존 잘못된 경로: /v1/notifications)
-  private baseUrl = `${API_BASE_URL}/api/v1/notifications`;
+  private baseUrl = `${API_BASE_V1}/notifications`;
 
   private async makeRequest<T>(
     endpoint: string, 

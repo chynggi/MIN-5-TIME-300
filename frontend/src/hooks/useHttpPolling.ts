@@ -22,19 +22,8 @@ export const useHttpPolling = ({
 
   // API URL 구성
   const getApiUrl = useCallback(() => {
-    let url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    
-    if (url.includes('cafe24.com')) {
-      // cafe24 환경에서는 /api/api 형태로 구성 (의도된 구조)
-      if (!url.includes('/api/api')) {
-        if (url.endsWith('/api')) {
-          url = url + '/api';
-        } else {
-          url = url.replace(/\/$/, '') + '/api/api';
-        }
-      }
-    }
-    return url;
+    // versioned base (api/v1)
+    return (require('@/lib/baseUrl') as typeof import('@/lib/baseUrl')).API_BASE_V1;
   }, []);
 
   // 인증 헤더 가져오기
@@ -61,7 +50,7 @@ export const useHttpPolling = ({
       }
 
       const response = await fetch(
-        `${apiUrl}/api/v1/chat/conversations/${conversationId}/messages?${params}`,
+        `${apiUrl}/chat/conversations/${conversationId}/messages?${params}`,
         {
           headers: getAuthHeaders(),
         }
@@ -144,7 +133,7 @@ export const useHttpPolling = ({
     try {
       const apiUrl = getApiUrl();
       const response = await fetch(
-        `${apiUrl}/api/v1/chat/conversations/${conversationId}/messages`,
+        `${apiUrl}/chat/conversations/${conversationId}/messages`,
         {
           method: 'POST',
           headers: getAuthHeaders(),
@@ -176,7 +165,7 @@ export const useHttpPolling = ({
     try {
       const apiUrl = getApiUrl();
       const response = await fetch(
-        `${apiUrl}/api/v1/chat/conversations/${conversationId}/read`,
+        `${apiUrl}/chat/conversations/${conversationId}/read`,
         {
           method: 'POST',
           headers: getAuthHeaders(),
