@@ -4,11 +4,13 @@ import { useState } from "react";
 interface FreeWriterProps {
   onComplete: (data: { title: string; content: string }) => void;
   onBack: () => void;
+  initialTitle?: string;
+  initialContent?: string;
 }
 
-export default function FreeWriter({ onComplete, onBack }: FreeWriterProps) {
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+export default function FreeWriter({ onComplete, onBack, initialTitle = "", initialContent = "" }: FreeWriterProps) {
+  const [title, setTitle] = useState(initialTitle);
+  const [content, setContent] = useState(initialContent);
 
   const handleComplete = () => {
     if (!title.trim() || !content.trim()) {

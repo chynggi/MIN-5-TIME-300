@@ -52,8 +52,8 @@ export default function DiaryDetailPage() {
   const [likeLoading, setLikeLoading] = useState(false);
   
   // Edit mode states
-  const [editMode, setEditMode] = useState(false);
-  const [editContent, setEditContent] = useState("");
+  // const [editMode, setEditMode] = useState(false);
+  // const [editContent, setEditContent] = useState("");
 
   useEffect(() => {
     // 현재 사용자 정보 가져오기
@@ -100,7 +100,7 @@ export default function DiaryDetailPage() {
         };
         
         setDiary(transformedDiary);
-        setEditContent(transformedDiary.content);
+        // setEditContent(transformedDiary.content);
       } catch (err) {
         setError("일기를 불러올 수 없습니다.");
       } finally {
@@ -142,17 +142,17 @@ export default function DiaryDetailPage() {
     };
   };
 
-  const handleUpdate = async () => {
-    if (!diary) return;
+  // const handleUpdate = async () => {
+  //   if (!diary) return;
     
-    try {
-      await api.put(`/diaries/${diary.id}`, { content: editContent });
-      setDiary({ ...diary, content: editContent });
-      setEditMode(false);
-    } catch {
-      setError("수정에 실패했습니다.");
-    }
-  };
+  //   try {
+  //     await api.put(`/diaries/${diary.id}`, { content: editContent });
+  //     setDiary({ ...diary, content: editContent });
+  //     setEditMode(false);
+  //   } catch {
+  //     setError("수정에 실패했습니다.");
+  //   }
+  // };
 
   const handleDelete = async () => {
     if (!diary) return;
@@ -265,7 +265,7 @@ export default function DiaryDetailPage() {
               <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-md border border-white/50 overflow-hidden">
                 {diary.image && (
                   <div className="relative group">
-                    <Image src={diary.image} alt="일기 이미지" width={1200} height={600} className="w-full h-72 object-cover" />
+                    <Image src={"https://chynggi.cafe24.com/" + diary.image} alt="일기 이미지" width={1200} height={600} className="w-full h-72 object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition" />
                   </div>
                 )}
@@ -315,36 +315,22 @@ export default function DiaryDetailPage() {
                   )}
 
                   <div className="relative">
-                    {editMode ? (
-                      <div className="space-y-4">
-                        <textarea
-                          value={editContent}
-                          onChange={(e) => setEditContent(e.target.value)}
-                          className="w-full px-4 py-4 text-sm leading-relaxed rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-4 focus:ring-indigo-200 min-h-[240px] font-medium shadow-inner resize-none"
-                          placeholder="일기 내용을 수정해주세요..."
-                        />
-                        <div className="flex items-center justify-end gap-3">
-                          <button onClick={() => setEditMode(false)} className="px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-100 text-slate-600 hover:bg-slate-200 transition">취소</button>
-                          <button onClick={handleUpdate} className="px-5 py-2.5 rounded-lg text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm transition">저장</button>
+                    {/* Removed edit mode UI */}
+                    <div>
+                      {diary.contentVisibility === 'private' && !diary.isOwner ? (
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
+                          <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-200 flex items-center justify-center text-slate-500">🔒</div>
+                          <p className="text-slate-600 text-sm font-medium">이 일기의 내용은 비공개입니다.</p>
+                          <div className="mt-4 text-[11px] tracking-wider text-slate-400 font-mono">
+                            {'*'.repeat(Math.min(diary.content.length, 120))}
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div>
-                        {diary.contentVisibility === 'private' && !diary.isOwner ? (
-                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-10 text-center">
-                            <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-200 flex items-center justify-center text-slate-500">🔒</div>
-                            <p className="text-slate-600 text-sm font-medium">이 일기의 내용은 비공개입니다.</p>
-                            <div className="mt-4 text-[11px] tracking-wider text-slate-400 font-mono">
-                              {'*'.repeat(Math.min(diary.content.length, 120))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="prose prose-slate prose-sm max-w-none">
-                            <p className="text-slate-700 leading-7 whitespace-pre-wrap font-medium tracking-wide">{diary.content}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                      ) : (
+                        <div className="prose prose-slate prose-sm max-w-none">
+                          <p className="text-slate-700 leading-7 whitespace-pre-wrap font-medium tracking-wide">{diary.content}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -369,9 +355,9 @@ export default function DiaryDetailPage() {
               </div>
 
               {/* Action Toolbar */}
-              {diary.isOwner && !editMode && (
+              {diary.isOwner && (
                 <div className="flex flex-wrap gap-3 items-center">
-                  <button onClick={() => setEditMode(true)} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 text-white text-sm font-semibold shadow hover:shadow-md hover:bg-slate-800 transition">
+                  <button onClick={() => router.push(`/diary/${diary.id}/edit`)} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 text-white text-sm font-semibold shadow hover:shadow-md hover:bg-slate-800 transition">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5h2m-1 0v14m9-7H4" /></svg>
                     수정하기
                   </button>
@@ -393,7 +379,7 @@ export default function DiaryDetailPage() {
                   </button>
                 </div>
               )}
-              {!diary.isOwner && !editMode && (
+              {!diary.isOwner && (
                 <div className="flex flex-wrap gap-3 items-center">
                   <button
                     onClick={toggleLike}

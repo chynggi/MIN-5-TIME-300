@@ -13,7 +13,17 @@ const RAW_ENV = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').rep
 const NORMALIZED_ORIGIN = RAW_ENV.replace(/(\/api)+(\/?$)/, '');
 
 // 버전 prefix 통일: 백엔드 컨트롤러들이 @Controller('api/v1/...') 구조
-export const API_BASE_V1 = `${NORMALIZED_ORIGIN}/api/api/v1`;
+
+// 만약 localhost:3000 등으로 접속하는 경우, API 서버가 다른 포트(3001)라면
+// CORS 문제 발생 가능. 이 경우 프록시 설정을 하거나, 환경변수를 상황에 맞게 조정 필요.
+// 그리고 이 경우에는 api/api/v1 중복이 아닌, api/v1만 설정.
+
+export let API_BASE_V1 = `${NORMALIZED_ORIGIN}/api/v1`;
+//if문으로, localhost가 아니면 API_BASE_V1을 api/api/v1로 설정
+if (!NORMALIZED_ORIGIN.includes('localhost')) {
+  API_BASE_V1 = `${NORMALIZED_ORIGIN}/api/v1`;
+}
+
 export const API_ORIGIN = NORMALIZED_ORIGIN;
 
 // 헬퍼: 중복 /api/v1 방지하며 경로 결합

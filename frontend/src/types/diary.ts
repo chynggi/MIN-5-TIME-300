@@ -77,4 +77,6 @@ export interface AIQuestionWriterProps {
 export interface FreeWriterProps {
   onComplete: (data: { title: string; content: string }) => void;
   onBack: () => void;
+  initialTitle?: string;
+  initialContent?: string;
 }
