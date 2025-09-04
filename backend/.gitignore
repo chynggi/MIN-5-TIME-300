@@ -9,8 +9,6 @@ logs/
 *.log
 
 # dotenv environment variables
-.env
-.env.*
 
 # Build output
 dist/
@@ -33,6 +31,8 @@ coverage/
 *.tgz
 .idea/
 *.swp
+
+package-lock.json
 
 # Prisma migrations
 prisma/migrations/*/migration.sql
