@@ -351,7 +351,7 @@ export default function DiaryDetailPage() {
               <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-md border border-white/50 overflow-hidden">
                 {diary.image && (
                   <div className="relative group">
-                    <Image src={"https://chynggi.cafe24.com/" + diary.image} alt="일기 이미지" width={1200} height={600} className="w-full h-72 object-cover" />
+                    <Image src={diary.image} alt="일기 이미지" width={1200} height={600} className="w-full h-72 object-cover" unoptimized />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition" />
                   </div>
                 )}
