@@ -21,7 +21,7 @@ export default function ChatPage() {
           return;
         }
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/profile`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/api/v1/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
