@@ -39,8 +39,9 @@ model User {
   exerciseFrequency   String?
   sleepPattern        String?
   socialActivity      String?
-  // 활동지수(0~99.5) 및 등급(1~12) 저장. activityScore는 퍼센트 단위 값
-  activityScore       Float    @default(0)
+  // 활동지수(0~100) 및 등급(1~12) 저장. activityScore는 퍼센트 단위 값
+  // 요구사항 변경: 가입 시 기본값 100% 부여
+  activityScore       Float    @default(100)
   activityLevel       Int      @default(1)
   lastActivityDecayAt DateTime?
   interests        UserInterest[]

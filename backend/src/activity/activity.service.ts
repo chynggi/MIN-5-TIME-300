@@ -3,7 +3,8 @@ import { PrismaService } from '../prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 // 활동지수 비즈니스 규칙 상수
-const MAX_SCORE = 99.5; // 최고 등급 상한
+// 요구사항: 가입 기본값을 100%로 설정하면서 상한도 100으로 상향
+const MAX_SCORE = 100; // 최고 등급 상한
 // 하루 기본 decay -0.3%
 const DAILY_DECAY = 0.3; // 퍼센트 포인트
 // 행동별 가점
@@ -99,6 +100,10 @@ export class ActivityService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id: userId }, include: { interests: true, lifestyleAnswers: true } });
       if (!user) return null;
+      // 이미 기본값 100%로 설정된 경우 로직 스킵 (재실행 방지)
+      if (user.activityScore >= 100) {
+        return tx.user.update({ where: { id: userId }, data: { lastActivityDecayAt: new Date() } });
+      }
       let score = 0;
       score += (user.interests?.length || 0) * 1.2;
       score += (user.lifestyleAnswers?.length || 0) * 0.8;
