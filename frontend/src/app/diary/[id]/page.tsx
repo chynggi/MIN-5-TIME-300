@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import api from "@/lib/axios";
 import Link from "next/link";
@@ -16,11 +16,14 @@ interface DiaryEntry {
   createdAt: string;
   updatedAt: string;
   image?: string;
-  voice?: string;
+  voice?: string; // 음성 메시지 파일 URL
   music?: {
+    id?: string;
     name: string;
     artists: { name: string }[];
     album: { images: { url: string }[] };
+    preview_url?: string | null; // Spotify 30초 미리듣기 URL
+    external_urls?: { spotify: string };
   };
   user: {
     id: string;
@@ -44,8 +47,14 @@ export default function DiaryDetailPage() {
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
+  // Voice audio
+  const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [voicePlaying, setVoicePlaying] = useState(false);
+  const [voiceProgress, setVoiceProgress] = useState(0); // percent
+  // Music audio (Spotify preview)
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [musicProgress, setMusicProgress] = useState(0); // percent
   // Like state
   const [likeCount, setLikeCount] = useState<number>(0);
   const [liked, setLiked] = useState<boolean>(false);
@@ -87,6 +96,14 @@ export default function DiaryDetailPage() {
           updatedAt: diaryData.updatedAt,
           image: diaryData.mediaUrl && diaryData.mediaType?.includes("image") ? diaryData.mediaUrl : undefined,
           voice: diaryData.mediaUrl && diaryData.mediaType?.includes("audio") ? diaryData.mediaUrl : undefined,
+          music: diaryData.music ? {
+            id: diaryData.music.id,
+            name: diaryData.music.name,
+            artists: diaryData.music.artists || [],
+            album: diaryData.music.album || { images: [] },
+            preview_url: diaryData.music.preview_url ?? diaryData.music.previewUrl ?? null,
+            external_urls: diaryData.music.external_urls || { spotify: '#' }
+          } : undefined,
           user: {
             id: diaryData.userId || diaryData.user?.id || "user",
             nickname: diaryData.user?.username || diaryData.user?.nickname || "사용자",
@@ -121,26 +138,95 @@ export default function DiaryDetailPage() {
     }
   }, [params.id, currentUser]);
 
-  const playVoice = () => {
-    if (!diary?.voice) return;
-
-    if (currentAudio) {
-      currentAudio.pause();
-      setCurrentAudio(null);
-      setIsPlaying(false);
-      return;
+  // 공용 정지 함수 (다른 소리 재생 시 호출)
+  const stopAllAudio = () => {
+    if (voiceAudioRef.current) {
+      voiceAudioRef.current.pause();
+      voiceAudioRef.current.currentTime = 0;
     }
-
-    const audio = new Audio(diary.voice);
-    audio.play();
-    setCurrentAudio(audio);
-    setIsPlaying(true);
-
-    audio.onended = () => {
-      setCurrentAudio(null);
-      setIsPlaying(false);
-    };
+    if (musicAudioRef.current) {
+      musicAudioRef.current.pause();
+      musicAudioRef.current.currentTime = 0;
+    }
+    setVoicePlaying(false);
+    setMusicPlaying(false);
+    setVoiceProgress(0);
+    setMusicProgress(0);
   };
+
+  const toggleVoice = () => {
+    if (!diary?.voice) return;
+    const el = voiceAudioRef.current;
+    if (!el) return;
+    if (voicePlaying) {
+      el.pause();
+      setVoicePlaying(false);
+    } else {
+      // 다른 오디오 정지
+      if (musicPlaying) stopMusicOnly();
+      el.play();
+      setVoicePlaying(true);
+    }
+  };
+
+  const toggleMusic = () => {
+    if (!diary?.music?.preview_url) return; // 미리듣기 없으면 재생 불가
+    const el = musicAudioRef.current;
+    if (!el) return;
+    if (musicPlaying) {
+      el.pause();
+      setMusicPlaying(false);
+    } else {
+      if (voicePlaying) stopVoiceOnly();
+      el.play();
+      setMusicPlaying(true);
+    }
+  };
+
+  const stopVoiceOnly = () => {
+    if (voiceAudioRef.current) {
+      voiceAudioRef.current.pause();
+      voiceAudioRef.current.currentTime = 0;
+    }
+    setVoicePlaying(false);
+    setVoiceProgress(0);
+  };
+  const stopMusicOnly = () => {
+    if (musicAudioRef.current) {
+      musicAudioRef.current.pause();
+      musicAudioRef.current.currentTime = 0;
+    }
+    setMusicPlaying(false);
+    setMusicProgress(0);
+  };
+
+  // 진행도 업데이트 핸들러
+  const handleVoiceTimeUpdate = () => {
+    const el = voiceAudioRef.current;
+    if (!el || !el.duration) return;
+    setVoiceProgress((el.currentTime / el.duration) * 100);
+  };
+  const handleMusicTimeUpdate = () => {
+    const el = musicAudioRef.current;
+    if (!el || !el.duration) return;
+    setMusicProgress((el.currentTime / el.duration) * 100);
+  };
+
+  // 종료 이벤트
+  const handleVoiceEnded = () => {
+    setVoicePlaying(false);
+    setVoiceProgress(0);
+  };
+  const handleMusicEnded = () => {
+    setMusicPlaying(false);
+    setMusicProgress(0);
+  };
+
+  // 일기 id 바뀌거나 unmount 시 정리
+  useEffect(() => {
+    return () => stopAllAudio();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.id]);
 
   // const handleUpdate = async () => {
   //   if (!diary) return;
@@ -277,28 +363,55 @@ export default function DiaryDetailPage() {
                     <div className="mb-6">
                       <div className="flex items-center gap-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
                         <button
-                          onClick={playVoice}
-                          className={`relative inline-flex items-center justify-center w-12 h-12 rounded-full text-white shadow ${isPlaying ? 'bg-rose-500 hover:bg-rose-600' : 'bg-indigo-500 hover:bg-indigo-600'} transition`}
+                          onClick={toggleVoice}
+                          className={`relative inline-flex items-center justify-center w-12 h-12 rounded-full text-white shadow ${voicePlaying ? 'bg-rose-500 hover:bg-rose-600' : 'bg-indigo-500 hover:bg-indigo-600'} transition`}
+                          aria-label={voicePlaying ? '음성 일시정지' : '음성 재생'}
                         >
-                          {isPlaying ? (
+                          {voicePlaying ? (
                             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
                           ) : (
                             <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="m9.5 17.5 8-5.5-8-5.5v11z"/></svg>
                           )}
                         </button>
                         <div className="flex-1">
-                          <div className="text-xs font-semibold text-slate-500 mb-1">음성 메시지</div>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="text-xs font-semibold text-slate-500">음성 메시지</div>
+                            <div className="text-[10px] text-slate-400 font-mono">{Math.round(voiceProgress)}%</div>
+                          </div>
                           <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
-                            <div className={`h-full bg-gradient-to-r from-indigo-400 to-rose-400 animate-pulse ${!isPlaying && 'w-0'}`} />
+                            <div
+                              className="h-full bg-gradient-to-r from-indigo-400 to-rose-400 transition-all"
+                              style={{ width: `${voiceProgress}%` }}
+                            />
                           </div>
                         </div>
                       </div>
+                      <audio
+                        ref={voiceAudioRef}
+                        src={diary.voice}
+                        onTimeUpdate={handleVoiceTimeUpdate}
+                        onEnded={handleVoiceEnded}
+                        preload="metadata"
+                        className="hidden"
+                      />
                     </div>
                   )}
 
                   {diary.music && (
                     <div className="mb-6">
                       <div className="flex items-center gap-4 bg-gradient-to-r from-indigo-50 to-rose-50 border border-slate-200 rounded-xl p-4">
+                        <button
+                          onClick={toggleMusic}
+                          disabled={!diary.music.preview_url}
+                          className={`relative inline-flex items-center justify-center w-12 h-12 rounded-full text-white shadow transition ${musicPlaying ? 'bg-rose-500 hover:bg-rose-600' : 'bg-indigo-500 hover:bg-indigo-600'} ${!diary.music.preview_url && '!cursor-not-allowed opacity-50'}`}
+                          aria-label={musicPlaying ? '음악 일시정지' : (diary.music.preview_url ? '음악 재생' : '미리듣기 없음')}
+                        >
+                          {musicPlaying ? (
+                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                          ) : (
+                            <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 24 24"><path d="m9.5 17.5 8-5.5-8-5.5v11z"/></svg>
+                          )}
+                        </button>
                         <div className="w-14 h-14 rounded-lg overflow-hidden bg-slate-200">
                           {diary.music.album.images[0] ? (
                             <Image src={diary.music.album.images[0].url} alt="앨범 커버" width={56} height={56} className="object-cover w-full h-full" />
@@ -307,10 +420,44 @@ export default function DiaryDetailPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-slate-700 truncate">{diary.music.name}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-semibold text-slate-700 truncate" title={diary.music.name}>{diary.music.name}</div>
+                            {!diary.music.preview_url && (
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-300 text-slate-700 font-semibold">미리듣기 없음</span>
+                            )}
+                          </div>
                           <div className="text-xs text-slate-500 truncate">{diary.music.artists.map(a => a.name).join(', ')}</div>
+                          {diary.music.preview_url && (
+                            <div className="mt-2">
+                              <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-rose-400 to-indigo-400 transition-all"
+                                  style={{ width: `${musicProgress}%` }}
+                                />
+                              </div>
+                              <div className="flex justify-between mt-1 text-[10px] text-slate-400 font-mono">
+                                <span>{musicPlaying ? Math.round(musicProgress) : 0}%</span>
+                                <a
+                                  href={diary.music.external_urls?.spotify || '#'}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:text-indigo-600 underline"
+                                >Spotify</a>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
+                      {diary.music.preview_url && (
+                        <audio
+                          ref={musicAudioRef}
+                          src={diary.music.preview_url}
+                          onTimeUpdate={handleMusicTimeUpdate}
+                          onEnded={handleMusicEnded}
+                          preload="metadata"
+                          className="hidden"
+                        />
+                      )}
                     </div>
                   )}
 
