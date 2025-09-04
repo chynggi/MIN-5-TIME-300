@@ -45,25 +45,50 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
 
   private parseQuestions(raw: string): { questions: GeneratedQuestionItem[] } {
     const questions: GeneratedQuestionItem[] = [];
-    try {
-      const obj = JSON.parse(raw);
-      if (Array.isArray(obj.questions)) {
-        for (const q of obj.questions) {
-          if (q?.text && q?.domain && this.autoQualityFilter(q.text)) {
-            questions.push({ domain: q.domain, text: q.text.trim() });
+    const sanitized = raw.replace(/```+json?/gi,'```');
+
+    const extractJson = (): string | undefined => {
+      const fence = sanitized.match(/```+\s*(?:json)?\s*([\s\S]*?)```/i);
+      if (fence) return fence[1];
+      const start = sanitized.indexOf('{');
+      const end = sanitized.lastIndexOf('}');
+      if (start !== -1 && end > start) return sanitized.slice(start, end + 1);
+    };
+
+    const tryParse = (candidate?: string) => {
+      if (!candidate) return false;
+      try {
+        const obj = JSON.parse(candidate);
+        if (Array.isArray(obj.questions)) {
+          for (const q of obj.questions) {
+            if (q?.text && q?.domain) {
+              const text = q.text.trim().replace(/^['"`]+|['"`]+$/g,'');
+              if (this.autoQualityFilter(text)) {
+                questions.push({ domain: q.domain, text });
+              }
+            }
           }
         }
-      }
-    } catch {
-      // 라인 기반 폴백
-      const lines = raw.split(/\n+/).map(l => l.replace(/^[-*\d.\s]+/,'').trim()).filter(l => l.length > 3).slice(0,5);
+        return questions.length > 0;
+      } catch { return false; }
+    };
+
+    const parsed = tryParse(extractJson()) || tryParse(sanitized);
+
+    if (!parsed) {
+      const lines = sanitized.split(/\n+/)
+        .map(l => l.replace(/^[-*\d.\s]+/, '').trim())
+        .filter(l => l.length >= 4 && l.length <= 120 && !/^```/.test(l) && !/^[{}\[\]]+$/.test(l) && !/^"?questions"?\s*:/.test(l))
+        .slice(0,5);
       const domains: GeneratedQuestionItem['domain'][] = ['emotion','action','relationship','recovery','goal'];
-      lines.forEach((text, i) => {
+      for (let i=0;i<lines.length;i++) {
+        const text = lines[i];
         if (this.autoQualityFilter(text)) {
           questions.push({ domain: domains[i] || 'emotion', text });
         }
-      });
+      }
     }
+
     return { questions: questions.slice(0,5) };
   }
 

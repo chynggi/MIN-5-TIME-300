@@ -46,33 +46,54 @@ export class GPTQuestionGenerator extends QuestionGeneratorInterface {
 
   private parseQuestions(raw: string): { questions: GeneratedQuestionItem[] } {
     const questions: GeneratedQuestionItem[] = [];
-    // JSON 블록 추출 시도
-    let jsonText = raw;
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (match) jsonText = match[0];
-    try {
-      const obj = JSON.parse(jsonText);
-      if (Array.isArray(obj.questions)) {
-        for (const q of obj.questions) {
-          if (q?.text && q?.domain) {
-            const text = this.postProcessQuestion(String(q.text));
-            if (this.autoQualityFilter(text)) {
-              questions.push({ domain: q.domain, text });
+    const sanitize = (t: string) => t.replace(/```+json?/gi,'```');
+    const work = sanitize(raw);
+
+    const extractJson = (): string | undefined => {
+      const fence = work.match(/```+\s*(?:json)?\s*([\s\S]*?)```/i);
+      if (fence) return fence[1];
+      const braceStart = work.indexOf('{');
+      const braceEnd = work.lastIndexOf('}');
+      if (braceStart !== -1 && braceEnd > braceStart) {
+        return work.slice(braceStart, braceEnd + 1);
+      }
+    };
+
+    const tryParse = (candidate?: string) => {
+      if (!candidate) return false;
+      try {
+        const obj = JSON.parse(candidate);
+        if (Array.isArray(obj.questions)) {
+          for (const q of obj.questions) {
+            if (q?.text && q?.domain) {
+              const text = this.postProcessQuestion(String(q.text).trim().replace(/^['"`]+|['"`]+$/g,''));
+              if (this.autoQualityFilter(text)) {
+                questions.push({ domain: q.domain, text });
+              }
             }
           }
         }
-      }
-    } catch {
-      // 줄 기반 추출 폴백
-      const lines = raw.split(/\n+/).map(l => l.trim()).filter(l => l.length > 3 && l.length <= 120).slice(0,5);
+        return questions.length > 0;
+      } catch { return false; }
+    };
+
+    const parsed = tryParse(extractJson()) || tryParse(work);
+
+    if (!parsed) {
+      // 라인 기반 폴백 (코드펜스/JSON 키/중괄호 제거)
+      const lines = work.split(/\n+/)
+        .map(l => l.trim())
+        .filter(l => l.length >= 4 && l.length <= 120 && !/^```/.test(l) && !/^[{}\[\]]+$/.test(l) && !/^"?questions"?\s*:/.test(l))
+        .slice(0,5);
       const domains: GeneratedQuestionItem['domain'][] = ['emotion','action','relationship','recovery','goal'];
-      lines.forEach((line, idx) => {
-        const text = this.postProcessQuestion(line);
-        if (this.autoQualityFilter(text)) {
-          questions.push({ domain: domains[idx] || 'emotion', text });
+      for (let i=0;i<lines.length;i++) {
+        const txt = this.postProcessQuestion(lines[i]);
+        if (this.autoQualityFilter(txt)) {
+          questions.push({ domain: domains[i] || 'emotion', text: txt });
         }
-      });
+      }
     }
+
     return { questions: questions.slice(0,5) };
   }
 

@@ -43,30 +43,71 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
 
   private parseQuestions(raw: string): { questions: GeneratedQuestionItem[] } {
     const questions: GeneratedQuestionItem[] = [];
-    try {
-      const jsonMatch = raw.match(/\{[\s\S]*\}$/);
-      const target = jsonMatch ? jsonMatch[0] : raw;
-      const obj = JSON.parse(target);
-      if (Array.isArray(obj.questions)) {
-        for (const q of obj.questions) {
-          if (q && typeof q.text === 'string' && typeof q.domain === 'string') {
-            const text = q.text.trim();
-            if (this.autoQualityFilter(text)) {
-              questions.push({ domain: q.domain, text });
+
+    const sanitize = (text: string) => text.replace(/```+json?/gi, '```').trim();
+    let work = sanitize(raw);
+
+    // 1) 코드펜스 내부 JSON 블록 우선 추출
+    let jsonCandidate: string | undefined = undefined;
+    const fenceMatch = work.match(/```+\s*(?:json)?\s*([\s\S]*?)```/i);
+    if (fenceMatch) {
+      jsonCandidate = fenceMatch[1];
+    }
+
+    // 2) 없으면 첫 '{' 부터 마지막 '}' 까지 시도 (중첩 단순 스캔)
+    if (!jsonCandidate) {
+      const firstBrace = work.indexOf('{');
+      const lastBrace = work.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonCandidate = work.slice(firstBrace, lastBrace + 1);
+      }
+    }
+
+    const tryParse = (text?: string) => {
+      if (!text) return false;
+      try {
+        const obj = JSON.parse(text);
+        if (Array.isArray(obj.questions)) {
+          for (const q of obj.questions) {
+            if (q && typeof q.text === 'string' && typeof q.domain === 'string') {
+              const trimmed = q.text.trim().replace(/^['"`]+|['"`]+$/g, '');
+              if (this.autoQualityFilter(trimmed)) {
+                questions.push({ domain: q.domain, text: trimmed });
+              }
             }
           }
         }
+        return questions.length > 0;
+      } catch {
+        return false;
       }
-    } catch (e) {
-      // 원시 텍스트에서 줄 단위 fallback (비정상 응답 시)
-      const lines = raw.split(/\n+/).map(l => l.trim()).filter(l => l.length >= 2 && l.length <= 120).slice(0,5);
+    };
+
+    const parsedOk = tryParse(jsonCandidate) || tryParse(work);
+
+    if (!parsedOk) {
+      // 3) 라인 기반 폴백: 코드펜스, 중괄호, 빈/언어지시 라인 제거
+      const lines = work
+        .split(/\n+/)
+        .map(l => l.trim())
+        .filter(l =>
+          l.length >= 4 &&
+          l.length <= 120 &&
+          !/^```/.test(l) &&
+          !/^[{}\[\]]+$/.test(l) &&
+          !/^"?questions"?\s*:/.test(l) &&
+          !/^domain\s*:/.test(l)
+        )
+        .slice(0,5);
       const domains: GeneratedQuestionItem['domain'][] = ['emotion','action','relationship','recovery','goal'];
-      lines.forEach((line, idx) => {
+      for (let i=0; i<lines.length; i++) {
+        const line = lines[i];
         if (this.autoQualityFilter(line)) {
-          questions.push({ domain: domains[idx] || 'emotion', text: line });
+          questions.push({ domain: domains[i] || 'emotion', text: line });
         }
-      });
+      }
     }
+
     return { questions: questions.slice(0,5) };
   }
 
