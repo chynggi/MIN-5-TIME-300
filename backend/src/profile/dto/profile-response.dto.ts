@@ -15,6 +15,7 @@ export class ProfileResponseDto {
   profileImageUrl: string;
   interests: ProfileInterestDto[];
   createdAt: string;
+  activityScore?: number; // 0-100 활동 지수
 }
 // 타인 프로필 상세 응답 DTO
 export class OtherProfileResponseDto {
@@ -29,4 +30,5 @@ export class OtherProfileResponseDto {
   isPublic: boolean;
   mbti: string;
   canViewCalendar?: boolean; // 달력 조회 권한 추가
+  activityScore?: number; // 0-100 활동 지수
 }

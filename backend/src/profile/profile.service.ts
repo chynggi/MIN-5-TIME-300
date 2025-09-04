@@ -29,6 +29,7 @@ export class ProfileService {
       },
     });
     if (!user) throw new NotFoundException('유저를 찾을 수 없습니다.');
+    const activityScore = await this.calculateActivityScore(userId);
     return {
       id: user.id,
       email: user.email,
@@ -40,6 +41,7 @@ export class ProfileService {
       profileImageUrl: user.profileImageUrl || '',
       interests: user.interests.map(i => ({ id: i.id, interest: i.interest, priority: i.priority })),
       createdAt: user.createdAt.toISOString(),
+      activityScore,
     };
   }
   /**
@@ -153,6 +155,7 @@ export class ProfileService {
       isPublic: true,
       mbti: otherUser.mbti || '',
       canViewCalendar,
+      activityScore: await this.calculateActivityScore(otherUserId),
     };
   }
 
@@ -379,6 +382,7 @@ export class ProfileService {
       profileImageUrl: user.profileImageUrl || '',
       interests: user.interests.map(i => ({ id: i.id, interest: i.interest, priority: i.priority })),
       createdAt: user.createdAt.toISOString(),
+      activityScore: await this.calculateActivityScore(userId),
     };
   }
 
@@ -673,6 +677,49 @@ export class ProfileService {
       success: true,
       message: '프로필이 완전히 업데이트되었습니다.',
     };
+  }
+
+  /**
+   * 활동 지수 계산 (0-100)
+   * - 최근 30일 공개/비공개 일기 수 (max 30 -> 30점)
+   * - 최근 30일 작성 채팅 메시지 수 (max 100 -> 25점)
+   * - 팔로워 수 (max 100 -> 20점, log 스케일)
+   * - 팔로잉/친구 수 (max 100 -> 10점, log 스케일)
+   * - 관심사 개수 (max 10 -> 5점)
+   * - 프로필 완성도 (MBTI, bio, location 등 필드 채움 비율 -> 10점)
+   */
+  private async calculateActivityScore(userId: string): Promise<number> {
+    // 기간 설정 (최근 30일)
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+
+    const [journalCount, messageCount, followerCount, followingCount, interests, user] = await Promise.all([
+      this.prisma.journal.count({ where: { userId, diaryDate: { gte: since } } }),
+      // 채팅 메시지: chatMessage 테이블이 있다고 가정 (없으면 0)
+      this.prisma.chatMessage ? this.prisma.chatMessage.count({ where: { senderId: userId, createdAt: { gte: since } } }) : Promise.resolve(0),
+      this.prisma.friend.count({ where: { addresseeId: userId, status: 'accepted' } }),
+      this.prisma.friend.count({ where: { requesterId: userId, status: 'accepted' } }),
+      this.prisma.userInterest.findMany({ where: { userId } }),
+      this.prisma.user.findUnique({ where: { id: userId } }),
+    ]);
+
+    // 1. 일기 점수 (30 max)
+    const diaryScore = Math.min(journalCount, 30) * (30 / 30);
+    // 2. 메시지 점수 (25 max, 0~100 -> 선형)
+    const messageScore = Math.min(messageCount, 100) * (25 / 100);
+    // 3. 팔로워 점수 (20 max, log 스케일)
+    const followerScore = Math.min(Math.log10(followerCount + 1) / Math.log10(101) * 20, 20);
+    // 4. 팔로잉/친구 점수 (10 max)
+    const followingScore = Math.min(Math.log10(followingCount + 1) / Math.log10(101) * 10, 10);
+    // 5. 관심사 점수 (5 max)
+    const interestScore = Math.min(interests.length, 10) * (5 / 10);
+    // 6. 프로필 완성도 (10 max)
+    const fields = [user?.mbti, user?.bio, user?.location, user?.birthDate, user?.profileImageUrl];
+    const filled = fields.filter(v => !!v).length;
+    const profileCompletenessScore = (filled / fields.length) * 10;
+
+    const total = diaryScore + messageScore + followerScore + followingScore + interestScore + profileCompletenessScore;
+    return Math.round(Math.min(100, total));
   }
 
   async getPrivacySettings(req: any): Promise<UpdatePrivacyDto> {

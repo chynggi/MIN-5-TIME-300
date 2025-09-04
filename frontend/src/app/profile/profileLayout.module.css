@@ -1,0 +1,60 @@
+/* 바깥 래퍼: 전체 뷰포트 배경 적용 */
+.outerBackground {
+  --pl-bg-start: #f5f7fa;
+  --pl-bg-end: #eef2f7;
+  --pl-bg-accent1: 99 102 241; /* indigo-500 */
+  --pl-bg-accent2: 139 92 246; /* violet-500 */
+  --pl-grid-overlay: linear-gradient(rgba(255,255,255,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.25) 1px, transparent 1px);
+  min-height: 100dvh;
+  width: 100%;
+  position: relative;
+  background: radial-gradient(circle at 80% 10%, rgba(var(--pl-bg-accent2)/0.12), transparent 50%),
+              radial-gradient(circle at 12% 85%, rgba(var(--pl-bg-accent1)/0.15), transparent 55%),
+              linear-gradient(135deg, var(--pl-bg-start), var(--pl-bg-end));
+  background-attachment: fixed;
+  overflow-x: hidden;
+}
+
+/* 어둡게: prefers-color-scheme 대응 */
+@media (prefers-color-scheme: dark) {
+  .outerBackground {
+    --pl-bg-start: #0d1014;
+    --pl-bg-end: #161b22;
+    --pl-grid-overlay: linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+    background: radial-gradient(circle at 80% 10%, rgba(var(--pl-bg-accent2)/0.22), transparent 52%),
+                radial-gradient(circle at 12% 85%, rgba(var(--pl-bg-accent1)/0.26), transparent 60%),
+                linear-gradient(140deg, var(--pl-bg-start), var(--pl-bg-end));
+  }
+}
+
+/* 미세한 패턴 오버레이 (접근성 위해 대비 낮춤) */
+.outerBackground::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--pl-grid-overlay);
+  background-size: 140px 140px, 140px 140px;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,0.45), rgba(0,0,0,0.25) 40%, rgba(0,0,0,0.15));
+  pointer-events: none;
+  opacity: 0.35;
+}
+@media (prefers-color-scheme: dark) {
+  .outerBackground::before {
+    opacity: 0.18;
+  }
+}
+
+/* 안쪽 컨텐츠 안전 영역 (기존 .container가 자체 padding 있으므로 최소화) */
+.innerSafe {
+  position: relative;
+  z-index: 1;
+  padding-top: 1.2rem;
+  padding-bottom: 3rem; /* 캘린더 하단 breathing */
+}
+
+/* 옵션: 풀 와이드 배리에이션 (필요 시) */
+.fullBleed {
+  max-width: none !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}

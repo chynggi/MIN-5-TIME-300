@@ -17,6 +17,7 @@ export interface ProfileResponse {
   interests: ProfileInterest[];
   createdAt: string;
   lifestyle: LifestyleAnswer[];
+  activityScore?: number; // 0-100 활동 지수
 }
 
 export interface UpdateProfileData {

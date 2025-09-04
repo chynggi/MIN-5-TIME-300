@@ -9,6 +9,7 @@ import { diaryApi } from '../../services/diary-api';
 import { statisticsApi } from '../../services/statistics-api';
 import { getRealtimeSocket, disconnectRealtimeSocket } from '@/lib/realtimeSocket';
 import { ProfileResponse } from '../../types/api';
+import ActivityIndicator from '../../components/activity/ActivityIndicator';
 import { setAuthToken, testConnection } from '../../lib/api';
 import { authApi } from '../../services/auth-api';
 
@@ -25,6 +26,8 @@ interface MyProfile {
   isPublic: boolean;
   mbti: string;
   profileImageUrl?: string;
+  profileColor?: string;
+  activityScore?: number; // 활동지수 (0-100)
 }
 
 interface CalendarDay {
@@ -32,6 +35,38 @@ interface CalendarDay {
   emotion?: string;
   hasEntry: boolean;
   diaryId?: string;
+}
+
+// 프로필 테마 색상을 기반으로 CSS 변수 style 객체 생성
+function buildThemeStyle(profileColor?: string) {
+  if (!profileColor) return undefined;
+  // 지원: hex (#RRGGBB), rgb/rgba(), linear-gradient 등
+  // gradient 그대로 쓰고, 단색이면 파생 색상 계산
+  const isGradient = /gradient\(/i.test(profileColor);
+  let accent = profileColor.trim();
+  let accentRgb = '99 102 241'; // fallback 기존 indigo
+  let accentSoft = 'rgba(0,0,0,0.05)';
+  if (!isGradient) {
+    // Hex -> RGB
+    const hex = profileColor.replace('#','');
+    if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+      const r = parseInt(hex.slice(0,2),16);
+      const g = parseInt(hex.slice(2,4),16);
+      const b = parseInt(hex.slice(4,6),16);
+      accentRgb = `${r} ${g} ${b}`;
+      // lighten 배경 (10%)
+      const lighten = (c:number)=>Math.min(255, Math.round(c + (255-c)*0.85));
+      const lr = lighten(r); const lg = lighten(g); const lb = lighten(b);
+      accentSoft = `rgba(${r},${g},${b},0.12)`;
+      accent = `linear-gradient(135deg, ${profileColor}, #${lr.toString(16).padStart(2,'0')}${lg.toString(16).padStart(2,'0')}${lb.toString(16).padStart(2,'0')})`;
+    }
+  }
+  return {
+    '--c-accent': isGradient ? 'var(--c-accent)' : profileColor,
+    '--c-accent-rgb': accentRgb,
+    '--c-accent-soft': isGradient ? 'rgba(255,255,255,0.12)' : accentSoft,
+    '--gradient-accent': accent,
+  } as React.CSSProperties;
 }
 
 export default function ProfilePage() {
@@ -48,6 +83,8 @@ export default function ProfilePage() {
     heartProgress: 0,
     isPublic: true,
     mbti: 'INFJ',
+    profileColor: undefined,
+    activityScore: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -226,6 +263,8 @@ export default function ProfilePage() {
         message: profileData.bio || '안녕하세요! 😊',
         mbti: profileData.mbti || 'INFJ',
         profileImageUrl: profileData.profileImageUrl,
+        profileColor: (profileData as any).profileColor,
+        activityScore: profileData.activityScore ?? prev.activityScore ?? 0,
       }));
       // 전역에 사용자 ID 기억 (간단한 공유)
       (window as any)._myProfileUserId = profileData.id;
@@ -333,7 +372,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className={styles.container}>
+      <div className={styles.container} style={buildThemeStyle(profile.profileColor)}>
         <div className={styles.loading}>프로필을 불러오는 중...</div>
       </div>
     );
@@ -341,7 +380,7 @@ export default function ProfilePage() {
 
   if (error) {
     return (
-      <div className={styles.container}>
+      <div className={styles.container} style={buildThemeStyle(profile.profileColor)}>
         <div className={styles.error}>
           <p>{error}</p>
           <div className={styles.devActions}>
@@ -358,214 +397,152 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className={styles.container}>
-      {/* 상단: 프로필 사진+MBTI+통계 병합 */}
-      <div className={styles.statsBox}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <div className={styles.avatarWrap}>
-            <img
-              src={profile.profileImageUrl 
-                ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${profile.profileImageUrl}`
-                : `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=ececec&color=bbb`
-              }
-              alt="프로필 이미지"
-              className={styles.avatarImg}
-            />
-            <span className={styles.mbtiBadge}>{profile.mbti}</span>
-          </div>
-          <div>
-            <div className={styles.statsRow}>
-              <span className={styles.statNum}>{profile.diaryCount}</span>
-              <span className={styles.statNum}>{profile.followerCount}</span>
-              <span className={styles.statNum}>{profile.followingCount}</span>
-            </div>
-            <div className={styles.statsLabelRow}>
-              <span className={styles.statLabel}>일기</span>
-              <span className={styles.statLabel}>팔로워</span>
-              <span className={styles.statLabel}>팔로잉</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 이름/메시지 */}
-      <div className={styles.profileTextBox}>
-        <div className={styles.nickname}><span role="img" aria-label="heart">💖</span>{profile.name}</div>
-        <div className={styles.bio}>{profile.message}</div>
-      </div>
-
-      {/* 버튼 */}
-      <div className={styles.buttonRow}>
-        <button onClick={handleEditProfile} className={styles.pinkButton}>프로필 편집</button>
-        <button onClick={handleTogglePublic} className={styles.pinkButton}>프로필 공개</button>
-        <button 
-          onClick={() => router.push('/profile/follow-requests')} 
-          className={styles.pinkButton}
-        >
-          팔로우 요청
-        </button>
-      </div>
-
-      {/* 캘린더 섹션 */}
-      <section style={{
-        background: 'linear-gradient(135deg, #fef3c7, #fcd34d)',
-        borderRadius: '12px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        padding: '16px',
-        margin: '16px 0'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '12px'
-        }}>
-          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}>
-            ◀
-          </button>
-          <h2 style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            {currentDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })}
-          </h2>
-          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}>
-            ▶
-          </button>
-        </div>
-        
-        {/* 요일 헤더 */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '4px',
-          marginBottom: '8px'
-        }}>
-          {['일', '월', '화', '수', '목', '금', '토'].map(day => (
-            <div key={day} style={{
-              textAlign: 'center',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              padding: '8px'
-            }}>
-              {day}
-            </div>
-          ))}
-        </div>
-        
-        {/* 캘린더 날짜들 */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '4px'
-        }}>
-          {calendarData.map((day, index) => {
-            if (day.date === 0) {
-              return <div key={index} style={{ aspectRatio: '1' }}></div>;
-            }
-
-            const year = currentDate.getFullYear();
-            const month = currentDate.getMonth();
-            const currentDateObj = new Date(year, month, day.date);
-            const today = new Date();
-            const todayObj = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            
-            // 로컬 날짜 비교 (시간대 문제 해결)
-            const currentLocalDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day.date).padStart(2, '0')}`;
-            const todayLocalDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-            
-            const isPast = currentLocalDate < todayLocalDate;
-            const isToday = currentLocalDate === todayLocalDate;
-            const isFuture = currentLocalDate > todayLocalDate;
-            
-            return (
-              <div key={index} style={{ aspectRatio: '1', position: 'relative' }}>
-                <button
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    transition: 'all 0.2s',
-                    border: 'none',
-                    cursor: isFuture ? 'not-allowed' : (isToday ? 'pointer' : (day.hasEntry ? 'pointer' : 'default')),
-                    backgroundColor: isFuture 
-                      ? '#f3f4f6'
-                      : isToday 
-                        ? '#dbeafe'
-                        : day.hasEntry 
-                          ? '#ffffff'
-                          : '#fef3c7',
-                    opacity: isFuture ? 0.6 : 1,
-                    boxShadow: day.hasEntry ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
-                    ...(isToday && { border: '2px solid #3b82f6' })
-                  }}
-                  disabled={isFuture}
-                  onClick={() => {
-                    console.log('🔍 Profile Calendar Click Debug:');
-                    console.log('- 클릭한 날짜:', day.date);
-                    console.log('- isFuture:', isFuture);
-                    console.log('- isToday:', isToday);
-                    console.log('- isPast:', isPast);
-                    console.log('- day.hasEntry:', day.hasEntry);
-                    console.log('- day.diaryId:', day.diaryId);
-                    console.log('- day.emotion:', day.emotion);
-                    console.log('- day 전체 객체:', day);
-                    
-                    if (isFuture) {
-                      console.log('➡️ 미래 날짜이므로 클릭 불가');
-                      return;
-                    }
-                    
-                    if (day.hasEntry && day.diaryId) {
-                      console.log('➡️ 일기가 있으므로 상세 페이지로 이동:', `/diary/${day.diaryId}`);
-                      router.push(`/diary/${day.diaryId}`);
-                    } else {
-                      console.log('➡️ 일기가 없으므로 새 일기 작성 페이지로 이동');
-                      const year = currentDate.getFullYear();
-                      const month = currentDate.getMonth();
-                      const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day.date).padStart(2,'0')}`;
-                      router.push(`/diary/new?date=${dateStr}`);
-                    }
-                  }}
-                >
-                  <span style={{ 
-                    fontWeight: isToday ? 'bold' : 'normal',
-                    color: isToday ? '#2563eb' : 'inherit'
-                  }}>
-                    {day.date}
-                  </span>
-                  {day.emotion && (
-                    <span style={{ fontSize: '18px', lineHeight: 'none' }}>
-                      {day.emotion === "🔒" ? day.emotion : day.emotion}
-                    </span>
-                  )}
-                  {isToday && !day.hasEntry && (
-                    <span style={{ fontSize: '10px', color: '#2563eb', marginTop: '4px' }}>오늘</span>
-                  )}
-                  {/* 회고 배지 (서버 isRetrospective 필드가 프론트 day 매핑 시 들어온다고 가정) */}
-                  {day.hasEntry && (day as any).isRetrospective && (
-                    <span style={{ position: 'absolute', top: '3px', right: '3px', background: '#db2777', color: '#fff', fontSize: '9px', padding: '2px 4px', borderRadius: '9999px', lineHeight: 1 }}>회고</span>
-                  )}
-                </button>
+    <div className={styles.container} style={buildThemeStyle(profile.profileColor)}>
+      <div className={`${styles.simpleStack} ${styles.fadeIn}`}>
+        {/* 좌측 / 기본 프로필 영역 */}
+        <section className={`${styles.panel} ${styles.profileHeader}`} aria-label="프로필 기본 정보">
+          <div className={styles.avatarWrapModern}>
+            {profile.profileImageUrl ? (
+              <img
+                src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}${profile.profileImageUrl}`}
+                alt={`${profile.name} 프로필 이미지`}
+                className={styles.avatarImgModern}
+                loading="lazy"
+              />
+            ) : (
+              <div className={styles.avatarFallback} aria-hidden="true">
+                {profile.name.slice(0,2).toUpperCase()}
               </div>
-            );
-          })}
-        </div>
-      </section>
+            )}
+            <span className={styles.mbtiBadgeModern} aria-label="MBTI">{profile.mbti}</span>
+          </div>
+          <div className={styles.basicInfo}>
+            <h1 className={styles.nicknameModern}>{profile.name}</h1>
+            <p className={styles.bioModern}>{profile.message}</p>
+            <div className={styles.statsModern}>
+              <button className={styles.statCard} onClick={() => handleStatsClick('followers')} aria-label={`일기 ${profile.diaryCount}개`}>
+                <span className={styles.statValue}>{profile.diaryCount}</span>
+                <span className={styles.statLabelModern}>DIARIES</span>
+              </button>
+              <button className={styles.statCard} onClick={() => handleStatsClick('followers')} aria-label={`팔로워 ${profile.followerCount}명`}>
+                <span className={styles.statValue}>{profile.followerCount}</span>
+                <span className={styles.statLabelModern}>FOLLOWERS</span>
+              </button>
+              <button className={styles.statCard} onClick={() => handleStatsClick('following')} aria-label={`팔로잉 ${profile.followingCount}명`}>
+                <span className={styles.statValue}>{profile.followingCount}</span>
+                <span className={styles.statLabelModern}>FOLLOWING</span>
+              </button>
+              <div className={styles.activityStat} aria-label={`활동지수 ${profile.activityScore ?? 0}%`}>
+                <ActivityIndicator score={profile.activityScore ?? 0} size={60} />
+              </div>
+            </div>
+            <div className={styles.actionRow}>
+              <button onClick={handleEditProfile} className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}>
+                ✏️ 프로필 편집
+              </button>
+              <button onClick={handleTogglePublic} className={`${styles.actionBtn} ${styles.actionBtnOutline}`}>
+                🔒 공개 설정
+              </button>
+            </div>
+          </div>
+        </section>
 
-      {/* 개발용 섹션 */}
+        {/* 중앙 / 캘린더 */}
+        <section className={`${styles.calendarPanel}`} aria-label="감정/일기 캘린더">
+          <header className={styles.calendarHeader}>
+            <button
+              type="button"
+              className={styles.calendarNavBtn}
+              aria-label="이전 달"
+              onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
+            >◀</button>
+            <h2 className={styles.calendarTitle}>
+              {currentDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })}
+            </h2>
+            <button
+              type="button"
+              className={styles.calendarNavBtn}
+              aria-label="다음 달"
+              onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
+            >▶</button>
+          </header>
+          <div className={styles.weekdayRow} aria-hidden="true">
+            {['일','월','화','수','목','금','토'].map(d => (
+              <div key={d} className={styles.weekdayCell}>{d}</div>
+            ))}
+          </div>
+          <div className={styles.calendarGrid}>
+            {calendarData.map((day, index) => {
+              if (day.date === 0) {
+                return (
+                  <div key={index} className={styles.dayCellOuter} aria-hidden="true">
+                    <button className={styles.dayBtn} data-empty="true" tabIndex={-1}></button>
+                  </div>
+                );
+              }
+              const year = currentDate.getFullYear();
+              const month = currentDate.getMonth();
+              const today = new Date();
+              const currentLocalDate = `${year}-${String(month + 1).padStart(2,'0')}-${String(day.date).padStart(2,'0')}`;
+              const todayLocalDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+              const isToday = currentLocalDate === todayLocalDate;
+              const isFuture = currentLocalDate > todayLocalDate;
+              const labelParts: string[] = [];
+              labelParts.push(`${day.date}일`);
+              if (isToday) labelParts.push('오늘');
+              if (day.hasEntry) labelParts.push('일기 작성됨');
+              if ((day as any).isRetrospective) labelParts.push('회고 있음');
+              return (
+                <div key={index} className={styles.dayCellOuter}>
+                  <button
+                    type="button"
+                    className={styles.dayBtn}
+                    data-today={isToday || undefined}
+                    data-future={isFuture || undefined}
+                    data-has-entry={day.hasEntry || undefined}
+                    aria-label={labelParts.join(' ')}
+                    aria-disabled={isFuture ? 'true' : undefined}
+                    onClick={() => {
+                      if (isFuture) return;
+                      if (day.hasEntry && day.diaryId) {
+                        router.push(`/diary/${day.diaryId}`);
+                      } else {
+                        const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day.date).padStart(2,'0')}`;
+                        router.push(`/diary/new?date=${dateStr}`);
+                      }
+                    }}
+                  >
+                    <span className={styles.dayDate}>{day.date}</span>
+                    {day.emotion && (
+                      <span className={styles.dayEmoji}>{day.emotion}</span>
+                    )}
+                    {isToday && !day.hasEntry && (
+                      <span style={{fontSize:'0.5rem',color:'var(--c-accent)'}}>오늘</span>
+                    )}
+                    {day.hasEntry && (day as any).isRetrospective && (
+                      <span className={styles.dayBadge}>회고</span>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <div className={styles.legendRow} aria-hidden="true">
+            <div className={styles.legendItem}><span className={styles.legendDot}></span>작성</div>
+            <div className={styles.legendItem}>🔒 미래</div>
+            <div className={styles.legendItem}>회고</div>
+          </div>
+        </section>
+
+        {/* 단일 컬럼 유지: 사이드 패널 제거 */}
+      </div>
+
       {error && (
         <div className={styles.devSection}>
           <div className={styles.errorMessage}>{error}</div>
           <div className={styles.devActions}>
-            <button onClick={quickLogin} className={styles.devButton}>
-              빠른 로그인
-            </button>
-            <button onClick={() => window.location.reload()} className={styles.devButton}>
-              새로고침
-            </button>
+            <button onClick={quickLogin} className={styles.devButton}>빠른 로그인</button>
+            <button onClick={() => window.location.reload()} className={styles.devButton}>새로고침</button>
           </div>
         </div>
       )}

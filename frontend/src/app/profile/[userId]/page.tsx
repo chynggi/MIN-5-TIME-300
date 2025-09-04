@@ -7,7 +7,7 @@ import api from '@/lib/axios';
 import BlockButton from '@/components/follow/BlockButton';
 import { followApi } from '@/services/follow-api';
 import { chatService } from '@/services/chatService';
-import { getRealtimeSocket, disconnectRealtimeSocket } from '@/lib/realtimeSocket';
+import { getRealtimeSocket } from '@/lib/realtimeSocket';
 
 interface UserProfile {
   id: string;
@@ -23,13 +23,41 @@ interface UserProfile {
   canViewCalendar?: boolean; // 달력 조회 권한 추가
   isBlocked?: boolean; // 차단 상태 추가
   followStatus?: 'none' | 'active' | 'requested'; // 팔로우 상태 추가
+  profileColor?: string;
 }
 
 interface CalendarDay {
   date: number;
   emotion?: string;
   hasEntry: boolean;
-  journalId?: string; // 일기 ID 추가
+  journalId?: string;
+}
+
+function buildThemeStyle(profileColor?: string) {
+  if (!profileColor) return undefined;
+  const isGradient = /gradient\(/i.test(profileColor);
+  let accent = profileColor.trim();
+  let accentRgb = '99 102 241';
+  let accentSoft = 'rgba(0,0,0,0.05)';
+  if (!isGradient) {
+    const hex = profileColor.replace('#','');
+    if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+      const r = parseInt(hex.slice(0,2),16);
+      const g = parseInt(hex.slice(2,4),16);
+      const b = parseInt(hex.slice(4,6),16);
+      accentRgb = `${r} ${g} ${b}`;
+      const lighten = (c:number)=>Math.min(255, Math.round(c + (255-c)*0.85));
+      const lr = lighten(r); const lg = lighten(g); const lb = lighten(b);
+      accentSoft = `rgba(${r},${g},${b},0.12)`;
+      accent = `linear-gradient(135deg, ${profileColor}, #${lr.toString(16).padStart(2,'0')}${lg.toString(16).padStart(2,'0')}${lb.toString(16).padStart(2,'0')})`;
+    }
+  }
+  return {
+    '--c-accent': isGradient ? 'var(--c-accent)' : profileColor,
+    '--c-accent-rgb': accentRgb,
+    '--c-accent-soft': isGradient ? 'rgba(255,255,255,0.12)' : accentSoft,
+    '--gradient-accent': accent,
+  } as React.CSSProperties;
 }
 
 export default function UserProfilePage() {
@@ -155,7 +183,7 @@ export default function UserProfilePage() {
     setLoading(true);
     const fetchProfile = async () => {
       try {
-        const res = await api.get(`/profile/${username}`);
+  const res = await api.get(`/profile/${username}`);
         const data = res.data;
         
         // 팔로우 관계 확인
@@ -183,6 +211,7 @@ export default function UserProfilePage() {
           canViewCalendar: data.canViewCalendar,
           isBlocked: data.isBlocked,
           followStatus: followStatus,
+          profileColor: data.profileColor,
         });
       } catch (e) {
         console.error('프로필 조회 실패', e);
@@ -367,261 +396,186 @@ export default function UserProfilePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className={styles.profileContainer}>
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          로딩 중...
-        </div>
-      </div>
-    );
-  }
+  const renderLoadingOrError = () => {
+    if (loading) {
+      return <div className={styles.loading}>프로필 로딩 중...</div>;
+    }
+    if (!profile) {
+      return <div className={styles.error}>사용자를 찾을 수 없습니다.</div>;
+    }
+    return null;
+  };
 
-  if (!profile) {
+  const followBtnVariant = () => {
+    if (!profile) return '';
+    if (profile.isBlocked) return 'blocked';
+    if (profile.followStatus === 'requested') return 'pending';
+    if (profile.followStatus === 'active' || profile.isFollowing) return 'outline';
+    return 'primary';
+  };
+
+  const followBtnLabel = () => getFollowButtonText();
+
+  const canViewCalendar = !!profile?.canViewCalendar;
+
+  if (loading || !profile) {
     return (
-      <div className={styles.profileContainer}>
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          사용자를 찾을 수 없습니다.
-        </div>
+      <div className={styles.container} style={buildThemeStyle(profile?.profileColor)}>
+        <div className={styles.simpleStack}>{renderLoadingOrError()}</div>
       </div>
     );
   }
 
   return (
-    <div className={styles.profileContainer}>
-      <div className={styles.header}>
-        <div className={styles.avatar}>
-          <span>{profile.mbti || '👤'}</span>
-        </div>
-        <div className={styles.stats}>
-          <div className={styles.stat}>
-            <div className={styles.statNum}>{profile.diaryCount}</div>
-            <div className={styles.statLabel}>일기</div>
+    <div className={styles.container} style={buildThemeStyle(profile.profileColor)}>
+      <div className={styles.simpleStack}>
+        {/* 상단 프로필 */}
+        <section className={`${styles.panel} ${styles.profileHeader}`} aria-label="사용자 기본 정보">
+          <div className={styles.avatarWrapModern} aria-hidden={!profile.mbti}>
+            <div className={styles.avatarFallback}>{profile.mbti || '👤'}</div>
+            {profile.mbti && <span className={styles.mbtiBadgeModern}>{profile.mbti}</span>}
           </div>
-          <div 
-            className={styles.stat}
-            onClick={() => handleStatsClick('followers')}
-            style={{ cursor: profile.canViewCalendar ? 'pointer' : 'default' }}
-          >
-            <div className={styles.statNum}>{profile.followerCount}</div>
-            <div className={styles.statLabel}>팔로워</div>
-          </div>
-          <div 
-            className={styles.stat}
-            onClick={() => handleStatsClick('following')}
-            style={{ cursor: profile.canViewCalendar ? 'pointer' : 'default' }}
-          >
-            <div className={styles.statNum}>{profile.followingCount}</div>
-            <div className={styles.statLabel}>팔로잉</div>
-          </div>
-        </div>
-      </div>
-      <div className={styles.profileName}>{profile.name}</div>
-      <div className={styles.profileMsg}>{profile.message}</div>
-      <div className={styles.btnRow}>
-        <button 
-          className={`${styles.btn} ${getFollowButtonStyle()}`}
-          onClick={handleFollowToggle}
-          disabled={profile.isBlocked}
-        >
-          {getFollowButtonText()}
-        </button>
-        <button 
-          className={`${styles.btn} ${styles.secondary}`}
-          onClick={handleMessageClick}
-          disabled={profile.isBlocked}
-        >
-          메시지
-        </button>
-        <BlockButton
-          userId={profile.id}
-          username={profile.name}
-          isBlocked={profile.isBlocked}
-          onBlockChange={(isBlocked) => {
-            setProfile(prev => prev ? { ...prev, isBlocked } : prev);
-          }}
-        />
-      </div>
-      
-      {/* 캘린더 섹션 */}
-      <section style={{
-        background: 'linear-gradient(135deg, #fef3c7, #fcd34d)',
-        borderRadius: '12px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        padding: '16px',
-        margin: '16px 0'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '12px'
-        }}>
-          <button 
-            onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
-            disabled={!profile.canViewCalendar}
-            style={{
-              opacity: profile.canViewCalendar ? 1 : 0.5,
-              cursor: profile.canViewCalendar ? 'pointer' : 'not-allowed'
-            }}
-          >
-            ◀
-          </button>
-          <h2 style={{ fontWeight: 'bold', fontSize: '18px' }}>
-            {currentDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })}
-          </h2>
-          <button 
-            onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
-            disabled={!profile.canViewCalendar}
-            style={{
-              opacity: profile.canViewCalendar ? 1 : 0.5,
-              cursor: profile.canViewCalendar ? 'pointer' : 'not-allowed'
-            }}
-          >
-            ▶
-          </button>
-        </div>
-        
-        {/* 요일 헤더 */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '4px',
-          marginBottom: '8px'
-        }}>
-          {['일', '월', '화', '수', '목', '금', '토'].map(day => (
-            <div key={day} style={{
-              textAlign: 'center',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              padding: '8px'
-            }}>
-              {day}
+          <div className={styles.basicInfo}>
+            <h1 className={styles.nicknameModern}>{profile.name}</h1>
+            <p className={styles.bioModern}>{profile.message || '소개가 없습니다.'}</p>
+            <div className={styles.statsModern}>
+              <div className={styles.statCard} aria-label={`일기 ${profile.diaryCount}개`}>
+                <span className={styles.statValue}>{profile.diaryCount}</span>
+                <span className={styles.statLabelModern}>DIARIES</span>
+              </div>
+              <button
+                type="button"
+                className={styles.statCard}
+                disabled={!canViewCalendar}
+                aria-label={`팔로워 ${profile.followerCount}명`}
+                onClick={() => canViewCalendar && handleStatsClick('followers')}
+              >
+                <span className={styles.statValue}>{profile.followerCount}</span>
+                <span className={styles.statLabelModern}>FOLLOWERS</span>
+              </button>
+              <button
+                type="button"
+                className={styles.statCard}
+                disabled={!canViewCalendar}
+                aria-label={`팔로잉 ${profile.followingCount}명`}
+                onClick={() => canViewCalendar && handleStatsClick('following')}
+              >
+                <span className={styles.statValue}>{profile.followingCount}</span>
+                <span className={styles.statLabelModern}>FOLLOWING</span>
+              </button>
             </div>
-          ))}
-        </div>
-        
-        {/* 캘린더 날짜들 */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: '4px'
-        }}>
-          {profile.canViewCalendar ? (
-            // 달력 조회 권한이 있는 경우
-            calendarData.map((day, index) => {
-              if (day.date === 0) {
-                return <div key={index} style={{ aspectRatio: '1' }}></div>;
-              }
+            <div className={styles.actionRow}>
+              <button
+                type="button"
+                onClick={handleFollowToggle}
+                disabled={profile.isBlocked}
+                className={[
+                  styles.actionBtn,
+                  followBtnVariant()==='primary' && styles.actionBtnPrimary,
+                  followBtnVariant()==='outline' && styles.actionBtnOutline,
+                  followBtnVariant()==='pending' && styles.actionBtnPending,
+                  followBtnVariant()==='blocked' && styles.actionBtnBlocked,
+                ].filter(Boolean).join(' ')}
+                aria-label="팔로우 상태 변경"
+              >
+                {followBtnLabel()}
+              </button>
+              <button
+                type="button"
+                onClick={handleMessageClick}
+                disabled={profile.isBlocked}
+                className={`${styles.actionBtn} ${styles.actionBtnOutline}`}
+              >💬 메시지</button>
+              <BlockButton
+                userId={profile.id}
+                username={profile.name}
+                isBlocked={profile.isBlocked}
+                className={styles.actionBtn}
+                onBlockChange={(isBlocked) => setProfile(prev => prev ? { ...prev, isBlocked } : prev)}
+              />
+            </div>
+          </div>
+        </section>
 
+        {/* 캘린더 */}
+        <section className={styles.calendarPanel} aria-label="사용자 일기 캘린더">
+          <header className={styles.calendarHeader}>
+            <button
+              type="button"
+              className={styles.calendarNavBtn}
+              aria-label="이전 달"
+              disabled={!canViewCalendar}
+              onClick={() => canViewCalendar && setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
+            >◀</button>
+            <h2 className={styles.calendarTitle}>{currentDate.toLocaleDateString('ko-KR',{year:'numeric',month:'long'})}</h2>
+            <button
+              type="button"
+              className={styles.calendarNavBtn}
+              aria-label="다음 달"
+              disabled={!canViewCalendar}
+              onClick={() => canViewCalendar && setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
+            >▶</button>
+          </header>
+          <div className={styles.weekdayRow} aria-hidden="true">
+            {['일','월','화','수','목','금','토'].map(d => <div key={d} className={styles.weekdayCell}>{d}</div>)}
+          </div>
+          <div className={styles.calendarGrid}>
+            {calendarData.map((day, index) => {
+              if (day.date === 0) {
+                return (
+                  <div key={index} className={styles.dayCellOuter} aria-hidden="true">
+                    <button className={styles.dayBtn} data-empty="true" tabIndex={-1}></button>
+                  </div>
+                );
+              }
               const year = currentDate.getFullYear();
               const month = currentDate.getMonth();
-              const currentDateObj = new Date(year, month, day.date);
               const today = new Date();
-              const todayObj = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-              
-              const isPast = currentDateObj < todayObj;
-              const isToday = currentDateObj.getTime() === todayObj.getTime();
-              const isFuture = currentDateObj > todayObj;
-              
+              const currentLocalDate = `${year}-${String(month + 1).padStart(2,'0')}-${String(day.date).padStart(2,'0')}`;
+              const todayLocalDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+              const isToday = currentLocalDate === todayLocalDate;
+              const isFuture = currentLocalDate > todayLocalDate;
+              const labelParts: string[] = [];
+              labelParts.push(`${day.date}일`);
+              if (isToday) labelParts.push('오늘');
+              if (day.hasEntry) labelParts.push('일기 작성됨');
               return (
-                <div key={index} style={{ aspectRatio: '1' }}>
+                <div key={index} className={styles.dayCellOuter}>
                   <button
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '12px',
-                      transition: 'all 0.2s',
-                      border: 'none',
-                      cursor: (isFuture || !day.hasEntry) ? 'not-allowed' : 'pointer',
-                      backgroundColor: (isFuture || !day.hasEntry)
-                        ? '#f3f4f6'
-                        : isToday 
-                          ? '#dbeafe'
-                          : '#ffffff',
-                      opacity: (isFuture || !day.hasEntry) ? 0.6 : 1,
-                      boxShadow: day.hasEntry ? '0 1px 3px rgba(0, 0, 0, 0.1)' : 'none',
-                      ...(isToday && day.hasEntry && { border: '2px solid #3b82f6' })
-                    }}
-                    disabled={isFuture || !day.hasEntry}
+                    type="button"
+                    className={styles.dayBtn}
+                    data-today={isToday || undefined}
+                    data-future={isFuture || undefined}
+                    data-has-entry={day.hasEntry || undefined}
+                    aria-label={labelParts.join(' ')}
+                    aria-disabled={isFuture ? 'true' : undefined}
                     onClick={() => {
-                      if (day.hasEntry && !isFuture && day.journalId) {
-                        // 일기 상세 페이지로 이동
+                      if (isFuture) return;
+                      if (!canViewCalendar) return;
+                      if (day.hasEntry && day.journalId) {
                         router.push(`/diary/${day.journalId}`);
                       }
                     }}
                   >
-                    <span style={{ 
-                      fontWeight: (isToday && day.hasEntry) ? 'bold' : 'normal',
-                      color: (isToday && day.hasEntry) ? '#2563eb' : 'inherit'
-                    }}>
-                      {day.date}
-                    </span>
-                    {day.hasEntry && day.emotion && (
-                      <span style={{ fontSize: '18px', lineHeight: 'none' }}>
-                        {day.emotion === "🔒" ? day.emotion : emotionEmojis[day.emotion] || '😊'}
-                      </span>
+                    <span className={styles.dayDate}>{day.date}</span>
+                    {day.emotion && canViewCalendar && (
+                      <span className={styles.dayEmoji}>{day.emotion === '🔒' ? '🔒' : emotionEmojis[day.emotion] || '😊'}</span>
                     )}
-                    {!day.hasEntry && (
-                      <span style={{ fontSize: '18px' }}>🔒</span>
-                    )}
-                    {isToday && day.hasEntry && currentUser && currentUser.username === username && (
-                      <span style={{ fontSize: '10px', color: '#2563eb', marginTop: '4px' }}>오늘</span>
+                    {!canViewCalendar && <span className={styles.dayEmoji}>🔒</span>}
+                    {isToday && !day.hasEntry && !isFuture && canViewCalendar && (
+                      <span style={{fontSize:'0.5rem',color:'var(--c-accent)'}}>오늘</span>
                     )}
                   </button>
                 </div>
               );
-            })
-          ) : (
-            // 달력 조회 권한이 없는 경우 - 자물쇠 표시
-            Array.from({length: 42}).map((_, index) => (
-              <div key={index} style={{ aspectRatio: '1' }}>
-                <div style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '12px',
-                  backgroundColor: '#f3f4f6',
-                  opacity: '0.6',
-                  cursor: 'not-allowed'
-                }}>
-                  <span style={{ fontSize: '18px' }}>🔒</span>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-        
-        {/* 달력 조회 권한이 없는 경우 메시지 표시 */}
-        {!profile.canViewCalendar && (
-          <div style={{
-            textAlign: 'center',
-            marginTop: '16px',
-            padding: '12px',
-            backgroundColor: 'rgba(255, 255, 255, 0.7)',
-            borderRadius: '8px',
-            fontSize: '14px',
-            color: '#6b7280'
-          }}>
-            이 사용자의 일기 달력을 볼 권한이 없습니다.
+            })}
           </div>
-        )}
-      </section>
-
-      <div className={styles.iconRow}>
-        <span className={`${styles.icon} ${styles.active}`}>📖</span>
-        <span className={styles.icon}>💬</span>
-        <span className={styles.icon}>👥</span>
-        <span className={styles.icon}>🙋‍♂️</span>
+          {!canViewCalendar && (
+            <div className={styles.legendRow} style={{justifyContent:'center'}}>
+              <div className={styles.legendItem}>이 사용자의 일기 달력을 볼 권한이 없습니다.</div>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
