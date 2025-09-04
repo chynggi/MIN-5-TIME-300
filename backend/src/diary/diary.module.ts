@@ -5,9 +5,10 @@ import { PrismaModule } from '../prisma.module';
 import { VectorDbModule } from '../vector-db/vector-db.module';
 import { FileUploadService } from '../common/services/file-upload.service';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { ActivityModule } from '../activity/activity.module';
 
 @Module({
-  imports: [PrismaModule, VectorDbModule, RealtimeModule],
+  imports: [PrismaModule, VectorDbModule, RealtimeModule, ActivityModule],
   controllers: [DiaryController],
   providers: [DiaryService, FileUploadService],
   exports: [DiaryService],

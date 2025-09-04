@@ -57,7 +57,8 @@ class PrivacyApiService {
 
   // 사용자 차단
   async blockUser(targetUserId: string): Promise<{ success: boolean; message: string }> {
-    return this.request<{ success: boolean; message: string }>('/profile/privacy/block', {
+    // 백엔드 실제 엔드포인트: POST /api/v1/profile/block
+    return this.request<{ success: boolean; message: string }>('/profile/block', {
       method: 'POST',
       body: JSON.stringify({ targetUserId }),
     });
@@ -65,14 +66,37 @@ class PrivacyApiService {
 
   // 사용자 차단 해제
   async unblockUser(targetUserId: string): Promise<{ success: boolean; message: string }> {
-    return this.request<{ success: boolean; message: string }>(`/profile/privacy/unblock/${targetUserId}`, {
+    // 백엔드 실제 엔드포인트: DELETE /api/v1/profile/block/:targetUserId
+    return this.request<{ success: boolean; message: string }>(`/profile/block/${targetUserId}`, {
       method: 'DELETE',
     });
   }
 
   // 차단된 사용자 목록 조회
   async getBlockedUsers(): Promise<{ blockedUsers: Array<{ id: string; username: string; profileImageUrl?: string }> }> {
-    return this.request<{ blockedUsers: Array<{ id: string; username: string; profileImageUrl?: string }> }>('/profile/privacy/blocked');
+    // 백엔드 실제 엔드포인트: GET /api/v1/profile/blocked-users
+    return this.request<{ blockedUsers: Array<{ id: string; username: string; profileImageUrl?: string }> }>('/profile/blocked-users');
+  }
+
+  // === 활동지수(activity) 설정 ===
+  // 공개 여부 조회
+  async getActivitySettings(): Promise<{ activityPublic: boolean; lastResetAt?: string }> {
+    return this.request<{ activityPublic: boolean; lastResetAt?: string }>('/profile/activity/settings');
+  }
+
+  // 공개 여부 업데이트
+  async updateActivitySettings(data: { activityPublic: boolean }): Promise<{ success: boolean; activityPublic: boolean }> {
+    return this.request<{ success: boolean; activityPublic: boolean }>('/profile/activity/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // 활동지수 초기화
+  async resetActivity(): Promise<{ success: boolean; message: string; resetAt: string }> {
+    return this.request<{ success: boolean; message: string; resetAt: string }>('/profile/activity/reset', {
+      method: 'POST',
+    });
   }
 }
 

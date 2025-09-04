@@ -32,12 +32,14 @@ export default function ProfileSettingsPage() {
   const [allowDM, setAllowDM] = useState(true);
   const [showOnline, setShowOnline] = useState(true);
 
-  // Blocked users state (stub data initially)
+  // Blocked users state
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
   const [blockedLoading, setBlockedLoading] = useState(false);
 
   // Activity settings
   const [activityPublic, setActivityPublic] = useState(true);
+  const [activityLastResetAt, setActivityLastResetAt] = useState<string | undefined>(undefined);
+  const [activitySaving, setActivitySaving] = useState(false);
   const [activityResetPending, setActivityResetPending] = useState(false);
 
   useEffect(() => { loadInitial(); }, []);
@@ -59,15 +61,24 @@ export default function ProfileSettingsPage() {
         const notif = await notificationApi.getSettings();
         setAllowDM(notif.messageNotification);
       } catch {}
-      // Blocked users (stub) - replace with real API later
+      // Blocked users
       try {
         setBlockedLoading(true);
         const res = await privacyApi.getBlockedUsers();
         setBlockedUsers(res.blockedUsers.map(u => ({ id: u.id, username: u.username })));
       } catch (e) {
-        console.log('차단 사용자 목록 로드 실패(미구현 가능)', e);
+        console.log('차단 사용자 목록 로드 실패', e);
         setBlockedUsers([]);
       } finally { setBlockedLoading(false); }
+
+      // Activity settings (새 API)
+      try {
+        const act = await privacyApi.getActivitySettings();
+        setActivityPublic(act.activityPublic);
+        setActivityLastResetAt(act.lastResetAt);
+      } catch (e) {
+        console.log('활동지수 설정 로드 실패(아직 백엔드 미배포 가능)', e);
+      }
     } finally {
       setLoading(false);
     }
@@ -103,14 +114,30 @@ export default function ProfileSettingsPage() {
     }
   };
 
-  const handleResetActivity = () => {
+  const handleSaveActivityPublic = async () => {
+    setActivitySaving(true);
+    try {
+      await privacyApi.updateActivitySettings({ activityPublic });
+      alert('활동지수 공개 설정이 저장되었습니다.');
+    } catch (e) {
+      alert('저장 실패: ' + (e as any)?.message);
+    } finally {
+      setActivitySaving(false);
+    }
+  };
+
+  const handleResetActivity = async () => {
     if (!confirm('활동지수 데이터를 초기화하시겠습니까? (되돌릴 수 없음)')) return;
     setActivityResetPending(true);
-    setTimeout(() => {
-      // Stub: 실제로는 API 호출 후 상태 갱신
+    try {
+      const res = await privacyApi.resetActivity();
+      setActivityLastResetAt(res.resetAt);
+      alert('활동지수가 초기화되었습니다.');
+    } catch (e) {
+      alert('초기화 실패: 나중에 다시 시도해주세요.');
+    } finally {
       setActivityResetPending(false);
-      alert('활동지수가 초기화되었습니다 (스텁).');
-    }, 900);
+    }
   };
 
   const handleLogout = async () => {
@@ -264,7 +291,9 @@ export default function ProfileSettingsPage() {
                     </li>
                   ))}
                 </ul>
-                <div style={{ fontSize: '.6rem', color: 'var(--c-text-soft)', marginTop: '.5rem' }}>* 차단 기능은 API 연동 예정입니다.</div>
+                {blockedUsers.length > 0 && (
+                  <div style={{ fontSize: '.6rem', color: 'var(--c-text-soft)', marginTop: '.5rem' }}>총 {blockedUsers.length}명 차단됨</div>
+                )}
               </>
             )}
 
@@ -273,6 +302,11 @@ export default function ProfileSettingsPage() {
                 <h2 style={{ fontSize: '.85rem', fontWeight: 700, letterSpacing: '.5px', color: 'var(--c-text)' }}>활동지수 설정</h2>
                 <div style={{ display:'flex', flexDirection:'column', gap:'.9rem' }}>
                   {renderToggle('활동지수 공개', activityPublic, ()=>setActivityPublic(p=>!p), '다른 사용자에게 활동지수 카드 표시')}
+                  <div style={{ display:'flex', gap:'.6rem' }}>
+                    <button type="button" className={`btn btn-primary`} disabled={activitySaving} onClick={handleSaveActivityPublic} style={{ flex:'0 0 auto', minWidth:'120px', padding:'.55rem .9rem' }}>
+                      {activitySaving ? '저장 중...' : '공개 설정 저장'}
+                    </button>
+                  </div>
                   <div style={{ border:'1px solid var(--c-border)', background:'var(--c-bg-soft)', padding:'.9rem 1rem', borderRadius:'14px', fontSize:'.7rem', lineHeight:1.5 }}>
                     활동지수는 최근 활동(일기 작성, 팔로우, 상호작용 등)을 기반으로 산출됩니다. <br/>초기화 시 즉시 0%로 떨어지며 다시 지표가 쌓이는 데 시간이 필요합니다.
                     <div style={{ display:'flex', gap:'.6rem', marginTop:'.75rem' }}>
@@ -286,8 +320,11 @@ export default function ProfileSettingsPage() {
                         {activityResetPending ? '초기화 중...' : '활동지수 초기화'}
                       </button>
                     </div>
+                    {activityLastResetAt && (
+                      <div style={{ fontSize:'.55rem', color:'var(--c-text-soft)', marginTop:'.55rem' }}>마지막 초기화: {new Date(activityLastResetAt).toLocaleString()}</div>
+                    )}
                   </div>
-                  <div style={{ fontSize: '.6rem', color: 'var(--c-text-soft)' }}>* 공개/초기화는 추후 백엔드 연동 예정.</div>
+                  <div style={{ fontSize: '.6rem', color: 'var(--c-text-soft)' }}>활동지수 데이터는 주기적으로 재계산됩니다.</div>
                 </div>
               </>
             )}

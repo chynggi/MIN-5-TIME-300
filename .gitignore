@@ -14,10 +14,6 @@ build/
 .next/
 .next/
 
-# 환경 변수
-.env
-.env.*
-
 # 로그 및 기타
 logs/
 *.log
@@ -57,13 +53,6 @@ Thumbs.db
 # Windows
 Desktop.ini
 $RECYCLE.BIN/
-
-# 이미지
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.svg
 
 # Misc
 *.swp

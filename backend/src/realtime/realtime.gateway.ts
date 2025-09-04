@@ -117,4 +117,12 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     if (!this.server) return;
     this.server.to(`user:${payload.userId}`).emit('profile.counters.update', payload);
   }
+
+  /**
+   * 활동지수/레벨 업데이트 브로드캐스트
+   */
+  emitActivityUpdate(payload: { userId: string; activityScore: number; activityLevel: number }) {
+    if (!this.server) return;
+    this.server.to(`user:${payload.userId}`).emit('activity.update', payload);
+  }
 }

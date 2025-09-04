@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { generateDailyQuestion } from '../question/gemini-question.service';
 import type { Multer } from 'multer';
 import { CreateDiaryDto } from './dto/create-diary.dto';
+import { ActivityService } from '../activity/activity.service';
 import { RateDiaryDto } from './dto/rate-diary.dto';
 import { DiaryListResponseDto, DiaryDetailResponseDto } from './dto/diary-response.dto';
 import { TodayQuestionResponseDto } from './dto/today-question-response.dto';
@@ -17,6 +18,7 @@ export class DiaryService {
     private readonly vectorDbService: VectorDbService,
     private readonly fileUploadService: FileUploadService,
     private readonly realtimeGateway: RealtimeGateway,
+    private readonly activityService: ActivityService,
   ) {}
 
   /**
@@ -415,6 +417,11 @@ export class DiaryService {
     } catch (e) {
       // race condition 방지: unique 충돌 발생 시 재조회
     }
+    // 신규 좋아요 성공 시 활동지수 증가
+    this.activityService.addLikeScore(userId).catch(err => {
+      // eslint-disable-next-line no-console
+      console.warn('활동지수 좋아요 가점 실패:', err.message);
+    });
     const likeCount = await this.prisma.journalReaction.count({ where: { journalId: id, reactionType: 'like' } });
     return { liked: true, likeCount };
   }
@@ -547,6 +554,12 @@ export class DiaryService {
         // eslint-disable-next-line no-console
         console.error('실시간 diaryCount 전송 실패', err.message);
       });
+
+    // 활동지수 반영 (질문 사용 여부: dto.questionId 존재 시 질문 기반 작성으로 간주)
+    this.activityService.addDiaryScore(userId, !!dto.questionId).catch(err => {
+      // eslint-disable-next-line no-console
+      console.warn('활동지수 일기 가점 실패:', err.message);
+    });
 
     return result;
   }

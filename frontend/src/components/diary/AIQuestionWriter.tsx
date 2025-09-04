@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import api from "@/lib/axios";
 
 interface Question {
-  id: string;
+  id: string; // 내부 UI 식별자
+  domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal';
   text: string;
   answered: boolean;
   answer: string;
@@ -111,74 +112,38 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
   const generateQuestions = async () => {
     setIsGenerating(true);
     try {
-      // 실제 API 호출
-      const response = await api.post(`/questions/generate?model=${selectedModel}`);
-      const questionData = response.data;
-      
-      // 단일 질문을 여러 질문으로 확장 (임시)
-      const questionList = [
-        questionData.question,
-        "오늘 하루 중 가장 감사했던 일은 무엇인가요?",
-        "오늘 새롭게 배운 것이나 깨달은 점이 있다면?",
-        "오늘 만난 사람들 중 특별히 기억에 남는 사람이 있나요?",
-        "오늘의 날씨가 당신의 기분에 어떤 영향을 주었나요?"
-      ];
-      
-      setTimeout(() => {
-        const questionsData = questionList.map((text, index) => ({
-          id: `question-${index}`,
-          text,
-          answered: false,
-          answer: "",
-          answerType: "text" as const,
-          emoji: ""
-        }));
-        setQuestions(questionsData);
-        setIsGenerating(false);
-      }, 1000);
-    } catch (error) {
-      console.error("질문 생성 실패:", error);
-      // 폴백: 기본 질문 사용 (선택된 모델에 따라 다른 기본 질문)
-      let fallbackQuestions: string[] = [];
-      
-      if (selectedModel === "claude-sonnet-4") {
-        fallbackQuestions = [
-          "오늘 당신의 마음을 가장 깊이 움직인 순간은 무엇이었나요?",
-          "지금 이 순간 당신이 느끼는 감정을 한 단어로 표현한다면?",
-          "오늘 하루 중 가장 의미 있었던 대화나 만남이 있었나요?",
-          "당신이 오늘 가장 감사하게 생각하는 것은 무엇인가요?",
-          "오늘의 경험이 앞으로의 당신에게 어떤 영향을 줄 것 같나요?"
-        ];
-      } else if (selectedModel === "gpt-5") {
-        fallbackQuestions = [
-          "오늘 하루를 한 편의 영화로 만든다면 어떤 장르가 될까요?",
-          "지금 당신의 마음 상태를 날씨로 표현한다면?",
-          "오늘 새롭게 발견한 것이나 배운 점이 있다면 무엇인가요?",
-          "만약 오늘을 다시 살 수 있다면 무엇을 다르게 하고 싶나요?",
-          "오늘 하루 중 가장 창의적이었던 순간은 언제였나요?"
-        ];
-      } else {
-        fallbackQuestions = [
-          "오늘 가장 기억에 남는 순간은 무엇이었나요?",
-          "오늘 하루 중 가장 감사했던 일은 무엇인가요?",
-          "오늘 새롭게 배운 것이나 깨달은 점이 있다면?",
-          "오늘 만난 사람들 중 특별히 기억에 남는 사람이 있나요?",
-          "오늘의 날씨가 당신의 기분에 어떤 영향을 주었나요?"
-        ];
+      const res = await api.post(`/questions/generate?model=${selectedModel}`);
+      // 기대 스키마: { questions: [ { domain, text }, ...5 ] }
+      const data = res.data;
+      const list = Array.isArray(data.questions) ? data.questions : [];
+      if (list.length !== 5) {
+        console.warn('질문 개수 비정상:', list.length);
       }
-      
-      setTimeout(() => {
-        const questionsData = fallbackQuestions.map((text, index) => ({
-          id: `question-${index}`,
-          text,
-          answered: false,
-          answer: "",
-          answerType: "text" as const,
-          emoji: ""
-        }));
-        setQuestions(questionsData);
-        setIsGenerating(false);
-      }, 1000);
+      const mapped: Question[] = list.map((q: any, idx: number) => ({
+        id: `q-${idx}`,
+        domain: q.domain,
+        text: q.text,
+        answered: false,
+        answer: '',
+        answerType: 'text',
+        emoji: ''
+      }));
+      // 도메인/텍스트 누락 대비 필터링
+      const filtered = mapped.filter(m => m.text && m.domain);
+      setQuestions(filtered);
+    } catch (error) {
+      console.error('질문 생성 실패:', error);
+      // 최소 폴백 (도메인 매핑된 기본 세트)
+      const fallback: Question[] = [
+        { id: 'q-0', domain: 'emotion', text: '지금 가장 선명한 감정은 무엇인가요?', answered: false, answer: '', answerType: 'text' },
+        { id: 'q-1', domain: 'action', text: '오늘 의미 있었던 작은 행동 하나를 떠올려볼까요?', answered: false, answer: '', answerType: 'text' },
+        { id: 'q-2', domain: 'relationship', text: '오늘 누구와의 상호작용이 마음에 남았나요?', answered: false, answer: '', answerType: 'text' },
+        { id: 'q-3', domain: 'recovery', text: '오늘 나를 회복시키거나 쉬게 한 순간이 있었나요?', answered: false, answer: '', answerType: 'text' },
+        { id: 'q-4', domain: 'goal', text: '내일 스스로에게 줄 아주 작은 약속은 무엇인가요?', answered: false, answer: '', answerType: 'text' }
+      ];
+      setQuestions(fallback);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -222,33 +187,38 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
   };
 
   const generateDiary = () => {
-    // 모든 질문과 답변을 하나의 일기로 결합
-    let content = "";
-    let questionIds = "";
-    
-    // 제목이 있으면 맨 앞에 추가
-    if (title.trim()) {
-      content = `${title}\n\n`;
+    // 사용자가 아무 답변도 저장하지 않은 경우: 현재 선택된 질문을 기반으로 빈 답변 템플릿 생성
+    const anyAnswered = questions.some(q => q.answered);
+    let working = questions;
+    if (!anyAnswered && typeof currentQuestionIndex === 'number' && questions[currentQuestionIndex]) {
+      working = [questions[currentQuestionIndex]]; // 단일 질문 기반 작성
+    } else if (!anyAnswered) {
+      working = questions.slice(0,1); // 안전 폴백
     }
-    
-    questions.forEach((q, index) => {
+
+    let contentLines: string[] = [];
+    let ids: string[] = [];
+    working.forEach(q => {
       if (q.answered) {
-        content += `${q.text}\n${q.answer}\n\n`;
-        questionIds += q.id + ",";
+        contentLines.push(`${q.text}\n${q.answer}`);
+        ids.push(q.id);
+      } else {
+        // 미답변이면 질문만 포함해 초안 작성 유도
+        contentLines.push(`${q.text}\n`);
+        ids.push(q.id);
       }
     });
 
-    // 제목이 없으면 첫 번째 질문의 답변으로 제목 생성
-    let finalTitle = title;
-    if (!finalTitle && questions[0]?.answered) {
-      finalTitle = questions[0].answer.slice(0, 20) + "...";
-      // 이미 content에 포함되어 있으므로 제목을 별도로 추가하지 않음
+    let finalTitle = title.trim();
+    if (!finalTitle) {
+      // 첫 질문 텍스트 일부로 제목 제안
+      finalTitle = working[0].text.slice(0, 18) + '...';
     }
 
-    onComplete({ 
-      title: finalTitle || "오늘의 일기", 
-      content: content.trim(), 
-      questionId: questionIds.slice(0, -1)
+    onComplete({
+      title: finalTitle,
+      content: contentLines.join('\n\n').trim(),
+      questionId: ids.join(',')
     });
   };
 
@@ -425,6 +395,9 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
                       {index + 1}
                     </span>
                     <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold tracking-wide uppercase">{question.domain}</span>
+                      </div>
                       <p className="text-xs md:text-sm font-medium text-gray-700 line-clamp-3 md:line-clamp-2">{question.text}</p>
                       {question.answered && (
                         <p className="mt-1 text-[11px] text-gray-500 bg-white/60 rounded px-2 py-1 line-clamp-1">

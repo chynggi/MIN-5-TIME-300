@@ -107,7 +107,7 @@ export default function DiaryListPage() {
   }, [diaries]);
 
   return (
-    <div className="px-4 py-6 max-w-6xl mx-auto space-y-6">
+  <div className="px-4 pb-6 pt-2 max-w-6xl mx-auto space-y-6 bg-white/70 dark:bg-neutral-900/40 backdrop-blur rounded-2xl shadow-sm border border-white/40 dark:border-neutral-700/40">
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">내 일기</h1>

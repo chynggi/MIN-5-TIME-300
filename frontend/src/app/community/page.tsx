@@ -20,7 +20,7 @@ export interface DiaryPin {
 // 임시 사용자 정보 (실제 로그인 정보로 대체 필요)
 const currentUser = {
   id: "me",
-  profileImageUrl: "/default-profile.png", // 실제 프로필 이미지 경로로 변경
+  profileImageUrl: "/default-profile.jpg", // 실제 프로필 이미지 경로로 변경
 };
 interface PublicDiary {
   id: string;
@@ -37,7 +37,7 @@ interface PublicDiary {
   profileColor?: string | null;
 }
 
-export default function Community2ListPage() {
+export default function CommunityListPage() {
   const [rawDiaries, setRawDiaries] = useState<PublicDiary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -88,7 +88,7 @@ export default function Community2ListPage() {
         id: d.id,
         lat: d.lat as number,
         lng: d.lng as number,
-        profileImageUrl: d.profileImageUrl || '/default-profile.png',
+        profileImageUrl: d.profileImageUrl || '/default-profile.jpg',
         username: d.username || '사용자',
         content: d.content,
         profileColor: d.profileColor || null,
@@ -120,9 +120,9 @@ export default function Community2ListPage() {
 
   // 기존 NavBar를 유지하고 지도는 그 아래 영역을 채우도록 구성
   return (
-    <div className="flex flex-col h-screen">
-      {/* 기존 상단 NavBar 복원 */}
-      <div className="bg-white shadow-sm p-4 shrink-0">
+    <div className="flex flex-col min-h-[100dvh]">
+      {/* 상단 바: 자체 반투명 카드 스타일 */}
+      <div className="mx-auto w-full md:w-2/3 xl:max-w-5xl bg-white/80 dark:bg-neutral-900/70 backdrop-blur border border-white/40 dark:border-neutral-700/40 rounded-xl shadow-sm p-4 mt-4 shrink-0">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
@@ -144,25 +144,28 @@ export default function Community2ListPage() {
           </div>
         </div>
       </div>
-      {/* 지도 및 오버레이 영역 */}
-      <div className="relative flex-1">
-        {!loading && !error && <Map pins={diaryPins} />}
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-600 bg-white/60 backdrop-blur-sm z-10">불러오는 중...</div>
-        )}
-        {error && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-red-500 text-white text-xs px-4 py-2 rounded shadow">{error}</div>
-        )}
-        {!loading && !error && diaryPins.length === 0 && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-white text-gray-600 text-xs px-4 py-2 rounded shadow">표시할 위치가 있는 공개 일기가 없습니다.</div>
-        )}
-        <div className="absolute inset-x-0 bottom-0 z-30 pointer-events-none">
-          <NearbyProfilesBar
-            profiles={nearbyProfiles}
-            isLoadingLocation={locLoading}
-            locationError={locError}
-          />
+      {/* 지도 영역 */}
+      <div className="relative flex-1 flex justify-center py-6">
+        <div className="relative w-full md:w-2/3 xl:w-7/12 2xl:w-1/2 h-[560px] md:h-[620px] bg-white/75 dark:bg-neutral-900/60 backdrop-blur rounded-2xl border border-white/40 dark:border-neutral-700/40 shadow-sm overflow-hidden">
+          {!loading && !error && <Map pins={diaryPins} />}
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-600 bg-white/60 backdrop-blur-sm z-10">불러오는 중...</div>
+          )}
+          {error && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-red-500 text-white text-xs px-4 py-2 rounded shadow">{error}</div>
+          )}
+          {!loading && !error && diaryPins.length === 0 && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-white text-gray-600 text-xs px-4 py-2 rounded shadow">표시할 위치가 있는 공개 일기가 없습니다.</div>
+          )}
+          <div className="absolute inset-x-0 bottom-0 z-30 pointer-events-none">
+            <NearbyProfilesBar
+              profiles={nearbyProfiles}
+              isLoadingLocation={locLoading}
+              locationError={locError}
+            />
+          </div>
         </div>
+        {/* 전역 fixed 이므로 body 최상단에서 잘리거나 가려지지 않음 */}
         <ChatSidebar isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
       </div>
     </div>

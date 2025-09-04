@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, Req, UseGuards, Query } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { QuestionService } from './question.service';
-import { TodayQuestionDto } from './dto/today-question.dto';
+import { TodayQuestionDto } from './dto/today-question.dto'; // 기존 DTO (단일 질문) - 유지
 import { VoteQuestionDto } from './dto/vote-question.dto';
 import { AIModel } from './interfaces/question-generator.interface';
 
@@ -24,7 +24,7 @@ export class QuestionController {
   async generate(
     @Req() req, 
     @Query('model') model?: string
-  ): Promise<TodayQuestionDto> {
+  ): Promise<any> { // 다중 질문 세트 반환
     const aiModel = model && Object.values(AIModel).includes(model as AIModel) 
       ? (model as AIModel) 
       : undefined;

@@ -3,7 +3,8 @@ import {
   QuestionGeneratorInterface, 
   QuestionGenerationRequest, 
   QuestionGenerationResponse, 
-  AIModel 
+  AIModel,
+  GeneratedQuestionItem
 } from '../interfaces/question-generator.interface';
 
 export class GPTQuestionGenerator extends QuestionGeneratorInterface {
@@ -28,23 +29,51 @@ export class GPTQuestionGenerator extends QuestionGeneratorInterface {
       const userPrompt = this.createUserPrompt(request);
 
       const raw = await this.callAPI(userPrompt, systemPrompt);
-      const question = this.postProcessQuestion(raw);
-
-      // 품질 필터 적용
-      if (!this.autoQualityFilter(question)) {
-        throw new Error('자동 품질 필터에 의해 차단된 질문');
-      }
-
+      const parsed = this.parseQuestions(raw);
+      if (!parsed.questions.length) throw new Error('파싱 실패');
       return {
-        question: question.trim(),
-        confidence: 0.92, // GPT-5는 높은 품질 예상
+        questions: parsed.questions,
+        confidence: 0.92,
         modelUsed: this.modelName,
         fallbackUsed: false,
+        rawOutput: raw,
       };
     } catch (error) {
       console.error('GPT-5 질문 생성 오류:', error);
-      return this.getDefaultQuestion(request.metaInfo.dayOfWeek);
+      return this.getDefaultQuestionSet(request.metaInfo.dayOfWeek);
     }
+  }
+
+  private parseQuestions(raw: string): { questions: GeneratedQuestionItem[] } {
+    const questions: GeneratedQuestionItem[] = [];
+    // JSON 블록 추출 시도
+    let jsonText = raw;
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (match) jsonText = match[0];
+    try {
+      const obj = JSON.parse(jsonText);
+      if (Array.isArray(obj.questions)) {
+        for (const q of obj.questions) {
+          if (q?.text && q?.domain) {
+            const text = this.postProcessQuestion(String(q.text));
+            if (this.autoQualityFilter(text)) {
+              questions.push({ domain: q.domain, text });
+            }
+          }
+        }
+      }
+    } catch {
+      // 줄 기반 추출 폴백
+      const lines = raw.split(/\n+/).map(l => l.trim()).filter(l => l.length > 3 && l.length <= 120).slice(0,5);
+      const domains: GeneratedQuestionItem['domain'][] = ['emotion','action','relationship','recovery','goal'];
+      lines.forEach((line, idx) => {
+        const text = this.postProcessQuestion(line);
+        if (this.autoQualityFilter(text)) {
+          questions.push({ domain: domains[idx] || 'emotion', text });
+        }
+      });
+    }
+    return { questions: questions.slice(0,5) };
   }
 
   protected async callAPI(userPrompt: string, systemPrompt?: string): Promise<string> {
@@ -192,7 +221,7 @@ export class GPTQuestionGenerator extends QuestionGeneratorInterface {
     const response = await this.openai.chat.completions.create({
       model: 'gpt-4o', // GPT-5가 완전히 출시될 때까지 GPT-4o 사용
       messages,
-      max_tokens: 100,
+  max_tokens: 300,
       temperature: 0.7,
       top_p: 0.9,
       frequency_penalty: 0.1,

@@ -144,9 +144,9 @@ export default function Map({ pins }: MapProps) {
       console.warn('NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID 가 설정되어 있지 않습니다.');
       return;
     }
-    const script = document.createElement('script');
-    // geocoder 서브모듈 포함
-    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&submodules=geocoder`;
+  const script = document.createElement('script');
+  // geocoder 서브모듈 포함 (공식 파라미터명: ncpClientId)
+  script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&submodules=geocoder`;
     script.async = true;
     script.onload = () => setIsLoaded(true);
     script.onerror = () => console.error('Naver Maps 스크립트 로드 실패');
@@ -218,16 +218,29 @@ export default function Map({ pins }: MapProps) {
     });
 
     pins.forEach((pin) => {
+      // 프로필 이미지를 동그랗게 보이도록 HTML content 기반 커스텀 마커 사용
+      // (기존 url 기반 MarkerImage 는 배경/투명 처리 문제로 흰 박스로 보이는 이슈 발생)
+      const markerSize = 44; // 외곽 포함 px
+      const avatarSize = 40; // 실제 이미지 영역
+      const profileUrl = pin.profileImageUrl || '/default-profile.jpg';
+      const markerHtml = `
+        <div style="width:${markerSize}px;height:${markerSize}px;display:flex;align-items:center;justify-content:center;position:relative;">
+          <div style="width:${avatarSize}px;height:${avatarSize}px;border-radius:50%;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.25);border:2px solid #ffffff;background:#f2f2f2;">
+            <img src="${profileUrl}" alt="프로필" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.style.display='none'" />
+          </div>
+          <div style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:10px;height:10px;background:rgba(0,0,0,0.35);filter:blur(4px);border-radius:50%;"></div>
+        </div>`;
+
       const marker = new naver.maps.Marker({
         position: new naver.maps.LatLng(pin.lat, pin.lng),
         map,
         icon: {
-          url: pin.profileImageUrl || '/default-profile.png',
-          size: new naver.maps.Size(40, 40),
-          origin: new naver.maps.Point(0, 0),
-          anchor: new naver.maps.Point(20, 40),
+          content: markerHtml,
+          size: new naver.maps.Size(markerSize, markerSize),
+          anchor: new naver.maps.Point(markerSize / 2, markerSize / 2),
         } as any,
-        title: '공개 일기',
+        title: pin.username ? `${pin.username}님의 공개 일기` : '공개 일기',
+        clickable: true,
       });
 
       const truncated = (pin.content || '일기 내용을 불러올 수 없습니다.')
@@ -272,7 +285,7 @@ export default function Map({ pins }: MapProps) {
              style="background:${validColor};">
           <div class="p-3 flex flex-col items-center gap-2">
             <div class="relative">
-              <img src="${pin.profileImageUrl || '/default-profile.png'}" alt="프로필" class="w-14 h-14 rounded-full object-cover ring-2 ring-white/40" />
+              <img src="${pin.profileImageUrl || '/default-profile.jpg'}" alt="프로필" class="w-14 h-14 rounded-full object-cover ring-2 ring-white/40" />
             </div>
             <div class="w-full text-center">
               <div class="font-medium text-xs break-all leading-snug" style="color:${textColor};">${pin.username || '익명'}</div>

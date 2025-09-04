@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateBasicInfoDto, UpdateProfileImageDto, UpdatePrivacyDto, UpdateLifestyleDto, ProfileCompleteDto } from './dto/update-profile-extended.dto';
-import { DetailedPrivacyDto, BlockUserDto, UnblockUserDto, PrivacySettingsResponseDto, VisibilityLevel } from './dto/privacy-settings.dto';
+import { DetailedPrivacyDto, BlockUserDto, UnblockUserDto, PrivacySettingsResponseDto, VisibilityLevel, ActivitySettingsResponseDto, UpdateActivitySettingsDto } from './dto/privacy-settings.dto';
 import { ProfileResponseDto, OtherProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateInterestsDto, InterestResponseDto } from './dto/update-interests.dto';
 import { LifestyleAnswerDto } from './dto/lifestyle-answer.dto';
@@ -23,9 +23,19 @@ export class ProfileService {
   async getProfile(req: any): Promise<ProfileResponseDto> {
     const userId = req.user.userId;
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
+      where: { id: userId },      
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        mbti: true,
+        bio: true,
+        birthDate: true,
+        location: true,
+        profileImageUrl: true,
+        createdAt: true,
         interests: true,
+        activityPublic: true,
       },
     });
     if (!user) throw new NotFoundException('유저를 찾을 수 없습니다.');
@@ -42,6 +52,7 @@ export class ProfileService {
       interests: user.interests.map(i => ({ id: i.id, interest: i.interest, priority: i.priority })),
       createdAt: user.createdAt.toISOString(),
       activityScore,
+      activityPublic: user.activityPublic,
     };
   }
   /**
@@ -52,8 +63,15 @@ export class ProfileService {
     // username 기반 조회
     const otherUser = await this.prisma.user.findFirst({ 
       where: { username: otherUsername },
-      include: {
+      select: {
+        id: true,
+        username: true,
+        bio: true,
+        mbti: true,
+        showDiariesToPublic: true,
+        showDiariesToFriends: true,
         privacySettings: true,
+        activityPublic: true,
       },
     });
     if (!otherUser) throw new NotFoundException('유저를 찾을 수 없습니다.');
@@ -156,6 +174,7 @@ export class ProfileService {
       mbti: otherUser.mbti || '',
       canViewCalendar,
       activityScore: await this.calculateActivityScore(otherUserId),
+      activityPublic: otherUser.activityPublic,
     };
   }
 
@@ -356,7 +375,16 @@ export class ProfileService {
         mbti: dto.mbti,
         profileImageUrl: dto.profileImageUrl,
       },
-      include: { interests: true },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        mbti: true,
+        profileImageUrl: true,
+        createdAt: true,
+        activityPublic: true,
+        interests: true,
+      },
     });
     // 프로필 변경 시 페르소나/목표 자동 추출 및 DB 저장
     try {
@@ -383,6 +411,7 @@ export class ProfileService {
       interests: user.interests.map(i => ({ id: i.id, interest: i.interest, priority: i.priority })),
       createdAt: user.createdAt.toISOString(),
       activityScore: await this.calculateActivityScore(userId),
+      activityPublic: user.activityPublic,
     };
   }
 
@@ -720,6 +749,30 @@ export class ProfileService {
 
     const total = diaryScore + messageScore + followerScore + followingScore + interestScore + profileCompletenessScore;
     return Math.round(Math.min(100, total));
+  }
+
+  // === 활동지수 공개/초기화 관련 메서드 ===
+  async getActivitySettings(req: any): Promise<ActivitySettingsResponseDto> {
+    const userId = req.user.userId;
+  const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { activityPublic: true, activityResetAt: true } });
+    if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    return {
+      activityPublic: user.activityPublic,
+      lastResetAt: user.activityResetAt ? user.activityResetAt.toISOString() : undefined,
+    };
+  }
+
+  async updateActivitySettings(req: any, dto: UpdateActivitySettingsDto): Promise<{ success: boolean; activityPublic: boolean }> {
+    const userId = req.user.userId;
+  const updated = await this.prisma.user.update({ where: { id: userId }, data: { activityPublic: dto.activityPublic } , select:{ activityPublic:true } });
+    return { success: true, activityPublic: updated.activityPublic };
+  }
+
+  async resetActivity(req: any): Promise<{ success: boolean; message: string; resetAt: string }> {
+    const userId = req.user.userId;
+    const now = new Date();
+  await this.prisma.user.update({ where: { id: userId }, data: { activityResetAt: now } });
+    return { success: true, message: '활동지수가 초기화되었습니다.', resetAt: now.toISOString() };
   }
 
   async getPrivacySettings(req: any): Promise<UpdatePrivacyDto> {

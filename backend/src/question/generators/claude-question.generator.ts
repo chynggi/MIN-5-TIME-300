@@ -3,7 +3,8 @@ import {
   QuestionGeneratorInterface, 
   QuestionGenerationRequest, 
   QuestionGenerationResponse, 
-  AIModel 
+  AIModel,
+  GeneratedQuestionItem
 } from '../interfaces/question-generator.interface';
 
 export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
@@ -26,24 +27,44 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
     try {
       const systemPrompt = this.createSystemPrompt();
       const userPrompt = this.createUserPrompt(request);
-
-      const question = await this.callAPI(userPrompt, systemPrompt);
-
-      // 품질 필터 적용
-      if (!this.autoQualityFilter(question)) {
-        throw new Error('자동 품질 필터에 의해 차단된 질문');
-      }
-
+      const raw = await this.callAPI(userPrompt, systemPrompt);
+      const parsed = this.parseQuestions(raw);
+      if (!parsed.questions.length) throw new Error('파싱된 질문 없음');
       return {
-        question: question.trim(),
-        confidence: 0.95, // Claude는 일반적으로 매우 높은 품질
+        questions: parsed.questions,
+        confidence: 0.95,
         modelUsed: this.modelName,
         fallbackUsed: false,
+        rawOutput: raw,
       };
     } catch (error) {
       console.error('Claude 질문 생성 오류:', error);
-      return this.getDefaultQuestion(request.metaInfo.dayOfWeek);
+      return this.getDefaultQuestionSet(request.metaInfo.dayOfWeek);
     }
+  }
+
+  private parseQuestions(raw: string): { questions: GeneratedQuestionItem[] } {
+    const questions: GeneratedQuestionItem[] = [];
+    try {
+      const obj = JSON.parse(raw);
+      if (Array.isArray(obj.questions)) {
+        for (const q of obj.questions) {
+          if (q?.text && q?.domain && this.autoQualityFilter(q.text)) {
+            questions.push({ domain: q.domain, text: q.text.trim() });
+          }
+        }
+      }
+    } catch {
+      // 라인 기반 폴백
+      const lines = raw.split(/\n+/).map(l => l.replace(/^[-*\d.\s]+/,'').trim()).filter(l => l.length > 3).slice(0,5);
+      const domains: GeneratedQuestionItem['domain'][] = ['emotion','action','relationship','recovery','goal'];
+      lines.forEach((text, i) => {
+        if (this.autoQualityFilter(text)) {
+          questions.push({ domain: domains[i] || 'emotion', text });
+        }
+      });
+    }
+    return { questions: questions.slice(0,5) };
   }
 
   protected async callAPI(userPrompt: string, systemPrompt?: string): Promise<string> {

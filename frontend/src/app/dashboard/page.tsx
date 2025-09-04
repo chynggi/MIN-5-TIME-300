@@ -225,7 +225,7 @@ export default function DashboardPage() {
   }, [bannerRef, autoScrollPaused, popularDiaries.length]);
 
   return (
-    <div className="flex flex-col space-y-6">
+  <div className="flex flex-col space-y-6 py-6">
       {/* 전역 채팅 아이콘 및 ChatList 모달 제거됨 */}
 
       {/* 메인 콘텐츠 */}

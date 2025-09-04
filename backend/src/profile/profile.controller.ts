@@ -5,7 +5,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateBasicInfoDto, UpdateProfileImageDto, UpdatePrivacyDto, UpdateLifestyleDto, ProfileCompleteDto } from './dto/update-profile-extended.dto';
-import { DetailedPrivacyDto, BlockUserDto, UnblockUserDto, PrivacySettingsResponseDto } from './dto/privacy-settings.dto';
+import { DetailedPrivacyDto, BlockUserDto, UnblockUserDto, PrivacySettingsResponseDto, ActivitySettingsResponseDto, UpdateActivitySettingsDto } from './dto/privacy-settings.dto';
 import { ProfileResponseDto, OtherProfileResponseDto } from './dto/profile-response.dto';
 import { UpdateInterestsDto, InterestResponseDto } from './dto/update-interests.dto';
 import { LifestyleAnswerDto } from './dto/lifestyle-answer.dto';
@@ -166,6 +166,22 @@ export class ProfileController {
   @Get('blocked-users')
   async getBlockedUsers(@Req() req): Promise<{ blockedUsers: Array<{ id: string; username: string; profileImageUrl?: string }> }> {
     return this.profileService.getBlockedUsers(req);
+  }
+
+  // 활동지수 설정 조회/업데이트 & 초기화
+  @Get('activity/settings')
+  async getActivitySettings(@Req() req): Promise<ActivitySettingsResponseDto> {
+    return this.profileService.getActivitySettings(req);
+  }
+
+  @Put('activity/settings')
+  async updateActivitySettings(@Req() req, @Body() dto: UpdateActivitySettingsDto): Promise<{ success: boolean; activityPublic: boolean }> {
+    return this.profileService.updateActivitySettings(req, dto);
+  }
+
+  @Post('activity/reset')
+  async resetActivity(@Req() req): Promise<{ success: boolean; message: string; resetAt: string }> {
+    return this.profileService.resetActivity(req);
   }
 
   // 프로필 공개 범위 체크 API

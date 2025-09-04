@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { ActivityService } from '../activity/activity.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
@@ -12,6 +13,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly activityService: ActivityService,
   ) {}
 
   async signup(dto: SignupDto): Promise<AuthResponseDto> {
@@ -38,6 +40,12 @@ export class AuthService {
         // job: dto.job,
         // education: dto.education,
       },
+    });
+
+    // 초기 활동지수 AI(heuristic) 할당 (실패해도 회원가입은 진행)
+    this.activityService.assignInitialScore(user.id).catch(err => {
+      // eslint-disable-next-line no-console
+      console.warn('초기 활동지수 설정 실패:', err.message);
     });
 
     // 관심사 저장

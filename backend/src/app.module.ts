@@ -16,12 +16,15 @@ import { PrismaModule } from './prisma.module';
 import { UsersModule } from './users/users.module';
 import { ChatGateway } from './chat/chat.gateway';
 import { JwtModule } from '@nestjs/jwt';
+import { ActivityModule } from './activity/activity.module';
+import { ScheduleModule } from '@nestjs/schedule';
 @Module({
   imports: [
     JwtModule.register({
       secret: process.env.JWT_SECRET, // .env에 JWT_SECRET=your_secret_key
       signOptions: { expiresIn: '1d' },
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     ProfileModule,
@@ -35,6 +38,7 @@ import { JwtModule } from '@nestjs/jwt';
     NotificationModule,
     UsersModule,
     RealtimeModule,
+  ActivityModule,
   ],
   controllers: [AppController],
   providers: [AppService, ChatGateway],

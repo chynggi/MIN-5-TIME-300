@@ -101,3 +101,12 @@ export class PrivacySettingsResponseDto {
     profileImageUrl?: string;
   }>;
 }
+
+export class ActivitySettingsResponseDto {
+  activityPublic: boolean;
+  lastResetAt?: string;
+}
+
+export class UpdateActivitySettingsDto {
+  activityPublic: boolean;
+}

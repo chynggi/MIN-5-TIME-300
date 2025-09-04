@@ -3,7 +3,8 @@ import {
   QuestionGeneratorInterface, 
   QuestionGenerationRequest, 
   QuestionGenerationResponse, 
-  AIModel 
+  AIModel,
+  GeneratedQuestionItem
 } from '../interfaces/question-generator.interface';
 
 export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
@@ -22,23 +23,51 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
       const userPrompt = this.createUserPrompt(request);
       const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
-      const question = await this.callAPI(fullPrompt);
+      const raw = await this.callAPI(fullPrompt);
+      const parsed = this.parseQuestions(raw);
 
-      // 품질 필터 적용
-      if (!this.autoQualityFilter(question)) {
-        throw new Error('자동 품질 필터에 의해 차단된 질문');
-      }
+      if (!parsed.questions.length) throw new Error('파싱된 질문이 없습니다');
 
       return {
-        question: question.trim(),
-        confidence: 0.9, // Gemini는 일반적으로 높은 신뢰도
+        questions: parsed.questions,
+        confidence: 0.9,
         modelUsed: this.modelName,
         fallbackUsed: false,
+        rawOutput: raw,
       };
     } catch (error) {
       console.error('Gemini 질문 생성 오류:', error);
-      return this.getDefaultQuestion(request.metaInfo.dayOfWeek);
+      return this.getDefaultQuestionSet(request.metaInfo.dayOfWeek);
     }
+  }
+
+  private parseQuestions(raw: string): { questions: GeneratedQuestionItem[] } {
+    const questions: GeneratedQuestionItem[] = [];
+    try {
+      const jsonMatch = raw.match(/\{[\s\S]*\}$/);
+      const target = jsonMatch ? jsonMatch[0] : raw;
+      const obj = JSON.parse(target);
+      if (Array.isArray(obj.questions)) {
+        for (const q of obj.questions) {
+          if (q && typeof q.text === 'string' && typeof q.domain === 'string') {
+            const text = q.text.trim();
+            if (this.autoQualityFilter(text)) {
+              questions.push({ domain: q.domain, text });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // 원시 텍스트에서 줄 단위 fallback (비정상 응답 시)
+      const lines = raw.split(/\n+/).map(l => l.trim()).filter(l => l.length >= 2 && l.length <= 120).slice(0,5);
+      const domains: GeneratedQuestionItem['domain'][] = ['emotion','action','relationship','recovery','goal'];
+      lines.forEach((line, idx) => {
+        if (this.autoQualityFilter(line)) {
+          questions.push({ domain: domains[idx] || 'emotion', text: line });
+        }
+      });
+    }
+    return { questions: questions.slice(0,5) };
   }
 
   protected async callAPI(prompt: string, systemPrompt?: string): Promise<string> {

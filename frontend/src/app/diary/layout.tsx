@@ -1,3 +1,9 @@
+import GradientBackgroundLayout from '@/components/layout/GradientBackgroundLayout';
+
 export default function DiaryLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return (
+    <GradientBackgroundLayout>
+      {children}
+    </GradientBackgroundLayout>
+  );
 }

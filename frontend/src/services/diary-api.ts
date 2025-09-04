@@ -33,9 +33,21 @@ export interface DiaryDetailResponse {
   feedbacks?: any[];
 }
 
-export interface TodayQuestionResponse {
-  question: string;
+// 신규 다중 질문 응답 스키마
+export interface GeneratedQuestionItem {
+  domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal';
+  text: string;
+}
+
+export interface GeneratedQuestionsResponse {
+  questions: GeneratedQuestionItem[]; // 정확히 5개 기대
+  modelUsed?: string; // 백엔드 확장 가능성
+  fallbackUsed?: boolean;
+}
+
+export interface TodayQuestionsResponse {
   date: string;
+  questions: GeneratedQuestionItem[]; // 오늘의 질문 세트 (5개)
 }
 
 export const diaryApi = {
@@ -63,9 +75,15 @@ export const diaryApi = {
     return apiRequest(`/diaries/${id}`);
   },
 
-  // 오늘의 질문 조회
-  getTodayQuestion: (): Promise<TodayQuestionResponse> => {
-    return apiRequest('/diaries/today-question');
+  // 오늘의 질문 세트 조회 (백엔드 엔드포인트가 변경되면 경로 갱신)
+  getTodayQuestions: (): Promise<TodayQuestionsResponse> => {
+    return apiRequest('/diaries/today-questions');
+  },
+
+  // 질문 세트 생성 (AI 직접 호출용) - 기존 /questions/generate 대체 예상
+  generateQuestions: (model?: string): Promise<GeneratedQuestionsResponse> => {
+    const url = model ? `/questions/generate?model=${encodeURIComponent(model)}` : '/questions/generate';
+    return apiRequest(url, { method: 'POST' });
   },
 
   // 오늘 작성된 맞팔 친구들의 공개 일기 목록

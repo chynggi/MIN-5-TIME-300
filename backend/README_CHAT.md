@@ -1,3 +1,47 @@
+# 질문 생성 API 업데이트 (2025-09)
+
+이 버전부터 AI 질문 생성 엔드포인트(`/api/v1/questions/generate`)는 단일 `question` 문자열 대신 아래 구조를 반환합니다.
+
+```
+{
+  "id": "claude-sonnet-4-set-1736051123",
+  "createdAt": "2025-09-04T12:34:56.000Z",
+  "model": "claude-sonnet-4",
+  "fallback": false,
+  "confidence": 0.93,
+  "questions": [
+    { "domain": "emotion", "text": "..." },
+    { "domain": "action", "text": "..." },
+    { "domain": "relationship", "text": "..." },
+    { "domain": "recovery", "text": "..." },
+    { "domain": "goal", "text": "..." }
+  ]
+}
+```
+
+변경 사항 요약:
+- 응답 프로퍼티 `question` → 제거, `questions[]` 추가
+- 도메인 5개(emotion/action/relationship/recovery/goal) 세트 제공
+- 품질/폴백 정보: `confidence`, `fallback`
+- 원시 모델 출력은 내부 디버깅용(`rawOutput`)으로만 보관 (클라이언트 미전달)
+
+마이그레이션 가이드(프론트엔드):
+1. 기존 `response.question` 접근 제거
+2. `response.questions.map(q => q.text)` 형태로 렌더링
+3. 단일 선택 기반 로직이 있다면 최초 1개 선택 UX 또는 전체 표시 UX로 전환
+
+추가 메트릭 주입 (프롬프트 컨텍스트):
+- regenerationCount, averageWritingTimeSec, averageAnswerLength, noResponseRate
+- 아직 재생성 로그는 0으로 고정 (TODO)
+
+백엔드 fallback:
+- 모델 실패 시 `getDefaultQuestionSet`으로 5개 기본 세트 제공
+
+문의/확장 예정:
+- 사용자 persona/goals 정식 활성화
+- 재생성 로그 테이블 추가 후 학습형 적응
+- 질문별 개별 feedback 수집 포맷 추가
+
 # 1:1 채팅 시스템 구현 가이드
 
 ## 📋 개요

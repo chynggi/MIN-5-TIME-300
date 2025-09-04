@@ -13,6 +13,23 @@
 npm run dev
 ```
 
+### 질문 생성 API 스키마 변경 (2025-09)
+
+백엔드 AI 질문 생성 응답이 단일 `question` 문자열에서 아래 JSON 구조로 변경되었습니다:
+
+```
+{
+	"questions": [
+		{ "domain": "emotion", "text": "..." },
+		{ "domain": "action", "text": "..." },
+		{ "domain": "relationship", "text": "..." },
+		{ "domain": "recovery", "text": "..." },
+		{ "domain": "goal", "text": "..." }
+	]
+}
+```
+
+프론트에서는 `AIQuestionWriter` 컴포넌트가 이 배열을 렌더링하며, 사용자가 일부 혹은 전부에 답변 후 일기를 생성할 수 있습니다. 기존 `getTodayQuestion` 사용처는 `getTodayQuestions`로 점진적 교체 예정입니다.
 ## 환경 변수 예시 (.env.local)
 ```
 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1

@@ -14,7 +14,7 @@ const navItems = [
     )
   },
   { 
-    href: "/community2", 
+    href: "/community", 
     label: "커뮤니티",
     icon: (active: boolean) => (
       <svg className={`w-6 h-6 ${active ? 'text-blue-600' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">

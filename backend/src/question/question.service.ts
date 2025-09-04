@@ -13,7 +13,8 @@ import {
   UserProfile, 
   RecentJournal, 
   MetaInfo,
-  PersonaAndGoals 
+  PersonaAndGoals,
+  GeneratedQuestionItem 
 } from './interfaces/question-generator.interface';
 
 @Injectable()
@@ -41,7 +42,7 @@ export class QuestionService {
     };
   }
 
-  async generate(req: any, preferredModel?: AIModel): Promise<TodayQuestionDto> {
+  async generate(req: any, preferredModel?: AIModel): Promise<any> {
     const userId = req.user.userId;
     
     // 1. 사용자 프로필 정보
@@ -111,6 +112,20 @@ export class QuestionService {
     const selectedModel = preferredModel || QuestionGeneratorFactory.getDefaultModel();
     
     // 7. 질문 생성 요청 준비
+    // 7-a. 메트릭 계산 (최근 일기 기반)
+    const validJournals = recentJournalsRaw.filter(j => !!j.content);
+    const averageWritingTimeSec = validJournals.length
+      ? Math.round(validJournals.reduce((acc, j) => acc + (j.writingDuration || 0), 0) / validJournals.length)
+      : undefined;
+    const averageAnswerLength = validJournals.length
+      ? Math.round(validJournals.reduce((acc, j) => acc + j.content.length, 0) / validJournals.length)
+      : undefined;
+    // 무응답 비율: 질문이 있었지만 내용이 매우 짧거나 없는 경우 (threshold < 5 chars)
+    const noResponseCount = validJournals.filter(j => (j.question && (!j.content || j.content.trim().length < 5))).length;
+    const noResponseRate = validJournals.length ? noResponseCount / validJournals.length : undefined;
+
+    const regenerationCount = 0; // TODO: 재생성 로그 테이블 도입 후 실제 값 반영
+
     const questionRequest: QuestionGenerationRequest = {
       userProfile,
       recentJournals,
@@ -118,15 +133,23 @@ export class QuestionService {
       userId,
       personaAndGoals,
       trendTopics,
+      regenerationCount,
+      averageWritingTimeSec,
+      averageAnswerLength,
+      noResponseRate,
     };
     
     // 8. 다중 모델 폴백으로 질문 생성 시도
     const response = await this.generateWithFallback(questionRequest, selectedModel);
 
+    // 새 다중 질문 응답 구조
     return {
-      id: `${response.modelUsed}-q-${Date.now()}`,
-      question: response.question,
+      id: `${response.modelUsed}-set-${Date.now()}`,
       createdAt: new Date().toISOString(),
+      model: response.modelUsed,
+      fallback: response.fallbackUsed,
+      confidence: response.confidence,
+      questions: response.questions,
     };
   }
 
@@ -154,7 +177,7 @@ export class QuestionService {
         const generator = QuestionGeneratorFactory.getGenerator(modelId);
         const response = await generator.generateQuestion(request);
         
-        if (response.question && response.question.trim().length > 0) {
+        if (response.questions && response.questions.length > 0) {
           console.log(`${modelId} 모델로 질문 생성 성공`);
           return response;
         }
@@ -172,29 +195,13 @@ export class QuestionService {
 
     // 모든 모델 실패시 기본 질문 반환
     console.log('모든 AI 모델 실패. 기본 질문 사용');
-    return {
-      question: this.getEmergencyQuestion(request.metaInfo.dayOfWeek),
-      confidence: 0.5,
-      modelUsed: 'fallback',
-      fallbackUsed: true,
-    };
+    return this.getDefaultQuestionSet(request.metaInfo.dayOfWeek);
   }
 
   /**
    * 긴급 상황용 기본 질문
    */
-  private getEmergencyQuestion(dayOfWeek: string): string {
-    const emergencyQuestions: { [key: string]: string } = {
-      monday: '새로운 한 주, 어떤 마음으로 시작하시나요?',
-      tuesday: '오늘 하루 중 가장 인상 깊었던 순간은?',
-      wednesday: '이번 주 중반, 지금 기분은 어떠신가요?',
-      thursday: '오늘 새롭게 깨달은 것이 있다면?',
-      friday: '이번 주를 돌아보며 느끼는 감정은?',
-      saturday: '주말을 맞아 하고 싶은 일은?',
-      sunday: '오늘 하루 어떻게 보내셨나요?',
-    };
-    return emergencyQuestions[dayOfWeek.toLowerCase()] || '오늘 하루 어떠셨나요?';
-  }
+  // getEmergencyQuestion 제거: getDefaultQuestionSet 사용
 
   // 사용 가능한 AI 모델 목록 조회
   async getAvailableModels(): Promise<{
@@ -206,6 +213,33 @@ export class QuestionService {
       models: QuestionGeneratorFactory.getAvailableModels(),
       defaultModel: QuestionGeneratorFactory.getDefaultModel(),
       enabledModels: QuestionGeneratorFactory.getEnabledModels(),
+    };
+  }
+
+  // 로컬 폴백: 제너레이터 추상 클래스의 protected 메서드에 접근할 수 없으므로 동일 로직 구현
+  private getDefaultQuestionSet(dayOfWeek: string): QuestionGenerationResponse {
+    const seed: { [key: string]: string } = {
+      monday: '새로운 한 주를 여는 감정은 무엇인가요?',
+      tuesday: '오늘 마음을 가장 움직인 순간은?',
+      wednesday: '주 중반 지금 마음에 가장 남은 행동은?',
+      thursday: '오늘 작은 성취나 배움이 있었다면?',
+      friday: '이번 주 나를 지탱해준 관계는?',
+      saturday: '주말에 나를 회복시킨 순간은?',
+      sunday: '다음 주를 위한 작은 다짐은?'
+    };
+    const base = seed[dayOfWeek?.toLowerCase()] || '오늘 하루 가장 선명한 감정은 무엇인가요?';
+    const questions: GeneratedQuestionItem[] = [
+      { domain: 'emotion', text: base },
+      { domain: 'action', text: '오늘 의미 있었던 작지만 구체적인 행동은 무엇이었나요?' },
+      { domain: 'relationship', text: '오늘 기억에 남는 대화나 상호작용이 있었나요?' },
+      { domain: 'recovery', text: '오늘 나를 잠깐이라도 회복시킨 휴식은 무엇이었나요?' },
+      { domain: 'goal', text: '내일 스스로에게 약속하고 싶은 아주 작은 한 가지는?' }
+    ];
+    return {
+      questions,
+      confidence: 0.5,
+      modelUsed: 'fallback',
+      fallbackUsed: true,
     };
   }
 }
