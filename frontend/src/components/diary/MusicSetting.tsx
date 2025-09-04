@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import apiRequest from "../../lib/api";
+// NOTE: 백엔드(Nest)로 이전됨: 기존 Next.js API Routes (/api/spotify/*) 삭제 예정.
+// apiRequest는 이미 API_BASE_V1 (ex: http://localhost:3001/api/v1) prefix가 붙으므로
+// 여기서는 '/spotify/...' 만 호출하면 됨.
 
 // Spotify 트랙 데이터 구조 정의
 interface SpotifyTrack {

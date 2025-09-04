@@ -18,6 +18,7 @@ import { ChatGateway } from './chat/chat.gateway';
 import { JwtModule } from '@nestjs/jwt';
 import { ActivityModule } from './activity/activity.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { SpotifyModule } from './spotify/spotify.module';
 @Module({
   imports: [
     JwtModule.register({
@@ -39,6 +40,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     UsersModule,
     RealtimeModule,
   ActivityModule,
+  SpotifyModule,
   ],
   controllers: [AppController],
   providers: [AppService, ChatGateway],
