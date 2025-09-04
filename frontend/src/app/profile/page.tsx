@@ -9,7 +9,7 @@ import { diaryApi } from '../../services/diary-api';
 import { statisticsApi } from '../../services/statistics-api';
 import { getRealtimeSocket, disconnectRealtimeSocket } from '@/lib/realtimeSocket';
 import { ProfileResponse } from '../../types/api';
-import ActivityIndicator from '../../components/activity/ActivityIndicator';
+// ActivityIndicator 제거: 활동지수를 다른 statCard들과 동일한 비주얼로 통일
 import { setAuthToken, testConnection } from '../../lib/api';
 import { authApi } from '../../services/auth-api';
 
@@ -401,6 +401,15 @@ export default function ProfilePage() {
       <div className={`${styles.simpleStack} ${styles.fadeIn}`}>
         {/* 좌측 / 기본 프로필 영역 */}
         <section className={`${styles.panel} ${styles.profileHeader}`} aria-label="프로필 기본 정보">
+          <button
+            type="button"
+            className={styles.settingsIconBtn}
+            aria-label="프로필 설정 이동"
+            onClick={() => router.push('/profile/settings')}
+            title="설정"
+          >
+            ⚙️
+          </button>
           <div className={styles.avatarWrapModern}>
             {profile.profileImageUrl ? (
               <img
@@ -432,8 +441,15 @@ export default function ProfilePage() {
                 <span className={styles.statValue}>{profile.followingCount}</span>
                 <span className={styles.statLabelModern}>FOLLOWING</span>
               </button>
-              <div className={styles.activityStat} aria-label={`활동지수 ${profile.activityScore ?? 0}%`}>
-                <ActivityIndicator score={profile.activityScore ?? 0} size={60} />
+              {/* 활동지수 카드: 다른 statCard와 동일한 구조 */}
+              <div
+                className={styles.statCard}
+                aria-label={`활동지수 ${profile.activityScore ?? 0}%`}
+                role="presentation"
+              >
+                <span className={styles.statValue}>{profile.activityScore ?? 0}%</span>
+                <span className={styles.statLabelModern}>ACTIVITY</span>
+                {/* 향후: 히트맵/미니 바 추가 가능 */}
               </div>
             </div>
             <div className={styles.actionRow}>

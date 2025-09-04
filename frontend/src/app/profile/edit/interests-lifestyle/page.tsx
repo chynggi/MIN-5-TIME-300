@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
+import styles from '../../profile.module.css';
 import { InterestSelector, LifestyleSelector, InterestSelectionItem } from '../../../../components/profile';
 import apiRequest from '../../../../lib/api';
 
@@ -154,206 +155,133 @@ export default function ProfileEditInterestsLifestylePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">프로필 데이터를 불러오는 중...</p>
+      <div className={styles.container}>
+        <div className={styles.panel}>
+          <div className={styles.loadingContainer}>편집 데이터를 불러오는 중...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">프로필 편집</h1>
-              <p className="text-gray-600">관심사와 라이프스타일을 수정할 수 있습니다</p>
-            </div>
-            <div className="flex items-center space-x-3">
-              {/* 저장 버튼 - 변경사항이 있을 때만 표시 */}
-              {hasChanges && (
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={handleCancel}
-                    className="px-4 py-2 text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg transition-colors"
-                    disabled={saving}
-                  >
-                    취소
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className={`
-                      px-6 py-2 rounded-lg font-medium transition-all
-                      ${saving
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
-                      }
-                    `}
-                  >
-                    {saving ? '저장 중...' : '저장'}
-                  </button>
-                </div>
-              )}
-              <button
-                onClick={() => window.history.back()}
-                className="text-gray-600 hover:text-gray-800"
-              >
-                ← 뒤로가기
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className={styles.container}>
+      <div className={styles.panel}>
+        <header className={styles.subPageHeader}>
+          <button
+            className={`${styles.actionBtn} ${styles.actionBtnOutline}`}
+            onClick={() => window.history.back()}
+            style={{ flex: '0 0 auto', minWidth: 'auto', padding: '.55rem .9rem' }}
+            aria-label="이전 페이지로 돌아가기"
+          >
+            ←
+          </button>
+          <h1 className={styles.subPageTitle}>프로필 편집</h1>
+        </header>
+        <p style={{ marginTop: '-.35rem', fontSize: '.8rem', color: 'var(--c-text-soft)' }}>관심사와 라이프스타일을 수정할 수 있습니다</p>
 
-      {/* 탭 네비게이션 */}
-      <div className="bg-white border-b">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="flex items-center justify-between">
-            <div className="flex space-x-8">
-              <button
-                onClick={() => setCurrentTab('interests')}
-                className={`py-4 px-2 border-b-2 font-medium text-sm ${
-                  currentTab === 'interests'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                관심사
-              </button>
-              <button
-                onClick={() => setCurrentTab('lifestyle')}
-                className={`py-4 px-2 border-b-2 font-medium text-sm ${
-                  currentTab === 'lifestyle'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                라이프스타일
-              </button>
-            </div>
-            
-            {/* 탭별 저장 버튼 */}
-            {hasChanges && (
-              <div className="py-2">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className={`
-                    px-4 py-2 rounded-lg text-sm font-medium transition-all
-                    ${saving
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : currentTab === 'interests'
-                        ? 'bg-blue-600 text-white hover:bg-blue-700'
-                        : 'bg-orange-600 text-white hover:bg-orange-700'
-                    }
-                  `}
-                >
-                  {saving ? '저장 중...' : `${currentTab === 'interests' ? '관심사' : '라이프스타일'} 저장`}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 메인 컨텐츠 */}
-      <div className="py-8">
-        {/* 변경사항 상태 알림 */}
-        {hasChanges && (
-          <div className="max-w-4xl mx-auto px-6 mb-6">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                  <span className="text-yellow-800 font-medium">
-                    {currentTab === 'interests' ? '관심사' : '라이프스타일'}에 변경사항이 있습니다
-                  </span>
-                </div>
-                <div className="text-sm text-yellow-700">
-                  저장하지 않으면 변경사항이 사라집니다
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {currentTab === 'interests' && (
-          <InterestSelector
-            selectedItems={interestSelections}
-            selectedCategories={interestCategoriesSelected}
-            onToggleCategory={toggleInterestCategory}
-            onToggleItem={toggleInterestItem}
-            onSkipToNextPhase={() => setCurrentTab('lifestyle')}
-            title="관심사 수정"
-            colorTheme="blue"
-          />
-        )}
-        {currentTab === 'lifestyle' && (
-          <LifestyleSelector
-            selectedItems={lifestyleSelections}
-            selectedCategories={lifestyleCategoriesSelected}
-            onToggleCategory={toggleLifestyleCategory}
-            onToggleItem={toggleLifestyleItem}
-            onSkipToNextPhase={() => {/* no-op */}}
-            title="라이프스타일 수정"
-            colorTheme="orange"
-          />
-        )}
-      </div>
-
-      {/* 변경사항이 있을 때만 표시되는 하단 버튼 */}
-      {hasChanges && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-6 shadow-lg">
-          <div className="max-w-4xl mx-auto flex justify-between items-center">
-            <div className="text-sm text-orange-600">
-              변경사항이 있습니다. 저장하지 않으면 변경사항이 사라집니다.
-            </div>
-            
-            <div className="flex space-x-3">
+        <div style={{ display: 'flex', gap: '2rem', marginTop: '1.2rem', borderBottom: '1px solid var(--c-border)' }} role="tablist" aria-label="편집 범주">
+          <button
+            onClick={() => setCurrentTab('interests')}
+            role="tab"
+            aria-selected={currentTab === 'interests'}
+            className={currentTab === 'interests' ? `${styles.actionBtn} ${styles.actionBtnPrimary}` : `${styles.actionBtn} ${styles.actionBtnOutline}`}
+            style={{ flex: '0 0 auto', minWidth: '120px', padding: '.65rem .9rem' }}
+          >
+            관심사
+          </button>
+          <button
+            onClick={() => setCurrentTab('lifestyle')}
+            role="tab"
+            aria-selected={currentTab === 'lifestyle'}
+            className={currentTab === 'lifestyle' ? `${styles.actionBtn} ${styles.actionBtnPrimary}` : `${styles.actionBtn} ${styles.actionBtnOutline}`}
+            style={{ flex: '0 0 auto', minWidth: '120px', padding: '.65rem .9rem' }}
+          >
+            라이프스타일
+          </button>
+          {hasChanges && (
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '.6rem', alignItems: 'center' }}>
               <button
                 onClick={handleCancel}
-                className="px-6 py-2 text-gray-600 hover:text-gray-800"
+                className={`${styles.actionBtn} ${styles.actionBtnOutline}`}
                 disabled={saving}
+                style={{ padding: '.55rem .9rem' }}
               >
                 취소
               </button>
-              
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className={`
-                  px-8 py-2 rounded-lg font-medium transition-all
-                  ${saving
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }
-                `}
+                className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+                style={{ padding: '.55rem 1.1rem' }}
               >
-                {saving ? '저장 중...' : '변경사항 저장'}
+                {saving ? '저장 중...' : (currentTab === 'interests' ? '관심사 저장' : '라이프스타일 저장')}
               </button>
             </div>
-          </div>
+          )}
         </div>
-      )}
-      
-      {/* 성공 토스트 알림 */}
-      {showSuccessToast && (
-        <div className="fixed top-4 right-4 z-50">
-          <div className="bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-2 animate-fade-in">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span className="font-medium">
-              {currentTab === 'interests' ? '관심사' : '라이프스타일'}가 성공적으로 저장되었습니다!
-            </span>
+
+        {hasChanges && (
+          <div style={{ marginTop: '1rem', background: 'var(--c-bg-soft)', border: '1px solid var(--c-border)', padding: '0.9rem 1rem', borderRadius: '14px', display: 'flex', gap: '.75rem', alignItems: 'flex-start' }}>
+            <div style={{ width: '.6rem', height: '.6rem', background: 'var(--c-warn)', borderRadius: '50%', marginTop: '.25rem' }} />
+            <div style={{ fontSize: '.75rem', lineHeight: 1.5, color: 'var(--c-text-soft)', flex: 1 }}>
+              <strong style={{ color: 'var(--c-text)' }}>{currentTab === 'interests' ? '관심사' : '라이프스타일'}</strong>에 변경사항이 있습니다. 저장하지 않으면 변경사항이 사라집니다.
+            </div>
           </div>
+        )}
+
+        <div style={{ marginTop: '1.4rem' }}>
+          {currentTab === 'interests' && (
+            <InterestSelector
+              selectedItems={interestSelections}
+              selectedCategories={interestCategoriesSelected}
+              onToggleCategory={toggleInterestCategory}
+              onToggleItem={toggleInterestItem}
+              onSkipToNextPhase={() => setCurrentTab('lifestyle')}
+              title="관심사 수정"
+              colorTheme="blue"
+            />
+          )}
+          {currentTab === 'lifestyle' && (
+            <LifestyleSelector
+              selectedItems={lifestyleSelections}
+              selectedCategories={lifestyleCategoriesSelected}
+              onToggleCategory={toggleLifestyleCategory}
+              onToggleItem={toggleLifestyleItem}
+              onSkipToNextPhase={() => {}}
+              title="라이프스타일 수정"
+              colorTheme="orange"
+            />
+          )}
         </div>
-      )}
+
+        {hasChanges && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.75rem', marginTop: '2rem' }}>
+            <button
+              onClick={handleCancel}
+              className={`${styles.actionBtn} ${styles.actionBtnOutline}`}
+              disabled={saving}
+            >
+              취소
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+            >
+              {saving ? '저장 중...' : '변경사항 저장'}
+            </button>
+          </div>
+        )}
+
+        {showSuccessToast && (
+          <div style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 50 }}>
+            <div style={{ background: 'linear-gradient(90deg,#16a34a,#22c55e)', color: '#fff', padding: '.75rem 1rem', borderRadius: '14px', boxShadow: 'var(--shadow)', fontSize: '.75rem', display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <span aria-hidden="true">✅</span>
+              <span>{currentTab === 'interests' ? '관심사' : '라이프스타일'}가 성공적으로 저장되었습니다!</span>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

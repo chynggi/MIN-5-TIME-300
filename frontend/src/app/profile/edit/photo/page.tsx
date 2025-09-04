@@ -111,9 +111,9 @@ export default function PhotoEditPage() {
 
   if (loading) {
     return (
-      <div className={styles.profileContainer}>
-        <div className={styles.loadingContainer}>
-          프로필 사진을 불러오는 중...
+      <div className={styles.container}>
+        <div className={styles.panel}>
+          <div className={styles.loadingContainer}>프로필 사진을 불러오는 중...</div>
         </div>
       </div>
     );
@@ -122,71 +122,90 @@ export default function PhotoEditPage() {
   const displayPhoto = photoData.previewUrl || photoData.currentPhoto;
 
   return (
-    <div className={styles.profileContainer}>
-      <div className={styles.editHeader}>
-        <button 
-          className={styles.backButton}
-          onClick={() => router.back()}
-        >
-          ← 뒤로
-        </button>
-        <h1 className={styles.editTitle}>프로필 사진</h1>
-      </div>
+    <div className={styles.container}>
+      <div className={styles.panel}>
+        <header className={styles.subPageHeader}>
+          <button
+            className={`${styles.actionBtn} ${styles.actionBtnOutline}`}
+            onClick={() => router.back()}
+            style={{ flex: '0 0 auto', minWidth: 'auto', padding: '.55rem .9rem' }}
+            aria-label="이전 페이지로 돌아가기"
+          >
+            ←
+          </button>
+          <h1 className={styles.subPageTitle}>프로필 사진</h1>
+        </header>
 
-      <div className={styles.editForm}>
-        <div className={styles.photoContainer}>
-          <div className={styles.currentPhoto}>
-            {displayPhoto ? (
-              <img src={displayPhoto} alt="프로필 사진" />
-            ) : (
-              <div className={styles.photoPlaceholder}>
-                👤
-              </div>
-            )}
-          </div>
+        <div className={styles.editForm}>
+          <div className={styles.photoContainer}>
+            <div className={styles.currentPhoto}>
+              {displayPhoto ? (
+                <img src={displayPhoto} alt="프로필 사진" />
+              ) : (
+                <div className={styles.photoPlaceholder} aria-label="기본 프로필 아이콘">
+                  👤
+                </div>
+              )}
+            </div>
 
-          <div className={styles.photoButtons}>
-            <button 
-              className={`${styles.photoButton} ${styles.primary}`}
-              onClick={handlePhotoUpload}
-            >
-              📷 사진 선택
-            </button>
-            {displayPhoto && (
-              <button 
-                className={styles.photoButton}
-                onClick={handlePhotoRemove}
+            <div className={styles.photoButtons}>
+              <button
+                type="button"
+                className={`${styles.actionBtn} ${styles.actionBtnOutline}`}
+                onClick={handlePhotoUpload}
+                style={{ minWidth: '140px' }}
               >
-                🗑️ 사진 제거
+                📷 사진 선택
               </button>
-            )}
+              {displayPhoto && (
+                <button
+                  type="button"
+                  className={`${styles.actionBtn} ${styles.actionBtnOutline}`}
+                  onClick={handlePhotoRemove}
+                  style={{ minWidth: '140px' }}
+                >
+                  🗑️ 사진 제거
+                </button>
+              )}
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className={styles.hiddenFileInput}
+            />
           </div>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect}
-            className={styles.hiddenFileInput}
-          />
-        </div>
+          <div className={styles.formGroup}>
+            <small style={{ color: 'var(--c-text-soft)', fontSize: '12px', textAlign: 'center', display: 'block', lineHeight: 1.5 }}>
+              • 권장 크기: 400x400px 이상<br />
+              • 지원 형식: JPG, PNG, GIF<br />
+              • 최대 용량: 5MB<br />
+              * 프로필 사진 업로드는 백엔드 구현 대기 중입니다.
+            </small>
+          </div>
 
-        <div className={styles.formGroup}>
-          <small style={{ color: '#666', fontSize: '12px', textAlign: 'center' }}>
-            • 권장 크기: 400x400px 이상<br/>
-            • 지원 형식: JPG, PNG, GIF<br/>
-            • 최대 용량: 5MB<br/>
-            * 프로필 사진 업로드는 백엔드 구현 대기 중입니다.
-          </small>
+          <div style={{ display: 'flex', gap: '.75rem', marginTop: '.5rem' }}>
+            <button
+              type="button"
+              className={`${styles.actionBtn} ${styles.actionBtnOutline}`}
+              onClick={() => router.back()}
+              disabled={saving}
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? '저장 중...' : '저장하기'}
+            </button>
+          </div>
         </div>
-
-        <button 
-          className={styles.saveButton} 
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? '저장 중...' : '저장하기'}
-        </button>
       </div>
     </div>
   );

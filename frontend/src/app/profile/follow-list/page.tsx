@@ -123,41 +123,37 @@ function FollowListContent() {
 
   const currentList = tab === 'followers' ? followers : following;
 
-  if (loading) {
-    return (
-      <div className={styles.profileContainer}>
-        <div className={styles.loadingContainer}>
-          목록을 불러오는 중...
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.profileContainer}>
-      <div className={styles.editHeader}>
-        <button 
-          className={styles.backButton}
+  const inner = (
+    <>
+      <header className={styles.subPageHeader}>
+        <button
+          className={`${styles.actionBtn} ${styles.actionBtnOutline}`}
           onClick={() => router.back()}
+          style={{ flex: '0 0 auto', minWidth: 'auto', padding: '.55rem .9rem' }}
+          aria-label="이전 페이지로 돌아가기"
         >
-          ← 뒤로
+          ←
         </button>
-        <h1 className={styles.editTitle}>
-           {username ? '친구 목록' : (tab === 'followers' ? '팔로워' : '팔로잉')}
+        <h1 className={styles.subPageTitle}>
+          {username ? '친구 목록' : (tab === 'followers' ? '팔로워' : '팔로잉')}
         </h1>
-      </div>
+      </header>
 
-  {!username && (
-        <div className={styles.tabContainer}>
-          <button 
+      {!username && (
+        <div className={styles.tabContainer} style={{ marginBottom: '1.2rem' }}>
+          <button
             className={`${styles.tab} ${tab === 'followers' ? styles.tabActive : ''}`}
             onClick={() => handleTabChange('followers')}
+            aria-selected={tab === 'followers'}
+            role="tab"
           >
             팔로워 ({followers.length})
           </button>
-          <button 
+          <button
             className={`${styles.tab} ${tab === 'following' ? styles.tabActive : ''}`}
             onClick={() => handleTabChange('following')}
+            aria-selected={tab === 'following'}
+            role="tab"
           >
             팔로잉 ({following.length})
           </button>
@@ -167,19 +163,22 @@ function FollowListContent() {
       <div className={styles.userList}>
         {currentList.length === 0 ? (
           <div className={styles.emptyState}>
-             {username 
-              ? '친구 목록이 비공개입니다.' 
-              : (tab === 'followers' ? '팔로워가 없습니다' : '팔로잉한 사용자가 없습니다')
-            }
+            {username
+              ? '친구 목록이 비공개입니다.'
+              : (tab === 'followers' ? '팔로워가 없습니다' : '팔로잉한 사용자가 없습니다')}
           </div>
         ) : (
           currentList.map((user) => (
             <div key={user.id} className={styles.userItem}>
-              <div 
+              <div
                 className={styles.userInfo}
-                  onClick={() => handleUserClick(user.name)}
+                onClick={() => handleUserClick(user.name)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleUserClick(user.name)}
+                aria-label={`${user.name} 프로필로 이동`}
               >
-                <div className={styles.userAvatar}>
+                <div className={styles.userAvatar} aria-hidden="true">
                   {user.mbti || '👤'}
                 </div>
                 <div>
@@ -189,27 +188,48 @@ function FollowListContent() {
                   )}
                 </div>
               </div>
-               {!username && user.status === 'accepted' && (
-                <button 
+              {!username && user.status === 'accepted' && (
+                <button
                   className={`${styles.followBtn} ${
-                    tab === 'followers' 
+                    tab === 'followers'
                       ? (user.isFollowing ? styles.followBtnFollowing : styles.followBtnFollow)
                       : styles.followBtnUnfollow
                   }`}
                   onClick={() => handleFollowToggle(
-                    user.id, 
+                    user.id,
                     tab === 'followers' ? user.isFollowing || false : true
                   )}
+                  aria-label={tab === 'followers'
+                    ? (user.isFollowing ? `${user.name} 언팔로우` : `${user.name} 팔로우`)
+                    : `${user.name} 언팔로우`}
                 >
-                  {tab === 'followers' 
+                  {tab === 'followers'
                     ? (user.isFollowing ? '팔로잉' : '팔로우')
-                    : '언팔로우'
-                  }
+                    : '언팔로우'}
                 </button>
               )}
             </div>
           ))
         )}
+      </div>
+    </>
+  );
+
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.panel}>
+          {inner}
+          <div className={styles.loadingContainer}>목록을 불러오는 중...</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.panel}>
+        {inner}
       </div>
     </div>
   );

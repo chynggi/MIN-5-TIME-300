@@ -124,101 +124,118 @@ export default function BasicInfoEditPage() {
 
   if (loading) {
     return (
-      <div className={styles.profileContainer}>
-        <div className={styles.loadingContainer}>
-          프로필 정보를 불러오는 중...
+      <div className={styles.container}>
+        <div className={styles.panel}>
+          <div className={styles.loadingContainer}>프로필 정보를 불러오는 중...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={styles.profileContainer}>
-      <div className={styles.editHeader}>
-        <button 
-          className={styles.backButton}
-          onClick={() => router.back()}
-        >
-          ← 뒤로
-        </button>
-        <h1 className={styles.editTitle}>기본 정보</h1>
-      </div>
-
-      <div className={styles.editForm}>
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>이름</label>
-          <input
-            type="text"
-            className={styles.formInput}
-            value={formData.name}
-            onChange={(e) => handleInputChange('name', e.target.value)}
-            placeholder="이름을 입력하세요"
-          />
-        </div>
-
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>생년월일</label>
-          <input
-            type="date"
-            className={styles.formInput}
-            value={formData.birthDate}
-            onChange={(e) => handleInputChange('birthDate', e.target.value)}
-          />
-        </div>
-
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>성별</label>
-          <div className={styles.radioGroup}>
-            {genderOptions.map((option) => (
-              <label key={option.value} className={styles.radioLabel}>
-                <input
-                  type="radio"
-                  name="gender"
-                  value={option.value}
-                  checked={formData.gender === option.value}
-                  onChange={(e) => handleInputChange('gender', e.target.value)}
-                />
-                <span>{option.label}</span>
-              </label>
-            ))}
-          </div>
-          <small style={{ color: '#666', fontSize: '12px' }}>
-            * 성별은 아직 백엔드 구현 대기 중입니다.
-          </small>
-        </div>
-
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>MBTI</label>
-          <select
-            className={styles.formSelect}
-            value={formData.mbti}
-            onChange={(e) => handleInputChange('mbti', e.target.value)}
+    <div className={styles.container}>
+      <div className={styles.panel}>
+        <header className={styles.subPageHeader}>
+          <button
+            className={`${styles.actionBtn} ${styles.actionBtnOutline}`}
+            onClick={() => router.back()}
+            style={{ flex: '0 0 auto', minWidth: 'auto', padding: '.55rem .9rem' }}
+            aria-label="이전 페이지로 돌아가기"
           >
-            <option value="">선택하세요</option>
-            {mbtiOptions.map((mbti) => (
-              <option key={mbti} value={mbti}>{mbti}</option>
-            ))}
-          </select>
-        </div>
+            ←
+          </button>
+          <h1 className={styles.subPageTitle}>기본 정보</h1>
+        </header>
 
-        <div className={styles.formGroup}>
-          <label className={styles.formLabel}>자기소개</label>
-          <textarea
-            className={styles.formTextarea}
-            value={formData.bio}
-            onChange={(e) => handleInputChange('bio', e.target.value)}
-            placeholder="자신을 소개해보세요"
-            rows={3}
-          />
-        </div>
+        <form className={styles.editForm} onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel} htmlFor="name">이름</label>
+            <input
+              id="name"
+              type="text"
+              className={styles.formInput}
+              value={formData.name}
+              onChange={(e) => handleInputChange('name', e.target.value)}
+              placeholder="이름을 입력하세요"
+              autoComplete="name"
+            />
+          </div>
 
-        <button 
-          className={styles.saveButton} 
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? '저장 중...' : '저장하기'}
-        </button>
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel} htmlFor="birthDate">생년월일</label>
+              <input
+                id="birthDate"
+                type="date"
+                className={styles.formInput}
+                value={formData.birthDate}
+                onChange={(e) => handleInputChange('birthDate', e.target.value)}
+              />
+            </div>
+
+          <div className={styles.formGroup}>
+            <span className={styles.formLabel}>성별</span>
+            <div className={styles.radioGroup} role="radiogroup" aria-label="성별 선택">
+              {genderOptions.map((option) => (
+                <label key={option.value} className={styles.radioLabel}>
+                  <input
+                    type="radio"
+                    name="gender"
+                    value={option.value}
+                    checked={formData.gender === option.value}
+                    onChange={(e) => handleInputChange('gender', e.target.value)}
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+            <small style={{ color: '#666', fontSize: '12px' }}>* 성별은 아직 백엔드 구현 대기 중입니다.</small>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel} htmlFor="mbti">MBTI</label>
+            <select
+              id="mbti"
+              className={styles.formSelect}
+              value={formData.mbti}
+              onChange={(e) => handleInputChange('mbti', e.target.value)}
+            >
+              <option value="">선택하세요</option>
+              {mbtiOptions.map((mbti) => (
+                <option key={mbti} value={mbti}>{mbti}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel} htmlFor="bio">자기소개</label>
+            <textarea
+              id="bio"
+              className={styles.formTextarea}
+              value={formData.bio}
+              onChange={(e) => handleInputChange('bio', e.target.value)}
+              placeholder="자신을 소개해보세요"
+              rows={3}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '.75rem', marginTop: '.5rem' }}>
+            <button
+              type="button"
+              className={`${styles.actionBtn} ${styles.actionBtnOutline}`}
+              onClick={() => router.back()}
+              disabled={saving}
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+              disabled={saving}
+            >
+              {saving ? '저장 중...' : '저장하기'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

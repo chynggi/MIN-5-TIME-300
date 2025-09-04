@@ -3,11 +3,7 @@ import { useEffect, useState, useContext } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FriendSearch from "@/components/FriendSearch";
 import { socialApi } from "@/services/social-api";
-import { 
-  Tab, 
-  FriendWithDiary, 
-  SocialFriendsResponse 
-} from "@/types/social.dto";
+import { Tab, FriendWithDiary, SocialFriendsResponse } from "@/types/social.dto";
 import { useNotifications } from "@/context/NotificationContext";
 import { AuthContext } from "@/context/AuthContext";
 
@@ -153,16 +149,16 @@ export default function FriendsPageContent() {
 
   if (loading && friends.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-lg">로딩 중...</div>
+      <div className="ui-page flex items-center justify-center">
+        <div className="text-base text-soft">로딩 중...</div>
       </div>
     );
   }
 
   if (error && friends.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-red-500">{error}</div>
+      <div className="ui-page flex items-center justify-center">
+        <div className="text-base" style={{color:'var(--c-danger)'}}>{error}</div>
       </div>
     );
   }
@@ -170,21 +166,19 @@ export default function FriendsPageContent() {
   const emptyMsg = getEmptyMessage();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 전역 보라색 채팅 아이콘 및 ChatList 모달 제거됨 */}
-
+    <div className="ui-page">
       {/* 헤더 */}
-      <div className="bg-white shadow-sm p-4">
-        <div className="max-w-md mx-auto flex items-center justify-end gap-2">
+      <div className="ui-pageHeader">
+        <div className="ui-responsive-narrow flex items-center justify-end gap-sm">
           <FriendSearch />
           {isAuthenticated && (
             <button
               onClick={() => router.push('/notifications')}
-              className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
+              className="iconBtn"
               aria-label="알림"
             >
               <svg
-                className="w-6 h-6"
+                style={{ width:'20px', height:'20px' }}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -198,7 +192,7 @@ export default function FriendsPageContent() {
                 />
               </svg>
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                <span style={{ position:'absolute', top:'-4px', right:'-4px', background:'var(--c-danger)', color:'#fff', fontSize:'10px', lineHeight:1, borderRadius:'999px', minWidth:'18px', height:'18px', display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px' }}>
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
@@ -208,17 +202,14 @@ export default function FriendsPageContent() {
       </div>
 
       {/* 탭 네비게이션 */}
-      <div className="max-w-md mx-auto px-4 mt-3">
-        <div className="grid grid-cols-3 bg-gray-100 rounded-xl p-1 text-sm">
+      <div className="ui-responsive-narrow" style={{ padding:'1rem 1rem .25rem' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', background:'var(--c-bg-soft)', border:'1px solid var(--c-border)', borderRadius:'14px', padding:'.4rem', gap:'.4rem' }}>
           {(['mutual', 'following', 'favorites'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => handleTabChange(t)}
-              className={`py-2 rounded-lg transition ${
-                tab === t 
-                  ? 'bg-white shadow font-semibold text-gray-800' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
+              className={`btn ${tab === t ? 'btn-primary' : 'btn-outline'}`}
+              style={{ padding:'.55rem .4rem', fontSize:'.7rem' }}
             >
               {t === 'mutual' ? '친구(맞팔)' : t === 'following' ? '팔로우' : '즐겨찾기'}
             </button>
@@ -226,88 +217,56 @@ export default function FriendsPageContent() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto p-4">
-        {/* 친구 목록 섹션 */}
-        <div className="bg-white rounded-lg shadow-sm">
-          <div className="p-4 border-b border-gray-100">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-800">
-                {tab === 'mutual' ? '친구(맞팔)' : tab === 'following' ? '팔로우' : '즐겨찾기'}
-              </h2>
-              <span className="text-sm text-gray-500">{total}명</span>
-            </div>
+      {/* 친구 목록 패널 */}
+      <div className="ui-responsive-narrow" style={{ padding:'1rem' }}>
+        <div className="friendListPanel fade-in">
+          <div className="friendListPanelHeader">
+            <h2 className="friendListPanelTitle">{tab === 'mutual' ? '친구(맞팔)' : tab === 'following' ? '팔로우' : '즐겨찾기'}</h2>
+            <span className="friendListPanelMeta">{total}명</span>
           </div>
-          
-          <div className="p-4">
+          <div style={{ padding:'1rem 1.1rem 1.15rem' }}>
             {friends.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <div className="mb-2 text-2xl">{emptyMsg.icon}</div>
-                <div className="text-sm font-medium">{emptyMsg.title}</div>
-                <div className="text-xs text-gray-400 mt-1">{emptyMsg.subtitle}</div>
+              <div className="emptyState">
+                <div className="emptyIcon">{emptyMsg.icon}</div>
+                <div className="emptyTitle">{emptyMsg.title}</div>
+                <div className="emptySubtitle">{emptyMsg.subtitle}</div>
               </div>
             ) : (
-              <div className="space-y-4">
-                {friends.map((friend) => (
-                  <div 
-                    key={friend.id} 
+              <div style={{ display:'flex', flexDirection:'column', gap:'.85rem' }}>
+                {friends.map(friend => (
+                  <div
+                    key={friend.id}
+                    className="friendItem"
                     onClick={() => handleProfileClick(friend.user.username)}
-                    className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
                   >
-                    {/* 프로필 섹션 */}
-                    <div className="flex-shrink-0">
-                      <div className="relative group">
-                        <div className="w-16 h-16 rounded-full overflow-hidden border-3 transition-all group-hover:scale-105"
-                             style={{ borderColor: getProfileColor(friend.user.id) }}>
-                          {friend.user.profileImageUrl ? (
-                            <img 
-                              src={friend.user.profileImageUrl} 
-                              alt={friend.user.username}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-                              <span className="text-gray-500 text-2xl">👤</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* 온라인 상태 표시 */}
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-2 border-white rounded-full"></div>
-                      </div>
+                    <div className="friendAvatarWrap" style={{ borderColor: getProfileColor(friend.user.id) }}>
+                      {friend.user.profileImageUrl ? (
+                        <img src={friend.user.profileImageUrl} alt={friend.user.username} style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      ) : (
+                        <span>👤</span>
+                      )}
+                      <span className="friendStatusDot" />
                     </div>
-
-                    {/* 사용자 정보 */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-gray-800 truncate">{friend.user.username}</h3>
-                        {friend.user.mbti && (
-                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-600 rounded-full font-medium">
-                            {friend.user.mbti}
-                          </span>
-                        )}
+                    <div className="friendMeta">
+                      <div className="friendNameRow">
+                        <span className="friendName" title={friend.user.username}>{friend.user.username}</span>
+                        {friend.user.mbti && <span className="badge badge-accent">{friend.user.mbti}</span>}
                       </div>
-                      
-                      {/* 최근 활동 */}
                       {friend.lastDiary ? (
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <span>📝 최근 일기:</span>
-                          <span className="font-medium">
-                            {formatTime(friend.lastDiary.createdAt)}
+                        <div className="friendActivity">
+                          <span style={{ fontWeight:600 }}>📝</span>
+                          <span>{formatTime(friend.lastDiary.createdAt)}</span>
+                          <span className="inlineIconGroup">
+                            {friend.lastDiary.hasPhoto && <span title="사진">📷</span>}
+                            {friend.lastDiary.hasAudio && <span title="오디오">🎤</span>}
+                            {friend.lastDiary.hasMusic && <span title="음악">🎵</span>}
                           </span>
-                          <div className="flex items-center gap-1 ml-2">
-                            {friend.lastDiary.hasPhoto && <span className="text-blue-500">📷</span>}
-                            {friend.lastDiary.hasAudio && <span className="text-green-500">🎤</span>}
-                            {friend.lastDiary.hasMusic && <span className="text-purple-500">🎵</span>}
-                          </div>
                         </div>
                       ) : (
-                        <div className="text-sm text-gray-400">아직 일기가 없습니다</div>
+                        <div className="friendActivity" style={{ opacity:.6 }}>아직 일기가 없습니다</div>
                       )}
                     </div>
-
-                    {/* 액션 버튼들 */}
-                    <div className="flex-shrink-0 flex items-center gap-2">
-                      {/* 메시지 버튼 */}
+                    <div style={{ display:'flex', alignItems:'center', gap:'.5rem' }}>
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
@@ -320,41 +279,28 @@ export default function FriendsPageContent() {
                             alert('메시지를 시작할 수 없습니다. 다시 시도해주세요.');
                           }
                         }}
-                        className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        className="iconBtn"
                         title="메시지 보내기"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg style={{ width:'16px', height:'16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-3.582 8-8 8a8.959 8.959 0 01-4.906-1.455L3 21l2.455-5.094A8.959 8.959 0 013 12c0-4.418 3.582-8 8-8s8 3.582 8 8z" />
                         </svg>
                       </button>
-                      
-                      {/* 즐겨찾기 버튼 */}
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFavorite(friend.id, friend.isFavorite);
-                        }}
-                        className={`p-2 rounded-lg transition-colors ${
-                          friend.isFavorite 
-                            ? 'text-yellow-500 bg-yellow-50 hover:bg-yellow-100' 
-                            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-                        }`}
+                        onClick={(e) => { e.stopPropagation(); toggleFavorite(friend.id, friend.isFavorite); }}
+                        className={`iconBtn ${friend.isFavorite ? 'iconBtn-favoriteActive' : ''}`}
                         title="즐겨찾기 토글"
+                        aria-pressed={friend.isFavorite}
                       >
                         ★
                       </button>
-                      
-                      {/* 최근 일기 보기 버튼 */}
                       {friend.lastDiary && (
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDiaryClick(friend.lastDiary!.id);
-                          }}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          onClick={(e) => { e.stopPropagation(); handleDiaryClick(friend.lastDiary!.id); }}
+                          className="iconBtn iconBtn-accent"
                           title="최근 일기 보기"
                         >
-                          <span role="img" aria-label="최근 일기 보기">🔗</span>
+                          🔗
                         </button>
                       )}
                     </div>

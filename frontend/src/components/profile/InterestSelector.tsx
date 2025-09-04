@@ -46,8 +46,8 @@ export const InterestSelector: React.FC<InterestSelectorProps> = ({
 
   return (
     <div className={`w-full max-w-3xl mx-auto ${className}`}>
-      <div className="mb-6 text-center">
-        <h2 className={`text-2xl font-bold ${accentText}`}>{title}</h2>
+      <div className="mb-5 text-center">
+        <h2 className={`text-xl font-bold ${accentText}`}>{title}</h2>
         <p className="text-gray-600 text-sm mt-2">
           {phase === 'category' && '관심 있는 카테고리를 선택하면 바로 세부 항목을 설정할 수 있습니다.'}
           {phase === 'items' && `${activeCategory.name} 카테고리의 세부 관심사를 선택하세요.`}
@@ -70,7 +70,7 @@ export const InterestSelector: React.FC<InterestSelectorProps> = ({
 
       {phase === 'category' && (
         <div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-5">
             {categories.map((cat, idx) => {
               const selected = isCategorySelected(cat.name);
               return (
@@ -78,15 +78,14 @@ export const InterestSelector: React.FC<InterestSelectorProps> = ({
                   key={cat.name}
                   type="button"
                   onClick={() => handleCategoryClick(cat.name, idx)}
-                  className={`px-4 py-6 rounded-xl font-medium border-2 transition transform hover:scale-105 ${
+                  className={`px-2.5 py-3 rounded-xl font-medium border-2 transition hover:scale-[1.04] ${
                     selected
                       ? `${accentBg} text-white ${accentBorder} shadow-lg`
                       : `bg-white ${accentTextColor} ${accentBorderLight} hover:bg-opacity-90`
                   }`}
                 >
-                  <div className="text-2xl mb-2">{iconsMap[cat.name] || '⭐'}</div>
-                  <div className="text-lg font-bold mb-1">{cat.name}</div>
-                  <div className="text-xs opacity-80">{cat.items.length}개 항목</div>
+                  <div className="text-lg mb-1">{iconsMap[cat.name] || '⭐'}</div>
+                  <div className="text-sm font-bold leading-snug">{cat.name}</div>
                 </button>
               );
             })}
@@ -134,9 +133,9 @@ export const InterestSelector: React.FC<InterestSelectorProps> = ({
             {isCategorySelected(activeCategory.name) ? '카테고리 선택 해제' : '카테고리 선택하기'}
           </button>
           {isCategorySelected(activeCategory.name) && (
-            <div className={`${accentSoftBg} rounded-xl p-4 w-full max-w-lg`}>
-              <div className={`font-bold mb-3 ${accentTextColor}`}>{activeCategory.name}</div>
-              <div className="grid grid-cols-1 gap-2">
+            <div className={`${accentSoftBg} rounded-xl p-3 w-full max-w-lg`}>
+              <div className={`font-bold mb-2 text-sm ${accentTextColor}`}>{activeCategory.name}</div>
+              <div className="grid grid-cols-2 gap-2">
                 {activeCategory.items.map(item => {
                   const selected = isItemSelected(activeCategory.name, item);
                   return (
@@ -144,7 +143,7 @@ export const InterestSelector: React.FC<InterestSelectorProps> = ({
                       key={item}
                       type="button"
                       onClick={() => onToggleItem(activeCategory.name, item)}
-                      className={`w-full px-3 py-2 rounded-lg text-sm font-medium border transition ${
+                      className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-medium border transition ${
                         selected
                           ? `${accentBg} text-white ${accentBorder}`
                           : `bg-white ${accentTextColor} ${accentBorderLight} hover:bg-opacity-90`
@@ -157,7 +156,7 @@ export const InterestSelector: React.FC<InterestSelectorProps> = ({
               </div>
             </div>
           )}
-          <div className="text-xs text-gray-500 mt-1">
+          <div className="text-[10px] text-gray-500 mt-1">
             선택된 카테고리: {selectedCategories.length}개 | 선택된 항목: {selectedItems.length}개
           </div>
           <button

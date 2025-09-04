@@ -6,13 +6,8 @@ import { useRouter } from "next/navigation";
 import { AuthContext } from "../context/AuthContext";
 
 export default function Navigation() {
-  const { user, isAuthenticated, logout } = useContext(AuthContext);
+  const { user, isAuthenticated } = useContext(AuthContext);
   const router = useRouter();
-
-  const handleLogout = async () => {
-    await logout();
-    router.push('/');
-  };
 
   const handleNotificationClick = () => {
     router.push('/notifications');
@@ -25,20 +20,14 @@ export default function Navigation() {
           WITH ME
         </Link>
         
-        {/* 로그인된 사용자에게만 알림 버튼과 로그아웃 버튼 표시 */}
-        {isAuthenticated && (
-          <div>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              로그아웃
-            </button>
+        {/* 로그인된 사용자: 추후 알림/설정 아이콘 영역 (로그아웃 버튼 제거됨) */}
+        {isAuthenticated ? (
+          <div className="flex items-center gap-3">
+            {/* 예: 알림 버튼이나 설정 페이지 진입 버튼을 여기에 배치 가능 */}
           </div>
+        ) : (
+          <div />
         )}
-        
-        {/* 로그인되지 않은 경우 빈 div */}
-        {!isAuthenticated && <div />}
       </div>
     </nav>
   );
