@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { SpotifyService, SpotifyTrackFormatted } from './spotify.service';
 
-@Controller('spotify')
+@Controller('api/v1/spotify')
 export class SpotifyController {
   constructor(private readonly spotifyService: SpotifyService) {}
 
