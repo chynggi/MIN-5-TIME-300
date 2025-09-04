@@ -359,9 +359,9 @@ export default function ProfilePage() {
 
   return (
     <div className={styles.container}>
-      {/* 상단: 프로필 이미지/MBTI + 통계 */}
-      <div className={styles.topRow}>
-        <div className={styles.avatarBox}>
+      {/* 상단: 프로필 사진+MBTI+통계 병합 */}
+      <div className={styles.statsBox}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
           <div className={styles.avatarWrap}>
             <img
               src={profile.profileImageUrl 
@@ -373,17 +373,17 @@ export default function ProfilePage() {
             />
             <span className={styles.mbtiBadge}>{profile.mbti}</span>
           </div>
-        </div>
-        <div className={styles.statsBox}>
-          <div className={styles.statsRow}>
-            <span className={styles.statNum}>{profile.diaryCount}</span>
-            <span className={styles.statNum}>{profile.followerCount}</span>
-            <span className={styles.statNum}>{profile.followingCount}</span>
-          </div>
-          <div className={styles.statsLabelRow}>
-            <span className={styles.statLabel}>일기</span>
-            <span className={styles.statLabel}>팔로워</span>
-            <span className={styles.statLabel}>팔로잉</span>
+          <div>
+            <div className={styles.statsRow}>
+              <span className={styles.statNum}>{profile.diaryCount}</span>
+              <span className={styles.statNum}>{profile.followerCount}</span>
+              <span className={styles.statNum}>{profile.followingCount}</span>
+            </div>
+            <div className={styles.statsLabelRow}>
+              <span className={styles.statLabel}>일기</span>
+              <span className={styles.statLabel}>팔로워</span>
+              <span className={styles.statLabel}>팔로잉</span>
+            </div>
           </div>
         </div>
       </div>
