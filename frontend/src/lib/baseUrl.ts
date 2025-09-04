@@ -21,7 +21,7 @@ const NORMALIZED_ORIGIN = RAW_ENV.replace(/(\/api)+(\/?$)/, '');
 export let API_BASE_V1 = `${NORMALIZED_ORIGIN}/api/v1`;
 //if문으로, localhost가 아니면 API_BASE_V1을 api/api/v1로 설정
 if (!NORMALIZED_ORIGIN.includes('localhost')) {
-  API_BASE_V1 = `${NORMALIZED_ORIGIN}/api/v1`;
+  API_BASE_V1 = `${NORMALIZED_ORIGIN}/api/api/v1`;
 }
 
 export const API_ORIGIN = NORMALIZED_ORIGIN;
