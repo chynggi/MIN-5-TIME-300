@@ -22,7 +22,7 @@ import {
   BlockUserDto
 } from './dto';
 
-@Controller('follow')
+@Controller('api/v1/follow')
 @UseGuards(AuthGuard('jwt'))
 export class FollowController {
   constructor(private readonly followService: FollowService) {}
