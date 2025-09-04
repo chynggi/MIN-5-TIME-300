@@ -32,6 +32,7 @@ coverage/
 .idea/
 *.swp
 
+# Ignore package-lock.json if you are not using it
 package-lock.json
 
 # Prisma migrations
