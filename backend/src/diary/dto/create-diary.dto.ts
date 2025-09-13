@@ -9,6 +9,10 @@ export class CreateDiaryDto {
   questionId?: string;
 
   @IsOptional()
+  @IsString()
+  questionModel?: string; // 질문 생성에 사용된 AI 모델 id (요약 모델 동기화 목적)
+
+  @IsOptional()
   @IsBooleanString()
   isPublic?: string; // 'true' | 'false'
 

@@ -121,23 +121,18 @@ model Journal {
   mediaUrl        String?
   mediaType       String?
   writingDuration Int
-  question        JournalQuestion?
-  reactions       JournalReaction[]
+  reactions       JournalReaction[] // 좋아요 저장 모델과 연결
   // (Removed) communityComments CommunityComment[]
   // (Removed) feedbackLogs FeedbackLog[]
   lat        Float?   // 위도
   lng        Float?   // 경도
   embedding   Float[]  // 임베딩(768차원) 저장: 재계산 비용 절감
+  // 요약 메타데이터 (2025-09 추가)
+  summaryModel        String?  // 요약에 실제 사용된 모델명
+  summaryTruncated    Boolean? @default(false) // 길이 제한으로 잘렸는지 여부
+  summaryFallbackUsed Boolean? @default(false) // 폴백 사용 여부
 }
 
-
-model JournalQuestion {
-  id         String   @id @default(uuid())
-  journal    Journal  @relation(fields: [journalId], references: [id])
-  journalId  String   @unique
-  question   String
-  createdAt  DateTime @default(now())
-}
 
 model JournalReaction {
   id           String   @id @default(uuid())

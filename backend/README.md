@@ -24,6 +24,26 @@
    npx prisma migrate dev --name init
    ```
 
+## AI 일기 요약 기능
+질문 기반(Q&A) 일기 작성 시 서버는 저장 전에 원문(질문/답변 나열 형태)을 자연스러운 1인칭 서술형 일기로 요약합니다.
+
+### 환경 변수
+| 이름 | 설명 | 필수 | 비고 |
+|------|------|------|------|
+| `GEMINI_API_KEY` | Google Gemini API 키 | 선택 | 없으면 요약 생략 후 원문 저장(경고 로그) |
+
+### 처리 흐름
+1. 클라이언트: `questionId` 포함하여 `/api/v1/diaries` POST (FormData)
+2. `DiaryService.createDiary` → `questionId` 존재 시 Q&A 기반 판단
+3. `DiarySummaryService` 가 Gemini(`gemini-2.0-pro`) 호출
+4. 응답 텍스트를 최종 `content` 로 저장 (원문 별도 보존 안 함)
+5. 실패/API Key 없음 → 원문 그대로 저장
+
+### 커스터마이징
+- 원문 보존 필요 시 `Journal` 모델에 `rawContent` 추가 후 저장 로직 확장
+- 모델 교체는 `DiarySummaryService` 내부 MODEL 값 수정으로 가능
+
+
 ## 개발 및 실행
 ```bash
 npm install

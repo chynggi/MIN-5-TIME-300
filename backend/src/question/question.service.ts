@@ -66,12 +66,11 @@ export class QuestionService {
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 7,
-      include: { question: true },
     });
     const recentJournals: RecentJournal[] = recentJournalsRaw.map(j => ({
       date: j.createdAt.toISOString().slice(0, 10),
       content: j.content,
-      question: j.question?.question ?? '',
+      question: '', // JournalQuestion 모델 제거로 질문 텍스트 저장 안 함
       emotionScore: j.emotionScore,
     }));
 
@@ -121,7 +120,8 @@ export class QuestionService {
       ? Math.round(validJournals.reduce((acc, j) => acc + j.content.length, 0) / validJournals.length)
       : undefined;
     // 무응답 비율: 질문이 있었지만 내용이 매우 짧거나 없는 경우 (threshold < 5 chars)
-    const noResponseCount = validJournals.filter(j => (j.question && (!j.content || j.content.trim().length < 5))).length;
+  // 기존: 질문 텍스트 기반 무응답 비율 계산 제거 (Question 모델 삭제)
+  const noResponseCount = 0;
     const noResponseRate = validJournals.length ? noResponseCount / validJournals.length : undefined;
 
     const regenerationCount = 0; // TODO: 재생성 로그 테이블 도입 후 실제 값 반영

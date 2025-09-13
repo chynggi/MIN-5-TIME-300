@@ -10,6 +10,17 @@ import { PrismaService } from '../prisma.service';
 import { VectorDbService } from '../vector-db/vector-db.service';
 import { FileUploadService } from '../common/services/file-upload.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { DiarySummaryService } from './summary.service';
+
+// 간단한 제목 추출: [제목] 패턴 혹은 첫 줄 30자
+function extractTitle(content: string): string | undefined {
+  if (!content) return undefined;
+  const titleMatch = content.match(/^\[제목\]\s*(.+)$/m);
+  if (titleMatch) return titleMatch[1].trim().slice(0, 50);
+  const firstLine = content.split(/\n/)[0].trim();
+  if (firstLine) return firstLine.slice(0, 50);
+  return undefined;
+}
 
 @Injectable()
 export class DiaryService {
@@ -19,6 +30,7 @@ export class DiaryService {
     private readonly fileUploadService: FileUploadService,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly activityService: ActivityService,
+    private readonly diarySummaryService: DiarySummaryService,
   ) {}
 
   /**
@@ -95,13 +107,12 @@ export class DiaryService {
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 3,
-      include: { question: true },
     });
     const recentJournals = recentJournalsRaw.map(j => ({
       id: j.id,
       content: j.content,
       date: j.createdAt.toISOString(),
-      question: j.question?.question ?? '',
+    question: '', // deprecated: JournalQuestion 제거로 항상 빈 문자열
       emotionScore: j.emotionScore,
     }));
     // 3. 메타 정보 (MetaInfo 타입에 맞게 모든 필드 포함)
@@ -185,7 +196,7 @@ export class DiaryService {
           emotion: p.emotion ?? undefined,
           mediaUrl: p.mediaUrl ?? undefined,
           mediaType: p.mediaType ?? undefined,
-          question: '',
+          question: '', // deprecated
           lat: (p as any).lat,
           lng: (p as any).lng,
           likes: p.reactions?.filter(r => r.reactionType === 'like').length || 0,
@@ -227,7 +238,7 @@ export class DiaryService {
         emotion: d.emotion ?? undefined, // 감정 이모지 포함
         mediaUrl: d.mediaUrl ?? undefined,
         mediaType: d.mediaType ?? undefined,
-        question: '', // 추후 질문 연동
+        question: '', // deprecated
       })),
       totalCount,
       page,
@@ -488,10 +499,24 @@ export class DiaryService {
     const lat = dto.lat !== undefined && dto.lat !== null && dto.lat !== '' ? parseFloat(dto.lat) : undefined;
     const lng = dto.lng !== undefined && dto.lng !== null && dto.lng !== '' ? parseFloat(dto.lng) : undefined;
 
+    // Q&A 기반 작성 감지 -> 요약 시도
+    let finalContent = dto.content;
+    let summaryMeta: { modelUsed: string; truncated: boolean; fallbackUsed: boolean } | null = null;
+    const isQuestionBased = !!dto.questionId;
+    if (isQuestionBased) {
+      try {
+  const res = await this.diarySummaryService.summarize(dto.content, { title: extractTitle(dto.content), modelId: dto.questionModel, userId });
+        finalContent = res.text;
+        summaryMeta = { modelUsed: res.modelUsed, truncated: res.truncated, fallbackUsed: res.fallbackUsed };
+      } catch (e) {
+        // 요약 실패 시 원문 유지 (이미 내부에서 로그 처리)
+      }
+    }
+
     const diary = await this.prisma.journal.create({
       data: {
         userId,
-        content: dto.content,
+        content: finalContent,
         isPublic,
         emotion: dto.emotion, // 감정 이모지 저장
         diaryDate, // 일기 날짜 저장
@@ -502,6 +527,9 @@ export class DiaryService {
         emotionScore: 0,
         lat,
         lng,
+        summaryModel: summaryMeta?.modelUsed,
+        summaryTruncated: summaryMeta?.truncated,
+        summaryFallbackUsed: summaryMeta?.fallbackUsed,
       },
     });
 
@@ -532,10 +560,10 @@ export class DiaryService {
 
     const result = {
       id: diary.id,
-      content: diary.content,
+  content: diary.content,
       createdAt: diary.createdAt.toISOString(),
       isPublic: diary.isPublic,
-      question: '', // 추후 질문 연동
+      question: '', // deprecated
       mediaUrl,
       mediaType,
       lat: (diary as any).lat ?? null,

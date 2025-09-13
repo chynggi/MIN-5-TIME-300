@@ -47,6 +47,7 @@ function NewDiaryContent() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [questionId, setQuestionId] = useState("");
+  const [questionModel, setQuestionModel] = useState("");
   const [startTime] = useState<number>(Date.now());
 
   // Date param handling
@@ -110,7 +111,13 @@ function NewDiaryContent() {
   };
   const handleDefaultImageSelect = (url: string) => { setImage(null); setPreview(url); setShowDefaultImageSelect(false); };
   const handleWritingModeSelect = (mode: "question" | "free") => { setCurrentView(mode === 'question' ? 'ai-question' : 'free-write'); };
-  const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string }) => { setTitle(data.title); setContent(data.content); setQuestionId(data.questionId); setCurrentView('main'); };
+  const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string; questionModel: string }) => { 
+    setTitle(data.title); 
+    setContent(data.content); 
+    setQuestionId(data.questionId); 
+    setQuestionModel(data.questionModel);
+    setCurrentView('main'); 
+  };
   const handleFreeWriteComplete = (data: { title: string; content: string }) => { setTitle(data.title); setContent(data.content); setCurrentView('main'); };
 
   const handleSubmit = async () => {
@@ -128,10 +135,14 @@ function NewDiaryContent() {
       const isPublic = diarySettings.postVisibility !== 'private';
       formData.append('isPublic', isPublic.toString());
       if (shareLocation && lat != null && lng != null) { formData.append('lat', lat.toString()); formData.append('lng', lng.toString()); }
-      if (questionId) formData.append('questionId', questionId);
+  if (questionId) formData.append('questionId', questionId);
+  if (questionModel) formData.append('questionModel', questionModel);
       if (image) formData.append('file', image);
       const response = await api.post("/diaries", formData, { headers: { "Content-Type": "multipart/form-data" } });
-      if (response.status === 200 || response.status === 201) { alert("일기가 성공적으로 저장되었습니다!"); router.push('/dashboard'); }
+      if (response.status === 200 || response.status === 201) { 
+        alert("일기가 성공적으로 저장되었습니다!\n(질문 기반 작성 내용은 자연스러운 일기 형태로 요약/정리되어 저장되었습니다.)"); 
+        router.push('/dashboard'); 
+      }
       else { throw new Error('저장 실패'); }
     } catch (err: any) {
       console.error('일기 저장 오류:', err?.response?.data || err);

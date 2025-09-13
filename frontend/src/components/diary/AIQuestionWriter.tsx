@@ -13,7 +13,7 @@ interface Question {
 }
 
 interface AIQuestionWriterProps {
-  onComplete: (data: { title: string; content: string; questionId: string }) => void;
+  onComplete: (data: { title: string; content: string; questionId: string; questionModel: string }) => void;
   onBack: () => void;
 }
 
@@ -218,7 +218,8 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
     onComplete({
       title: finalTitle,
       content: contentLines.join('\n\n').trim(),
-      questionId: ids.join(',')
+      questionId: ids.join(','),
+      questionModel: selectedModel,
     });
   };
 
