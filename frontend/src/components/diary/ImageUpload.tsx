@@ -5,6 +5,7 @@ import Image from "next/image";
 interface ImageUploadProps {
   onImageSelect: (file: File | null) => void;
   preview: string | null;
+  onDefaultImageSelect?: (url: string, presetKey?: string) => void; // 기본 이미지 실제 경로 + 프리셋 키 전달
 }
 
 const defaultImages = {
@@ -18,7 +19,7 @@ const defaultImages = {
   snow: "/images/weather/snow.jpg",
 };
 
-export default function ImageUpload({ onImageSelect, preview }: ImageUploadProps) {
+export default function ImageUpload({ onImageSelect, preview, onDefaultImageSelect }: ImageUploadProps) {
   const [selectedDefault, setSelectedDefault] = useState<string | null>(null);
   const [showDefaultImages, setShowDefaultImages] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -37,7 +38,9 @@ export default function ImageUpload({ onImageSelect, preview }: ImageUploadProps
 
   const handleDefaultSelect = (imageKey: string) => {
     setSelectedDefault(imageKey);
-    onImageSelect(null); // 기본 이미지 선택 시 파일은 null
+    onImageSelect(null); // 파일 비우기
+    const url = defaultImages[imageKey as keyof typeof defaultImages];
+    onDefaultImageSelect?.(url, imageKey); // 프리셋 키 함께 전달
   };
 
   const handleRemoveImage = () => {

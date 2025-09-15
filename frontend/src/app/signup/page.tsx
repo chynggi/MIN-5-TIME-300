@@ -538,6 +538,7 @@ const SignupPage = () => {
         education: form.education === "기타" ? form.educationOther : form.education,
         interests,
         lifestyle,
+        profileColor: form.profileColor,
       };
       const data = await signupApi.request(payload);
       if (data && data.token) {
@@ -1128,11 +1129,7 @@ const SignupPage = () => {
                         className="flex-1 py-2 rounded-md bg-gray-300 text-gray-800 text-xs font-semibold hover:bg-gray-400"
                         onClick={() => setStep(2)}
                       >카테고리 목록</button>
-                      <button
-                        type="button"
-                        className="flex-1 py-2 rounded-md bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700"
-                        onClick={() => setStep(4)}
-                      >다음 단계</button>
+                      {/* '다음 단계' 버튼 제거 (요구사항: 세부 선택 화면에서는 다음 단계 버튼 숨김) */}
                     </div>
                   )}
                 </div>
@@ -1316,11 +1313,7 @@ const SignupPage = () => {
                         className="flex-1 py-2 rounded-md bg-gray-300 text-gray-800 text-xs font-semibold hover:bg-gray-400"
                         onClick={() => setStep(4)}
                       >카테고리 목록</button>
-                      <button
-                        type="button"
-                        className="flex-1 py-2 rounded-md bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700"
-                        onClick={() => setStep(6)}
-                      >다음 단계</button>
+                      {/* '다음 단계' 버튼 제거 (요구사항: 세부 선택 화면에서는 다음 단계 버튼 숨김) */}
                     </div>
                   )}
                 </div>
@@ -1348,227 +1341,24 @@ const SignupPage = () => {
           {step === 6 && (
             <div className="flex flex-col items-center md:items-start w-full max-w-xl mx-auto">
               <label className="block font-semibold mb-2 text-gray-700">프로필 컬러</label>
-              {/* 프리셋 팔레트 */}
-              <div className="flex flex-wrap gap-2 justify-center mb-4">
+              <p className="text-xs text-gray-500 mb-3">원하는 색상을 하나 선택해 주세요.</p>
+              <div className="flex flex-wrap gap-3 justify-center">
                 {PROFILE_COLORS.map((color) => (
                   <button
                     key={color}
                     type="button"
-                    aria-label={`프리셋 색상 ${color} 선택`}
-                    className={`w-8 h-8 rounded-full border-2 transition focus:outline-none focus:ring-2 focus:ring-blue-300 ${form.profileColor === color ? "border-black scale-110" : "border-gray-200"}`}
+                    aria-label={`색상 ${color} 선택`}
+                    className={`w-10 h-10 rounded-full border-2 transition focus:outline-none focus:ring-2 focus:ring-blue-300 ${form.profileColor === color ? "border-blue-600 ring-2 ring-blue-300 scale-110" : "border-gray-200 hover:scale-105"}`}
                     style={{ background: color }}
                     onClick={() => setForm({ ...form, profileColor: color })}
                   />
                 ))}
               </div>
-              {/* 사용자 정의 색상 - color input */}
-              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-gray-700">직접 선택</span>
-                  <input
-                    type="color"
-                    value={form.profileColor}
-                    onChange={(e) => setForm({ ...form, profileColor: e.target.value })}
-                    aria-label="컬러 피커"
-                    className="w-16 h-16 p-0 border border-gray-300 rounded cursor-pointer"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-gray-700">HEX 코드</span>
-                  <input
-                    type="text"
-                    value={form.profileColor}
-                    onChange={(e) => {
-                      const val = e.target.value.trim();
-                      if (/^#?[0-9A-Fa-f]{0,6}$/.test(val.replace('#',''))) {
-                        const withHash = val.startsWith('#') ? val : ('#' + val);
-                        setForm({ ...form, profileColor: withHash });
-                      }
-                    }}
-                    placeholder="#RRGGBB"
-                    aria-label="HEX 색상 입력"
-                    className="px-3 py-2 rounded-md border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none text-sm"
-                  />
-                </div>
+              <div className="mt-4 flex items-center gap-2 text-sm">
+                <span className="text-gray-600">선택된 색상:</span>
+                <span className="w-6 h-6 rounded-full border" style={{ background: form.profileColor }} />
+                <span className="font-mono text-gray-700 text-xs">{form.profileColor}</span>
               </div>
-              {/* RGBA 직접 입력 + 히스토리 + 대비 + 색약 시뮬레이션 */}
-              {(() => {
-                const HISTORY_KEY = 'profileColorHistoryV1';
-                const MAX_HISTORY = 8;
-                const clamp = (n:number,min=0,max=255)=> Math.min(max,Math.max(min,n));
-                const parseHex = (hex:string) => {
-                  let h = hex.replace('#','');
-                  if (h.length === 3) h = h.split('').map(c=>c+c).join('');
-                  if (![6,8].includes(h.length)) return null;
-                  const r = parseInt(h.slice(0,2),16);
-                  const g = parseInt(h.slice(2,4),16);
-                  const b = parseInt(h.slice(4,6),16);
-                  const a = h.length===8? parseInt(h.slice(6,8),16):255;
-                  return {r,g,b,a};
-                };
-                const toHex = (r:number,g:number,b:number,a?:number, includeAlpha=true) => {
-                  const h = [r,g,b].map(v=>clamp(v).toString(16).padStart(2,'0')).join('');
-                  const ah = clamp(a??255).toString(16).padStart(2,'0');
-                  return '#'+h + (includeAlpha? ah:'');
-                };
-                const parsed = parseHex(form.profileColor) || {r:0,g:0,b:0,a:255};
-                const {r,g,b,a} = parsed;
-                // 명암비 계산 (WCAG)
-                const relativeLuminance = (c:number) => {
-                  const cs = c/255;
-                  return cs <= 0.03928 ? cs/12.92 : Math.pow((cs+0.055)/1.055, 2.4);
-                };
-                const lum = 0.2126*relativeLuminance(r) + 0.7152*relativeLuminance(g) + 0.0722*relativeLuminance(b);
-                const contrastWith = (bgLum:number, fgLum:number) => (Math.max(bgLum, fgLum) + 0.05)/(Math.min(bgLum, fgLum) + 0.05);
-                const contrastBlack = contrastWith(lum,0);
-                const contrastWhite = contrastWith(1, lum);
-                const recommendedText = contrastBlack > contrastWhite ? '#000000' : '#FFFFFF';
-                const recommendedContrast = Math.max(contrastBlack, contrastWhite);
-                const wcagLevel = (() => {
-                  if (recommendedContrast >= 7) return 'AAA';
-                  if (recommendedContrast >= 4.5) return 'AA';
-                  if (recommendedContrast >= 3) return 'AA Large';
-                  return 'Low';
-                })();
-                // 색약 시뮬레이션 (간단한 LMS 변환 근사)
-                const simulate = (type:string, r:number,g:number,b:number) => {
-                  // 변환 행렬 근사 (sRGB -> LMS)
-                  const sr = r/255, sg = g/255, sb = b/255;
-                  const L = 0.31399022*sr + 0.63951294*sg + 0.04649755*sb;
-                  const M = 0.15537241*sr + 0.75789446*sg + 0.08670142*sb;
-                  const S = 0.01775239*sr + 0.10944209*sg + 0.87256922*sb;
-                  let l=L,m=M,s=S;
-                  if (type==='protan') { l = m; } // 단순화
-                  if (type==='deutan') { m = l; }
-                  if (type==='tritan') { s = (l+m)/2; }
-                  // 역변환 (근사)
-                  let R = 5.47221206*l -4.6419601*m + 0.16963708*s;
-                  let G = -1.1252419*l +2.29317094*m -0.1678952*s;
-                  let B = 0.02980165*l -0.19318073*m +1.16364789*s;
-                  const to255 = (x:number)=> clamp(Math.round(x*255));
-                  return `rgb(${to255(R)},${to255(G)},${to255(B)})`;
-                };
-                const history: string[] = (() => {
-                  if (typeof window === 'undefined') return [];
-                  try { return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]') as string[]; } catch { return []; }
-                })();
-                const updateRgba = (nr:number, ng:number, nb:number, na:number) => {
-                  const hex = toHex(nr,ng,nb,na,true);
-                  setForm({...form, profileColor: hex});
-                };
-                const handleChannelInput = (channel:'r'|'g'|'b'|'a') => (e:React.ChangeEvent<HTMLInputElement>) => {
-                  const val = e.target.value === '' ? '' : e.target.value;
-                  if (val === '') { return; }
-                  if (!/^\d{1,3}$/.test(val)) return;
-                  const num = clamp(parseInt(val,10));
-                  updateRgba(channel==='r'?num:r, channel==='g'?num:g, channel==='b'?num:b, channel==='a'?num:a);
-                };
-                const handleKeyAdjust = (channel:'r'|'g'|'b'|'a') => (e:React.KeyboardEvent<HTMLInputElement>) => {
-                  if (['ArrowUp','ArrowDown'].includes(e.key)) {
-                    e.preventDefault();
-                    const deltaBase = e.shiftKey ? 10 : 1;
-                    const delta = e.key==='ArrowUp'? deltaBase : -deltaBase;
-                    const nv = clamp((channel==='r'?r:channel==='g'?g:channel==='b'?b:a)+delta,0, channel==='a'?255:255);
-                    updateRgba(channel==='r'?nv:r, channel==='g'?nv:g, channel==='b'?nv:b, channel==='a'?nv:a);
-                  }
-                };
-                const saveHistory = () => {
-                  if (!/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(form.profileColor)) return;
-                  if (history[0] === form.profileColor) return;
-                  const updated = [form.profileColor, ...history.filter(c=>c!==form.profileColor)].slice(0,MAX_HISTORY);
-                  localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
-                };
-                return (
-                  <div className="w-full flex flex-col gap-4 mb-6" aria-label="RGBA 입력" role="group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full border shadow-inner" style={{ background: form.profileColor }} aria-label="현재 선택 색상 미리보기" />
-                      <div className="text-xs text-gray-600 font-mono select-all">{form.profileColor}</div>
-                      <button type="button" onClick={saveHistory} className="px-2 py-1 rounded bg-gray-200 text-gray-700 text-xs hover:bg-gray-300" aria-label="현재 색상 히스토리에 저장">저장</button>
-                    </div>
-                    {/* HEX / RGBA 입력 */}
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
-                      <div className="col-span-2 md:col-span-1 flex flex-col gap-1">
-                        <label className="text-[11px] font-medium">HEX (6/8)</label>
-                        <input
-                          type="text"
-                          value={form.profileColor}
-                          onChange={(e)=>{
-                            const val = e.target.value.trim();
-                            if (/^#?[0-9A-Fa-f]{0,8}$/.test(val.replace('#',''))) {
-                              const withHash = val.startsWith('#')?val:'#'+val;
-                              setForm({...form, profileColor: withHash});
-                            }
-                          }}
-                          onBlur={()=>{ if (/^#[0-9A-Fa-f]{6}$/.test(form.profileColor)) { setForm({...form, profileColor: form.profileColor+ 'FF'});} }}
-                          placeholder="#RRGGBB or #RRGGBBAA"
-                          className="px-2 py-1 rounded border text-xs font-mono"
-                          aria-label="HEX 색상"
-                        />
-                      </div>
-                      {(['r','g','b','a'] as const).map(ch => (
-                        <div key={ch} className="flex flex-col gap-1">
-                          <label className="text-[11px] font-medium uppercase" htmlFor={`col-${ch}`}>{ch}</label>
-                          <input
-                            id={`col-${ch}`}
-                            type="number"
-                            min={0}
-                            max={255}
-                            value={ch==='r'?r:ch==='g'?g:ch==='b'?b:a}
-                            onChange={handleChannelInput(ch)}
-                            onKeyDown={handleKeyAdjust(ch)}
-                            className="px-2 py-1 rounded border text-xs font-mono w-full"
-                            aria-label={`${ch.toUpperCase()} 채널 값`}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    {/* 대비 정보 */}
-                    <div className="text-[11px] text-gray-600 flex flex-wrap gap-x-4 gap-y-1">
-                      <span>추천 텍스트 색상: <span className="font-mono" style={{color:recommendedText}}>{recommendedText}</span></span>
-                      <span>명암비: {recommendedContrast.toFixed(2)} : 1</span>
-                      <span>WCAG: {wcagLevel}</span>
-                    </div>
-                    {/* 색약 시뮬레이션 */}
-                    <div className="flex flex-col gap-2">
-                      <div className="text-[11px] font-medium text-gray-700">색약 모드 미리보기</div>
-                      <div className="flex gap-3">
-                        {[
-                          {k:'정상', c: form.profileColor},
-                          {k:'Protan', c: simulate('protan',r,g,b)},
-                          {k:'Deutan', c: simulate('deutan',r,g,b)},
-                          {k:'Tritan', c: simulate('tritan',r,g,b)},
-                        ].map(({k,c}) => (
-                          <div key={k} className="flex flex-col items-center gap-1">
-                            <div className="w-8 h-8 rounded-full border" style={{background:c}} title={k} aria-label={`${k} 시뮬레이션`} />
-                            <span className="text-[10px] text-gray-500">{k}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {/* 히스토리 */}
-                    {history.length > 0 && (
-                      <div>
-                        <div className="text-[11px] font-medium text-gray-700 mb-1">최근 사용</div>
-                        <div className="flex flex-wrap gap-2">
-                          {history.map(c => (
-                            <button
-                              key={c}
-                              type="button"
-                              aria-label={`최근 색상 ${c} 선택`}
-                              className={`w-7 h-7 rounded-full border ${form.profileColor===c?'ring-2 ring-blue-400 border-black':'border-gray-300'}`}
-                              style={{background:c}}
-                              onClick={()=> setForm({...form, profileColor:c})}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-              <p className="text-[11px] text-gray-500 leading-relaxed mb-2">
-                프리셋 / 컬러 피커 / HEX / RGBA 숫자 입력으로 색을 설정하세요. Shift+방향키로 10단위 조정.
-              </p>
             </div>
           )}
           {/* 하단 버튼/상태 */}

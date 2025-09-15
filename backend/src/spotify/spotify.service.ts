@@ -72,63 +72,104 @@ export class SpotifyService {
 
   async getPopular(category = 'toplists', limitStr = '10'): Promise<{ tracks: SpotifyTrackFormatted[] }> {
     const limit = parseInt(limitStr, 10) || 10;
-    const token = await this.fetchToken();
-    let collected: any[] = [];
+    let token: string | null = null;
     try {
-      if (category === 'toplists') {
-        const playlistRes = await fetch(`https://api.spotify.com/v1/playlists/37i9dQZEVXbNxXF4SkHj9F/tracks?market=KR&limit=${limit}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (playlistRes.ok) {
-          const playlistData = await playlistRes.json();
-            collected = playlistData.items.map((i: any) => i.track).filter((t: any) => t);
-        }
-      } else if (category === 'new-releases') {
-        const newRes = await fetch(`https://api.spotify.com/v1/browse/new-releases?country=KR&limit=${limit}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (newRes.ok) {
-          const newData = await newRes.json();
-          const albumPromises = newData.albums.items.slice(0, limit).map(async (album: any) => {
-            const albumTracksRes = await fetch(`https://api.spotify.com/v1/albums/${album.id}/tracks?market=KR&limit=1`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (albumTracksRes.ok) {
-              const albumTracksData = await albumTracksRes.json();
-              const track = albumTracksData.items[0];
-              if (track) {
-                track.album = album; // enrich images
-                return track;
-              }
-            }
-            return null;
-          });
-          collected = (await Promise.all(albumPromises)).filter(Boolean) as any[];
-        }
-      } else { // fallback k-pop genre
-        const searchRes = await fetch(`https://api.spotify.com/v1/search?q=genre:k-pop&type=track&market=KR&limit=${limit}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (searchRes.ok) {
-          const searchData = await searchRes.json();
-          collected = searchData.tracks.items;
+      token = await this.fetchToken();
+    } catch (e) {
+      // 자격 증명 미설정 혹은 토큰 오류 시 빈 목록 반환 (하드코딩 제거)
+      return { tracks: [] };
+    }
+
+    // 시나리오별 동적 수집: 1) toplists (KR Top 50) 2) Global Top 50 3) K-POP 장르 검색 4) 신규 발매 대표 트랙
+    const playlistCandidates = [
+      // 대한민국 Top 50 (공식 Spotify 플레이리스트 ID)
+      '37i9dQZEVXbNxXF4SkHj9F',
+      // Global Top 50
+      '37i9dQZEVXbMDoHDwVN2tF',
+    ];
+
+    const collected: any[] = [];
+
+    const authHeader = { Authorization: `Bearer ${token}` };
+
+    const tryFetchJson = async (url: string) => {
+      try {
+        const r = await fetch(url, { headers: authHeader });
+        if (!r.ok) return null;
+        return await r.json();
+      } catch (e) {
+        return null;
+      }
+    };
+
+    // 1. 플레이리스트 기반 수집
+    if (category === 'toplists') {
+      for (const pid of playlistCandidates) {
+        if (collected.length >= limit) break;
+        const data = await tryFetchJson(`https://api.spotify.com/v1/playlists/${pid}/tracks?market=KR&limit=${limit}`);
+        if (data?.items?.length) {
+          for (const item of data.items) {
+            if (item.track) collected.push(item.track);
+            if (collected.length >= limit) break;
+          }
         }
       }
-    } catch (e) {
-      // swallow and fallback below
-      console.error('Spotify popular fetch error', e);
     }
-    let tracks: SpotifyTrackFormatted[];
-    if (!collected.length) {
-      tracks = [
-        { id: 'fallback1', name: '좋은 날', artists: [{ name: '아이유' }], preview_url: null, external_urls: { spotify: '#' }, album: { images: [{ url: '/images/music/placeholder.jpg' }] } },
-        { id: 'fallback2', name: 'Spring Day', artists: [{ name: 'BTS' }], preview_url: null, external_urls: { spotify: '#' }, album: { images: [{ url: '/images/music/placeholder.jpg' }] } },
-        { id: 'fallback3', name: 'LOVE DIVE', artists: [{ name: 'IVE' }], preview_url: null, external_urls: { spotify: '#' }, album: { images: [{ url: '/images/music/placeholder.jpg' }] } },
-        { id: 'fallback4', name: 'Next Level', artists: [{ name: 'aespa' }], preview_url: null, external_urls: { spotify: '#' }, album: { images: [{ url: '/images/music/placeholder.jpg' }] } },
-      ];
-    } else {
-      tracks = collected.map((t) => this.mapTrack(t));
+
+    // 2. new-releases (필요 시 첫 트랙) - category === 'new-releases' 이거나 toplists 실패시
+    if ((category === 'new-releases' || !collected.length) && collected.length < limit) {
+      const newData = await tryFetchJson(`https://api.spotify.com/v1/browse/new-releases?country=KR&limit=${Math.min(limit, 20)}`);
+      if (newData?.albums?.items?.length) {
+        for (const album of newData.albums.items) {
+          if (collected.length >= limit) break;
+          // 각 앨범 대표 트랙 (첫 번째 트랙)
+          const albumTracks = await tryFetchJson(`https://api.spotify.com/v1/albums/${album.id}/tracks?market=KR&limit=1`);
+            const first = albumTracks?.items?.[0];
+            if (first) {
+              first.album = album; // 이미지 정보 보강
+              collected.push(first);
+            }
+        }
+      }
     }
+
+    // 3. 장르 검색 (k-pop) - 아직 부족하면 보충
+    if (collected.length < limit) {
+      const genreData = await tryFetchJson(`https://api.spotify.com/v1/search?q=genre:k-pop&type=track&market=KR&limit=${limit}`);
+      if (genreData?.tracks?.items?.length) {
+        for (const t of genreData.tracks.items) {
+          collected.push(t);
+          if (collected.length >= limit) break;
+        }
+      }
+    }
+
+    // 중복 제거 (트랙 ID 기준) 및 자르기
+    const uniqueMap = new Map<string, any>();
+    for (const t of collected) {
+      if (!t?.id) continue;
+      if (!uniqueMap.has(t.id)) uniqueMap.set(t.id, t);
+      if (uniqueMap.size >= limit) break;
+    }
+
+    const tracks = Array.from(uniqueMap.values()).map((t) => this.mapTrack(t));
     return { tracks };
+  }
+
+  async getRecommendations(seedGenres = 'k-pop,pop', limitStr = '10'): Promise<{ tracks: SpotifyTrackFormatted[] }> {
+    const limit = parseInt(limitStr, 10) || 10;
+    let token: string | null = null;
+    try {
+      token = await this.fetchToken();
+    } catch (e) {
+      return { tracks: [] };
+    }
+    const res = await fetch(`https://api.spotify.com/v1/recommendations?limit=${limit}&seed_genres=${encodeURIComponent(seedGenres)}&market=KR`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return { tracks: [] };
+    const data = await res.json();
+    const items = (data.tracks || []).map((t: any) => this.mapTrack(t));
+    return { tracks: items };
   }
 }

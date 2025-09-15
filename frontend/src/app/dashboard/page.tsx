@@ -33,7 +33,13 @@ export default function DashboardPage() {
   // 자동 가로 스크롤 관련
   const [showScrollHint, setShowScrollHint] = useState(true); // 초기 힌트 (스크롤바 제거 후 첫 이동 시 사라짐)
   const bannerRef = useRef<HTMLDivElement | null>(null);
-  const [autoScrollPaused, setAutoScrollPaused] = useState(false);
+  const [autoScrollPaused, setAutoScrollPaused] = useState(false); // (이제 사용X: 로테이션으로 대체 예정)
+  const [currentPopularIndex, setCurrentPopularIndex] = useState(0); // 로테이션 현재 인덱스
+  const [previousPopularIndex, setPreviousPopularIndex] = useState<number | null>(null); // 애니메이션 이전 인덱스
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward'); // 좌우 슬라이드 방향
+  const rotationInterval = 5500; // ms 간격
+  const ANIM_DURATION = 600; // 애니메이션 길이(ms)
   // 전역 보라색 채팅 아이콘 제거: ChatList import/state 삭제
   const router = useRouter();
 
@@ -167,62 +173,40 @@ export default function DashboardPage() {
       .then(async ([d, friendsToday, popularList]) => {
         setDiaries(d);
         setFriendsTodayDiaries(friendsToday);
-        // 각 인기 일기에 대해 좋아요 상태 병렬 조회 (가능 하면)
-        try {
-          const withLikeStates = await Promise.all(popularList.map(async (pd: any) => {
-            try {
-              const likeRes = await api.get(`/diaries/${pd.id}/like`);
-              return { ...pd, liked: likeRes.data.liked, likes: likeRes.data.likeCount };
-            } catch {
-              return pd;
-            }
-          }));
-          setPopularDiaries(withLikeStates);
-        } catch {
-          setPopularDiaries(popularList);
-        }
+        // 인기 일기는 간단히 그대로 세팅 (좋아요/내용 제거된 미니 카드 전용)
+        setPopularDiaries(popularList);
       })
       .catch(() => setError("대시보드 데이터를 불러오지 못했습니다."))
       .finally(() => setLoading(false));
   }, []);
 
-  // 좋아요 토글 (Optimistic)
-  const togglePopularLike = async (id: string) => {
-    setPopularDiaries(prev => prev.map(d => d.id === id ? { ...d, liked: !d.liked, likes: (d.likes || 0) + (d.liked ? -1 : 1) } : d));
-    try {
-      const res = await api.post(`/diaries/${id}/like`);
-      setPopularDiaries(prev => prev.map(d => d.id === id ? { ...d, liked: res.data.liked, likes: res.data.likeCount } : d));
-    } catch {
-      // 실패 시 롤백
-      setPopularDiaries(prev => prev.map(d => d.id === id ? { ...d, liked: !d.liked, likes: (d.likes || 0) + (d.liked ? 1 : -1) } : d));
-    }
+  // 좋아요/콘텐츠 UI 제거 -> 관련 토글 로직 삭제
+
+  // 로테이션 (광고 배너처럼 한 개씩 순환)
+  const changePopularIndex = (next: number) => {
+    if (!popularDiaries.length) return;
+    if (next === currentPopularIndex) return;
+    const direction: 'forward' | 'backward' =
+      (next > currentPopularIndex || (currentPopularIndex === popularDiaries.length - 1 && next === 0))
+        ? 'forward'
+        : 'backward';
+    setSlideDirection(direction);
+    setPreviousPopularIndex(currentPopularIndex);
+    setCurrentPopularIndex(next);
+    setIsAnimating(true);
+    setTimeout(() => {
+      setPreviousPopularIndex(null);
+      setIsAnimating(false);
+    }, ANIM_DURATION);
   };
 
-  // 스크롤 힌트 감지
-  const handleBannerScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
-    if (el.scrollLeft > 16) setShowScrollHint(false);
-  };
-
-  // 자동 스크롤 (부드럽게 순환)
   useEffect(() => {
-    if (!bannerRef.current) return;
-    let raf: number;
-    const speed = 0.4; // px per frame 정도 (약 24px/s @60fps)
-    const step = () => {
-      if (!autoScrollPaused && bannerRef.current) {
-        const el = bannerRef.current;
-        el.scrollLeft += speed;
-        // 끝 근처 도달 시 처음으로 자연스럽게 이동 (무한 루프 효과)
-        if (el.scrollWidth - el.clientWidth - el.scrollLeft < 1) {
-          el.scrollLeft = 0;
-        }
-      }
-      raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [bannerRef, autoScrollPaused, popularDiaries.length]);
+    if (!popularDiaries.length) return;
+    const id = setInterval(() => {
+      changePopularIndex((currentPopularIndex + 1) % popularDiaries.length);
+    }, rotationInterval);
+    return () => clearInterval(id);
+  }, [popularDiaries.length, currentPopularIndex]);
 
   return (
   <div className="flex flex-col space-y-6 py-6">
@@ -234,7 +218,7 @@ export default function DashboardPage() {
         <section className="bg-white rounded-xl shadow p-4">
           <div className="flex justify-between items-center mb-3">
             <h2 className="font-bold text-lg">오늘의 일기</h2>
-            <Link href="/friends" className="text-blue-600 text-sm">더보기</Link>
+            {/* '더보기' 링크 제거 요청에 따라 삭제 */}
           </div>
           {friendsTodayDiaries.length === 0 ? (
             <div className="text-sm text-gray-500 py-4 text-center">오늘의 일기가 없습니다.</div>
@@ -359,7 +343,7 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Top10 인기 일기 배너 (광고식/말풍선 스타일) */}
+        {/* Top10 인기 일기 - 단일 로테이션 (프로필 + 말풍선 + 아이콘 + 닉네임/작성일) */}
         <section className="relative bg-gradient-to-r from-pink-200 to-pink-300 rounded-xl shadow p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-bold text-lg text-gray-800">🔥 인기 일기 Top 10</h2>
@@ -368,83 +352,85 @@ export default function DashboardPage() {
           {popularDiaries.length === 0 && (
             <div className="bg-white/60 rounded-lg p-6 text-center text-sm text-gray-600">아직 인기 일기가 없습니다. 첫 번째 감정 일기를 남겨보세요!</div>
           )}
-          {popularDiaries.length > 0 && (
-            <div
-              ref={bannerRef}
-              className="relative flex gap-4 overflow-x-auto no-scrollbar pr-4 py-1"
-              onScroll={handleBannerScroll}
-              onMouseEnter={() => setAutoScrollPaused(true)}
-              onMouseLeave={() => setAutoScrollPaused(false)}
-              onTouchStart={() => setAutoScrollPaused(true)}
-              onTouchEnd={() => setAutoScrollPaused(false)}
-              style={{ scrollBehavior: 'auto', maxHeight: 190 }}
-            >
-              {/* Gradient Scroll Hint */}
-              {showScrollHint && <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-pink-200 to-transparent hidden sm:block" />}
-              {popularDiaries.map((d, idx) => {
-                const created = new Date(d.createdAt);
-                const timeStr = created.toLocaleTimeString('ko-KR', { hour12: false });
-                const displayEmotion = d.emotion || computeEmotionFromScore(d.emotionScore);
-                return (
-                  <div key={d.id} className="flex-shrink-0 w-56 group">
-                    <button
-                      onClick={() => window.location.href = `/diary/${d.id}`}
-                      className="relative w-full text-left"
-                    >
-                      {/* 말풍선 본체 */}
-                      <div className="rounded-2xl bg-emerald-200 px-4 pt-3 pb-4 shadow hover:shadow-md transition-all h-[170px] flex flex-col justify-between group/bubble" title={d.content}>
-                        <div className="flex items-start gap-2">
-                          <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shadow-inner text-sm">{(d.username || '익명').slice(0,1)}</div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 text-[11px] text-gray-700 font-medium">
-                              <span>{timeStr}</span>
-                              <span className="flex items-center gap-1 text-gray-600">
-                                {/* 이미지 (mediaType === image 또는 파일 확장자) */}
-                                {(d.mediaType === 'image' || /\.(png|jpe?g|gif|webp)$/i.test(d.mediaUrl || '')) && (
-                                  <span title="첨부 이미지">📷</span>
-                                )}
-                                {/* 음성 (mediaType === audio) */}
-                                {(d.mediaType === 'audio' || /\.(mp3|m4a|wav|ogg)$/i.test(d.mediaUrl || '')) && (
-                                  <span title="음성 메시지">🔊</span>
-                                )}
-                                {/* Spotify 링크 (content 내 spotify 혹은 mediaType === 'spotify') */}
-                                {((d.mediaType === 'spotify') || /open\.spotify\.com/.test(d.content)) && (
-                                  <span title="Spotify 음악">🎧</span>
-                                )}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-[12px] font-semibold text-gray-800 line-clamp-2">{d.question}</p>
-                          </div>
-                        </div>
-                        <p className="mt-2 text-[11px] text-gray-700 line-clamp-2 flex-1" title={d.content}>{d.content}</p>
-                        <div className="mt-2 flex items-center justify-between text-[11px] text-gray-600">
-                          <span className="flex items-center gap-1">
-                            {displayEmotion && <span className="text-base leading-none">{emotionEmojis[displayEmotion] || displayEmotion}</span>}
-                            <span>{d.username || '익명'}</span>
-                          </span>
-                          <button 
-                            type="button"
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePopularLike(d.id); }}
-                            className={`flex items-center gap-1 font-medium transition text-[11px] ${d.liked ? 'text-rose-600' : 'text-pink-600 hover:text-rose-500'}`}
-                            title={d.liked ? '좋아요 취소' : '좋아요'}
-                          >
-                            {d.liked ? '💖' : '❤️'} {d.likes ?? 0}
-                          </button>
-                        </div>
-                        <span className="absolute -top-2 -left-2 bg-pink-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">{idx + 1}</span>
+          {popularDiaries.length > 0 && (() => {
+            const active = popularDiaries[currentPopularIndex];
+            const prev = previousPopularIndex !== null ? popularDiaries[previousPopularIndex] : null;
+
+            const buildCard = (d: DiaryPreview | null, isPrev = false) => {
+              if (!d) return null;
+              const created = new Date(d.createdAt);
+              const timeStr = created.toLocaleTimeString('ko-KR', { hour12: false });
+              const hasImage = (d.mediaType === 'image' || /\.(png|jpe?g|gif|webp)$/i.test(d.mediaUrl || ''));
+              const hasAudio = (d.mediaType === 'audio' || /\.(mp3|m4a|wav|ogg)$/i.test(d.mediaUrl || ''));
+              const hasSpotify = (d.mediaType === 'spotify' || /open\.spotify\.com/.test(d.content));
+              const inClass = slideDirection === 'forward' ? 'animate-slideInRight' : 'animate-slideInLeft';
+              const outClass = slideDirection === 'forward' ? 'animate-slideOutLeft' : 'animate-slideOutRight';
+              return (
+                <div
+                  key={d.id + (isPrev ? '-prev' : '-curr')}
+                  className={`absolute inset-0 flex items-start gap-3 ${isPrev ? outClass + ' pointer-events-none' : inClass}`}
+                  style={{willChange:'transform,opacity'}}
+                >
+                  <button
+                    onClick={() => window.location.href = `/diary/${d.id}`}
+                    className="relative w-16 h-16 rounded-2xl border-2 border-cyan-300 bg-white flex items-center justify-center text-xl font-semibold shadow overflow-hidden shrink-0 hover:shadow-lg transition"
+                    title={d.username || '익명'}
+                  >
+                    <span className="absolute -top-1 -left-1 bg-pink-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow">{(isPrev ? previousPopularIndex : currentPopularIndex)! + 1}</span>
+                    {(d as any).profileImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={(d as any).profileImageUrl} alt={d.username || '익명'} className="w-full h-full object-cover" />
+                    ) : (
+                      (d.username || '익명').slice(0,1)
+                    )}
+                  </button>
+                  <button
+                    onClick={() => window.location.href = `/diary/${d.id}`}
+                    className="relative flex-1 text-left"
+                  >
+                    <div className="relative bg-cyan-400 text-black rounded-3xl px-8 py-4 flex items-center gap-10 shadow hover:shadow-xl transition min-h-[80px]">
+                      <span className="font-semibold text-2xl tracking-wide tabular-nums">{timeStr}</span>
+                      <div className="flex items-center gap-6 ml-auto text-2xl select-none">
+                        <span title={hasImage ? '이미지 첨부 있음' : '이미지 없음'} className={hasImage ? 'text-black drop-shadow-sm' : 'text-black/30'}>📷</span>
+                        <span title={hasAudio ? '음성 메시지 있음' : '음성 메시지 없음'} className={hasAudio ? 'text-black drop-shadow-sm' : 'text-black/30'}>🔊</span>
+                        <span title={hasSpotify ? 'Spotify 음악 있음' : 'Spotify 음악 없음'} className={hasSpotify ? 'text-black drop-shadow-sm' : 'text-black/30'}>🎧</span>
                       </div>
-                      {/* 꼬리 */}
-                      <div className="absolute -bottom-2 left-6 w-5 h-5 rotate-45 bg-emerald-200"></div>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {/* 모바일 드래그 힌트 */}
-          {showScrollHint && popularDiaries.length > 0 && (
-            <div className="sm:hidden mt-2 text-center text-[11px] text-pink-700 animate-pulse">옆으로 드래그해서 더 보기 →</div>
-          )}
+                      <span className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-cyan-400 rotate-45 rounded-sm" />
+                    </div>
+                  </button>
+                </div>
+              );
+            };
+
+            return (
+              <div className="relative group">
+                <div className="relative min-h-[120px] overflow-hidden">
+                  {buildCard(prev, true)}
+                  {buildCard(active)}
+                </div>
+                <div className="mt-6 flex justify-center gap-2 relative">
+                  {popularDiaries.slice(0,10).map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => changePopularIndex(i)}
+                      aria-label={`순위 ${i+1}번 보기`}
+                      className={`w-2.5 h-2.5 rounded-full transition-all ${i === currentPopularIndex ? 'bg-pink-600 scale-110' : 'bg-white/60 hover:bg-white/90'}`}
+                    />
+                  ))}
+                </div>
+                <style jsx>{`
+                  @keyframes slideInRight {0%{opacity:0;transform:translateX(110%);}55%{opacity:1;}100%{opacity:1;transform:translateX(0);} }
+                  @keyframes slideOutLeft {0%{opacity:1;transform:translateX(0);}100%{opacity:0;transform:translateX(-110%);} }
+                  @keyframes slideInLeft {0%{opacity:0;transform:translateX(-110%);}55%{opacity:1;}100%{opacity:1;transform:translateX(0);} }
+                  @keyframes slideOutRight {0%{opacity:1;transform:translateX(0);}100%{opacity:0;transform:translateX(110%);} }
+                  .animate-slideInRight{animation:slideInRight ${ANIM_DURATION}ms cubic-bezier(.45,.05,.2,.95) forwards;}
+                  .animate-slideOutLeft{animation:slideOutLeft ${ANIM_DURATION}ms cubic-bezier(.45,.05,.2,.95) forwards;}
+                  .animate-slideInLeft{animation:slideInLeft ${ANIM_DURATION}ms cubic-bezier(.45,.05,.2,.95) forwards;}
+                  .animate-slideOutRight{animation:slideOutRight ${ANIM_DURATION}ms cubic-bezier(.45,.05,.2,.95) forwards;}
+                `}</style>
+              </div>
+            );
+          })()}
         </section>
       </div>
     </div>

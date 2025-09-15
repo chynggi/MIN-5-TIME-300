@@ -91,6 +91,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
     if (!data?.userId) return;
+    // TODO: 프로필 프라이버시 정책 적용 시 다음 Hook에서 검증
+    // this.canSubscribeToProfile(client.userId, data.userId)
+    //   .then(can => { if (can) client.join(`user:${data.userId}`); })
+    //   .catch(() => {/* 거부 시 아무 처리 안함 혹은 에러 이벤트 */});
     client.join(`user:${data.userId}`);
     this.logger.debug(`클라이언트 ${client.id} -> user:${data.userId} 구독`);
   }
@@ -116,6 +120,16 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   }) {
     if (!this.server) return;
     this.server.to(`user:${payload.userId}`).emit('profile.counters.update', payload);
+  }
+
+  // 프라이버시 검증 Skeleton (미구현)
+  // 향후 ProfileService 주입 후 visibility 정책 검사 추가 예정
+  private async canSubscribeToProfile(requesterId: string | undefined, targetUserId: string): Promise<boolean> {
+    if (!targetUserId) return false;
+    // 자신의 프로필은 항상 허용
+    if (requesterId && requesterId === targetUserId) return true;
+    // TODO: 비공개 프로필이면 팔로우 관계/권한 검사 필요
+    return true; // 기본 허용 (현행 유지)
   }
 
   /**

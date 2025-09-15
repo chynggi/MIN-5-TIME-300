@@ -55,7 +55,7 @@ export class FollowService {
 
     const status = followee.isPrivate ? FollowStatus.REQUESTED : FollowStatus.ACTIVE;
 
-    return await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       let follow;
 
       if (existingFollow) {
@@ -107,7 +107,6 @@ export class FollowService {
       // 공개 계정인 경우 즉시 카운터 업데이트 및 실시간 브로드캐스트
       if (status === FollowStatus.ACTIVE) {
         await this.updateFollowCounters(tx, followerId, followeeId, 'increment');
-        await this.broadcastCounters([followerId, followeeId]);
       }
 
       // 알림 생성
@@ -129,6 +128,11 @@ export class FollowService {
         followee: follow.followee
       };
     });
+    // 트랜잭션 커밋 후 실시간 이벤트 emit (최신 counters 기반)
+    if (result.status === FollowStatus.ACTIVE) {
+      await this.broadcastCounters([followerId, followeeId]);
+    }
+    return result;
   }
 
   /**
@@ -148,6 +152,7 @@ export class FollowService {
       throw new BadRequestException('팔로우 관계가 존재하지 않습니다.');
     }
 
+    const wasActive = existingFollow.status === FollowStatus.ACTIVE;
     await this.prisma.$transaction(async (tx) => {
       // 소프트 삭제
       await tx.follow.update({
@@ -156,11 +161,13 @@ export class FollowService {
       });
 
       // 활성 상태였던 경우에만 카운터 감소
-      if (existingFollow.status === FollowStatus.ACTIVE) {
+      if (wasActive) {
         await this.updateFollowCounters(tx, followerId, followeeId, 'decrement');
-        await this.broadcastCounters([followerId, followeeId]);
       }
     });
+    if (wasActive) {
+      await this.broadcastCounters([followerId, followeeId]);
+    }
   }
 
   /**
@@ -188,7 +195,7 @@ export class FollowService {
       throw new BadRequestException('승인할 팔로우 요청이 존재하지 않습니다.');
     }
 
-    return await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const follow = await tx.follow.update({
         where: { id: followRequest.id },
         data: { status: FollowStatus.ACTIVE },
@@ -204,7 +211,6 @@ export class FollowService {
 
   // 카운터 업데이트 및 브로드캐스트
   await this.updateFollowCounters(tx, followerId, followeeId, 'increment');
-  await this.broadcastCounters([followerId, followeeId]);
 
       // 팔로우 승인 알림 생성
       await this.notificationService.handleFollowEvent(followeeId, followerId, 'accept');
@@ -219,6 +225,8 @@ export class FollowService {
         followee: follow.followee
       };
     });
+    await this.broadcastCounters([followerId, followeeId]);
+    return result;
   }
 
   /**
@@ -250,15 +258,20 @@ export class FollowService {
    */
   private async broadcastCounters(userIds: string[]) {
     const unique = Array.from(new Set(userIds));
+    if (!unique.length) return;
+    // followCounters 테이블 한 번에 조회하여 DB count 부하 감소
+    const counters = await this.prisma.followCounters.findMany({
+      where: { userId: { in: unique } },
+      select: { userId: true, followersCount: true, followingCount: true }
+    });
+    const map = new Map(counters.map(c => [c.userId, c]));
     for (const uid of unique) {
-      const [followerCount, followingCount] = await Promise.all([
-        this.prisma.follow.count({ where: { followeeId: uid, status: FollowStatus.ACTIVE, deletedAt: null } }),
-        this.prisma.follow.count({ where: { followerId: uid, status: FollowStatus.ACTIVE, deletedAt: null } }),
-      ]);
+      const c = map.get(uid);
+      if (!c) continue; // 아직 생성되지 않은 경우 skip
       this.realtimeGateway.emitProfileCountersUpdate({
         userId: uid,
-        followerCount,
-        followingCount,
+        followerCount: c.followersCount,
+        followingCount: c.followingCount,
       });
     }
   }
@@ -610,21 +623,27 @@ export class FollowService {
   ) {
     const increment = operation === 'increment' ? 1 : -1;
 
-    // 팔로워 카운터 업데이트 (followee의 followers_count)
-    await tx.followCounters.upsert({
+    // decrement 시 음수 방지 위해 조건 적용 (Prisma 5: raw 작성 없이 2-step)
+    // followersCount 업데이트
+    const followeeCounter = await tx.followCounters.upsert({
       where: { userId: followeeId },
       update: {
         followersCount: { increment }
       },
       create: {
         userId: followeeId,
-        followersCount: Math.max(0, increment),
+        followersCount: increment > 0 ? increment : 0,
         followingCount: 0
       }
     });
+    if (followeeCounter.followersCount < 0) {
+      await tx.followCounters.update({
+        where: { userId: followeeId },
+        data: { followersCount: 0 }
+      });
+    }
 
-    // 팔로잉 카운터 업데이트 (follower의 following_count)
-    await tx.followCounters.upsert({
+    const followerCounter = await tx.followCounters.upsert({
       where: { userId: followerId },
       update: {
         followingCount: { increment }
@@ -632,9 +651,15 @@ export class FollowService {
       create: {
         userId: followerId,
         followersCount: 0,
-        followingCount: Math.max(0, increment)
+        followingCount: increment > 0 ? increment : 0
       }
     });
+    if (followerCounter.followingCount < 0) {
+      await tx.followCounters.update({
+        where: { userId: followerId },
+        data: { followingCount: 0 }
+      });
+    }
   }
 
   /**

@@ -475,6 +475,23 @@ export class DiaryService {
         }
         throw new BadRequestException('파일 업로드 중 오류가 발생했습니다.');
       }
+    } else if (dto.preset) {
+      // 프리셋 키 기반 기본 이미지 경로 매핑
+      const presetMap: Record<string, string> = {
+        spring: '/images/seasons/spring.jpg',
+        summer: '/images/seasons/summer.jpg',
+        autumn: '/images/seasons/autumn.jpg',
+        winter: '/images/seasons/winter.jpg',
+        sunny: '/images/weather/sunny.jpg',
+        night: '/images/weather/night.jpg',
+        rain: '/images/weather/rain.jpg',
+        snow: '/images/weather/snow.jpg',
+      };
+      const candidate = presetMap[dto.preset];
+      if (candidate) {
+        mediaUrl = candidate;
+        mediaType = 'image/jpeg';
+      }
     }
     
     // FormData로 전달된 문자열 값들을 올바른 타입으로 변환

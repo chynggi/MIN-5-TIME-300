@@ -236,16 +236,19 @@ export default function UserProfilePage() {
     if (targetUserId) {
       socket.emit('profile.subscribe', { userId: targetUserId });
     }
+    // 서버가 authoritative(최종) 카운터를 push 하므로 Optimistic 값과 충돌 시 서버 값을 신뢰
+    // 만약 delta 추적이 필요하면 별도 상태에 diff 저장 후 여기에서 reset 가능.
     socket.on('profile.counters.update', (data: any) => {
-      if (!profile) return;
-      if (data.userId === profile.id) {
-        setProfile(prev => prev ? {
+      setProfile(prev => {
+        if (!prev) return prev;
+        if (data.userId !== prev.id) return prev;
+        return {
           ...prev,
-          followerCount: data.followerCount !== undefined ? data.followerCount : prev.followerCount,
-          followingCount: data.followingCount !== undefined ? data.followingCount : prev.followingCount,
-          diaryCount: data.diaryCount !== undefined ? data.diaryCount : prev.diaryCount,
-        } : prev);
-      }
+            followerCount: data.followerCount !== undefined ? data.followerCount : prev.followerCount,
+            followingCount: data.followingCount !== undefined ? data.followingCount : prev.followingCount,
+            diaryCount: data.diaryCount !== undefined ? data.diaryCount : prev.diaryCount,
+        };
+      });
     });
     return () => {
       if (targetUserId) {

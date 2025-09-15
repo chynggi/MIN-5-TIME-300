@@ -42,6 +42,7 @@ export default function MusicSetting({ onMusicSelect, selectedTrack }: MusicSett
   const [hasSearched, setHasSearched] = useState(false);
   const [popularTracks, setPopularTracks] = useState<SpotifyTrack[]>([]);
   const [loadingPopular, setLoadingPopular] = useState(true);
+  const [triedRecommendations, setTriedRecommendations] = useState(false);
 
   // 오디오 객체와 타임아웃 참조 관리
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -67,21 +68,30 @@ export default function MusicSetting({ onMusicSelect, selectedTrack }: MusicSett
   }, []);
 
   // 인기곡 로드
-  useEffect(() => {
-    const loadPopularTracks = async () => {
-      setLoadingPopular(true);
-      try {
-        const data = await apiRequest('/spotify/popular?category=toplists&limit=10');
-        setPopularTracks(data.tracks || []);
-      } catch (error: any) {
-        console.error('인기곡 로드 실패:', error);
-        setSearchError('인기곡을 불러오는 중 오류가 발생했습니다.');
-      } finally {
-        setLoadingPopular(false);
+  const loadPopularTracks = async (opts?: { force?: boolean }) => {
+    if (!opts?.force && popularTracks.length && !triedRecommendations) return; // 초기 한 번 이후 강제 제외
+    setLoadingPopular(true);
+    setSearchError(null);
+    try {
+      const data = await apiRequest('/spotify/popular?category=toplists&limit=10');
+      const fetched: SpotifyTrack[] = data.tracks || [];
+      if (!fetched.length && !triedRecommendations) {
+        // 추천 API로 1회 fallback
+        setTriedRecommendations(true);
+        const rec = await apiRequest('/spotify/recommendations?seedGenres=k-pop,pop&limit=10');
+        setPopularTracks(rec.tracks || []);
+      } else {
+        setPopularTracks(fetched);
       }
-    };
-    loadPopularTracks();
-  }, []);
+    } catch (error: any) {
+      console.error('인기곡 로드 실패:', error);
+      setSearchError('인기/추천 곡을 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setLoadingPopular(false);
+    }
+  };
+
+  useEffect(() => { loadPopularTracks({ force: true }); }, []);
 
   // Spotify 음악 검색
   const searchSpotify = async () => {
@@ -287,6 +297,16 @@ export default function MusicSetting({ onMusicSelect, selectedTrack }: MusicSett
                   </div>
                   {!hasSearched && loadingPopular && (
                     <div className="text-xs text-gray-500" aria-live="polite">로딩중...</div>
+                  )}
+                  {!hasSearched && !loadingPopular && popularTracks.length === 0 && (
+                    <div className="text-[11px] text-gray-500 flex items-center gap-2">
+                      인기 데이터를 가져오지 못했습니다.
+                      <button
+                        type="button"
+                        onClick={() => loadPopularTracks({ force: true })}
+                        className="underline text-blue-600 hover:text-blue-800"
+                      >다시 시도</button>
+                    </div>
                   )}
                 </div>
                 {!loadingPopular && (

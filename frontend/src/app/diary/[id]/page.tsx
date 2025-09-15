@@ -247,7 +247,8 @@ export default function DiaryDetailPage() {
     
     try {
       await api.delete(`/diaries/${diary.id}`);
-      router.push("/diary");
+  // 목록 페이지(/diary) 제거됨: 대시보드로 이동
+  router.push("/dashboard");
     } catch {
       setError("삭제에 실패했습니다.");
     }
@@ -312,7 +313,7 @@ export default function DiaryDetailPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-rose-50 to-indigo-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white/70 backdrop-blur-xl rounded-2xl shadow-lg border border-white/40 p-8 text-center">
           <p className="text-red-500 font-semibold mb-4">{error}</p>
-          <Link href="/diary" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-md transition">
+          <Link href="/dashboard" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-md transition">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             일기 목록으로 돌아가기
           </Link>
@@ -328,7 +329,7 @@ export default function DiaryDetailPage() {
       <div className="max-w-5xl mx-auto">
         {/* Top Navigation / Breadcrumb */}
         <div className="flex items-center gap-3 mb-6">
-          <Link href="/diary" className="group inline-flex items-center justify-center w-9 h-9 rounded-full bg-white shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow transition">
+          <Link href="/dashboard" className="group inline-flex items-center justify-center w-9 h-9 rounded-full bg-white shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow transition">
             <svg className="w-5 h-5 text-slate-500 group-hover:text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </Link>
           <div className="flex items-center gap-2 text-xs font-medium text-slate-500">

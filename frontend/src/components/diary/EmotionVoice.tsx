@@ -496,7 +496,7 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
   }, [recordedAudio]);
 
   return (
-    <div className="flex gap-4 items-start">
+    <div className="flex gap-4 items-start mb-6 md:mb-8">
       {/* 감정 선택 (드롭다운) */}
       <div className="flex-1">
         <h3 className="text-sm font-semibold text-gray-700 mb-2">오늘의 감정</h3>
@@ -545,45 +545,41 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
                 )}
                 
                 {/* 녹음 버튼과 원형 진행 게이지 */}
-                <div className="relative inline-block">
+                <div className="relative w-full">
+                  {/* 직사각형 진행 바 (상단 얇은 바) */}
                   {isRecording && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <CircularProgress 
-                        progress={(recordingDuration / MAX_RECORDING_TIME) * 100}
-                        size={70}
-                        strokeWidth={3}
+                    <div className="absolute -top-2 left-0 right-0 h-1 bg-gray-200 rounded overflow-hidden">
+                      <div
+                        className="h-full bg-red-500 transition-all duration-150"
+                        style={{ width: `${(recordingDuration / MAX_RECORDING_TIME) * 100}%` }}
                       />
                     </div>
                   )}
-                  
                   <button
                     type="button"
                     aria-label={isRecording ? "녹음 중지" : "녹음 시작"}
                     onClick={handleRecordButtonClick}
-                    className={`group w-14 h-14 rounded-full flex items-center justify-center transition-all duration-150 relative overflow-hidden focus:outline-none focus:ring-4 focus:ring-blue-300/40 ${
+                    className={`group flex w-full items-center justify-center gap-3 px-5 h-[48px] rounded-lg border-2 text-sm font-medium transition-colors relative focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                       isRecording
-                        ? "bg-red-500 scale-105 shadow-lg"
-                        : "bg-indigo-600 hover:bg-indigo-700 shadow-md"
-                    } text-white ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+                        ? 'bg-red-500 border-red-600 text-white shadow'
+                        : 'bg-white border-gray-300 hover:border-indigo-400 hover:bg-indigo-50 text-gray-700'
+                    } ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
                     disabled={isProcessing}
                   >
-                    <span className="absolute inset-0 rounded-full bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    {isRecording ? <StopIcon className="w-7 h-7" /> : <MicIcon className="w-7 h-7" />}
+                    <span className={`flex items-center justify-center w-8 h-8 rounded-md ${isRecording ? 'bg-red-600/40' : 'bg-indigo-100 text-indigo-600 group-hover:bg-indigo-200'} transition-colors`}>
+                      {isRecording ? <StopIcon className="w-5 h-5" /> : <MicIcon className="w-5 h-5" />}
+                    </span>
+                    <span className="pr-1">
+                      {isRecording ? `녹음 중... ${formatDuration(recordingDuration)}` : '음성 녹음'}
+                    </span>
                     {isRecording && (
-                      <span className="absolute -inset-1 animate-ping rounded-full bg-red-400/40" />
+                      <span className="absolute inset-0 rounded-lg ring-2 ring-red-400/40 animate-pulse pointer-events-none" />
                     )}
                   </button>
                 </div>
                 
                 {/* 상태 메시지 */}
-                <p className="text-xs text-gray-600 mt-2 text-center">
-                  {isProcessing 
-                    ? "처리 중..." 
-                    : isRecording 
-                      ? `녹음 중... ${formatDuration(recordingDuration)} / ${formatDuration(MAX_RECORDING_TIME)}`
-                      : "눌러서 녹음 (최대 2분)"
-                  }
-                </p>
+                {/* 안내 문구 제거 (요청사항) */}
                 
                 {/* 웨이브폼 시각화 */}
                 {isRecording && (
@@ -592,20 +588,21 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
                       ref={canvasRef}
                       width="200"
                       height="60"
-                      className="w-full h-12 bg-slate-800 rounded-lg border border-slate-600"
+                      className="w-full h-16 bg-slate-800 rounded-md border border-slate-600"
                     />
-                    <div className="text-xs text-center text-gray-500 mt-1">
-                      실시간 웨이브폼
+                    <div className="text-xs text-gray-500 mt-1 flex justify-between">
+                      <span>실시간 웨이브폼</span>
+                      <span className="text-[10px] text-gray-400">{formatDuration(recordingDuration)}</span>
                     </div>
                   </div>
                 )}
                 
                 {/* 시간 진행 바 */}
                 {isRecording && (
-                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                    <div 
-                      className="bg-red-500 h-2 rounded-full transition-all duration-100"
-                      style={{width: `${(recordingDuration / MAX_RECORDING_TIME) * 100}%`}}
+                  <div className="w-full bg-gray-200 rounded-md h-2 mt-2 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-red-500 to-orange-400 h-2 transition-all duration-100"
+                      style={{ width: `${(recordingDuration / MAX_RECORDING_TIME) * 100}%` }}
                     />
                   </div>
                 )}
@@ -632,7 +629,7 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
                 type="button"
                 aria-label={isPlaying ? "일시정지" : "재생"}
                 onClick={isPlaying ? pauseAudio : playAudio}
-                className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
+                className="bg-white border border-blue-300 text-blue-600 px-3 py-2 rounded-md hover:bg-blue-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-1"
               >
                 {isPlaying ? <PauseIcon /> : <PlayIcon />}
               </button>
@@ -647,7 +644,7 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
                 type="button"
                 aria-label="다시 녹음"
                 onClick={restartRecording}
-                className="flex items-center gap-1 bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300"
+                className="flex items-center gap-1 bg-white border border-green-400 text-green-600 px-3 py-2 rounded-md text-xs hover:bg-green-50 transition-colors focus:outline-none focus:ring-2 focus:ring-green-300 focus:ring-offset-1"
               >
                 <RedoIcon /> 다시 녹음
               </button>

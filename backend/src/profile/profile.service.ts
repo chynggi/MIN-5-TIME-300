@@ -72,20 +72,59 @@ export class ProfileService {
         showDiariesToFriends: true,
         privacySettings: true,
         activityPublic: true,
+        isProfilePublic: true,
       },
     });
     if (!otherUser) throw new NotFoundException('유저를 찾을 수 없습니다.');
     const otherUserId = otherUser.id;
     
-    // 공개 일기 수
+    // 공개 일기 수 (공개 일기만 카운트)
     const diaryCount = await this.prisma.journal.count({ where: { userId: otherUserId, isPublic: true } });
-    // 팔로워/팔로잉 카운트
-    const followerCount = await this.prisma.friend.count({ where: { addresseeId: otherUserId, status: 'accepted' } });
-    const followingCount = await this.prisma.friend.count({ where: { requesterId: otherUserId, status: 'accepted' } });
-    // 현재 사용자 팔로우 상태
-    const isFollowing = !!(await this.prisma.friend.findFirst({ where: { requesterId: currentUserId, addresseeId: otherUserId, status: 'accepted' } }));
+
+    // FollowCounters 활용 (없으면 즉시 생성 X, 0 처리)
+    const followCounters = await this.prisma.followCounters.findUnique({ where: { userId: otherUserId } });
+    let followerCount = followCounters?.followersCount ?? 0;
+    let followingCount = followCounters?.followingCount ?? 0;
+
+    // 현재 사용자 팔로우 상태(Follow 테이블 기준)
+    const followRelation = await this.prisma.follow.findUnique({
+      where: { followerId_followeeId: { followerId: currentUserId, followeeId: otherUserId } }
+    });
+    const isFollowing = !!(followRelation && followRelation.deletedAt === null && followRelation.status === 'ACTIVE');
+
     // LPG 점수 조회 (StatisticsService 이용)
     const lpgData = await this.statisticsService.getLPGScore({ user: { userId: otherUserId } });
+
+    // 프로필 visibility 우선 Quick Fix: profileVisibility=PRIVATE && 친구 아님 => 최소 응답
+    let profileVisibility: string | undefined = otherUser.privacySettings?.profileVisibility;
+    // 기본: isProfilePublic true이면 PUBLIC 취급, false이면 FRIENDS 취급 (간단 맵핑)
+    if (!profileVisibility) {
+      profileVisibility = otherUser.isProfilePublic ? 'PUBLIC' : 'FRIENDS';
+    }
+
+    // 친구 관계(Follow ACTIVE 상호 여부)를 아직 계산하지 않았으므로 간단히 isFollowing 역방향도 검사
+    const reverseRelation = await this.prisma.follow.findUnique({
+      where: { followerId_followeeId: { followerId: otherUserId, followeeId: currentUserId } }
+    });
+    const otherFollowsMe = !!(reverseRelation && reverseRelation.deletedAt === null && reverseRelation.status === 'ACTIVE');
+    const isFriendLike = isFollowing && otherFollowsMe; // 상호 팔로우를 친구로 간주 (Quick Fix)
+
+    if (profileVisibility === 'PRIVATE' && currentUserId !== otherUserId && !isFriendLike) {
+      return {
+        id: otherUser.id,
+        username: otherUser.username,
+        diaryCount: 0,
+        followerCount: 0,
+        followingCount: 0,
+        lpgScore: 0,
+        isFollowing,
+        isPublic: false,
+        mbti: '',
+        canViewCalendar: false,
+        activityScore: undefined,
+        activityPublic: otherUser.activityPublic,
+      };
+    }
 
     // 달력 조회 권한 계산
     let canViewCalendar = false;
@@ -161,6 +200,12 @@ export class ProfileService {
       }
     }
 
+    // activityPublic 반영: 비공개면 다른 사용자에게 activityScore 숨김
+    let activityScore: number | undefined = undefined;
+    if (otherUser.activityPublic || currentUserId === otherUserId) {
+      activityScore = await this.calculateActivityScore(otherUserId);
+    }
+
     return {
       id: otherUser.id,
       username: otherUser.username,
@@ -170,10 +215,10 @@ export class ProfileService {
       followingCount,
       lpgScore: lpgData.lpgScore,
       isFollowing,
-      isPublic: true,
+      isPublic: profileVisibility === 'PUBLIC',
       mbti: otherUser.mbti || '',
       canViewCalendar,
-      activityScore: await this.calculateActivityScore(otherUserId),
+      activityScore,
       activityPublic: otherUser.activityPublic,
     };
   }
