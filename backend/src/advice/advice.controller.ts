@@ -4,7 +4,7 @@ import { RateCacheService } from '../common/services/rate-cache.service';
 import { AuthGuard } from '@nestjs/passport';
 
 @UseGuards(AuthGuard('jwt') as any)
-@Controller('advice')
+@Controller('api/v1/advice')
 export class AdviceController {
   constructor(private readonly service: AdviceService, private readonly rate: RateCacheService) {}
 

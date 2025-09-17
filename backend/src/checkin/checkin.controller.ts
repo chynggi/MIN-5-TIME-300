@@ -4,7 +4,7 @@ import { CreateCheckinDto } from './dto/create-checkin.dto';
 import { AuthGuard } from '@nestjs/passport';
 
 @UseGuards(AuthGuard('jwt') as any)
-@Controller('checkin')
+@Controller('api/v1/checkin')
 export class CheckinController {
   constructor(private readonly service: CheckinService) {}
 

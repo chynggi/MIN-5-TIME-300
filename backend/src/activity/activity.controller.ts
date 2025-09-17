@@ -3,7 +3,7 @@ import { ActivityService } from './activity.service';
 import { ActivityResponseDto } from './dto/activity-response.dto';
 import { PrismaService } from '../prisma.service';
 
-@Controller('activity')
+@Controller('api/v1/activity')
 export class ActivityController {
   constructor(private readonly prisma: PrismaService, private readonly activityService: ActivityService) {}
 

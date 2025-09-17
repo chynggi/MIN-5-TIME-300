@@ -13,6 +13,7 @@ import { FileUploadExceptionFilter } from '../common/filters/file-upload-excepti
 import { DiarySummaryService } from './summary.service';
 import { IsArray, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { SaveQuestionAnswersDto } from './dto/save-question-answers.dto';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/diaries')
@@ -130,25 +131,5 @@ export class DiaryController {
   }
 }
 
-// 질문 답변 저장용 DTO 및 엔드포인트 추가
-class QAItemDto {
-  @IsString() domain!: string; // emotion|relationship|recovery|action|goal
-  @IsString() question!: string;
-  @IsString() answer!: string;
-}
-
-class SaveQuestionAnswersDto {
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => QAItemDto)
-  qa!: QAItemDto[]; // 정확히 1~5개 기대
-
-  @IsOptional()
-  @IsString()
-  modelId?: string; // 요약/생성 모델 동기화용
-
-  @IsOptional()
-  @IsString()
-  diaryDate?: string; // 지정 시 해당 날짜 일기(없으면 생성)로 저장
-}
+// DTO는 './dto/save-question-answers.dto'로 분리되었습니다.
 

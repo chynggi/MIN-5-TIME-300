@@ -11,6 +11,8 @@ import { VectorDbService } from '../vector-db/vector-db.service';
 import { FileUploadService } from '../common/services/file-upload.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { DiarySummaryService } from './summary.service';
+import { AdviceService } from '../advice/advice.service';
+import { StreakBadgeService } from '../activity/streak-badge.service';
 
 // 간단한 제목 추출: [제목] 패턴 혹은 첫 줄 30자
 function extractTitle(content: string): string | undefined {
@@ -31,9 +33,8 @@ export class DiaryService {
     private readonly realtimeGateway: RealtimeGateway,
     private readonly activityService: ActivityService,
     private readonly diarySummaryService: DiarySummaryService,
-    // 조언 갱신 훅
-    private readonly adviceService: import('../advice/advice.service').AdviceService,
-    private readonly streakBadgeService: import('../activity/streak-badge.service').StreakBadgeService,
+    private readonly adviceService: AdviceService,
+    private readonly streakBadgeService: StreakBadgeService,
   ) {}
 
   /**
