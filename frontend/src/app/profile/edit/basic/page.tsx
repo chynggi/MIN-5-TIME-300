@@ -188,7 +188,6 @@ export default function BasicInfoEditPage() {
                 </label>
               ))}
             </div>
-            <small style={{ color: '#666', fontSize: '12px' }}>* 성별은 아직 백엔드 구현 대기 중입니다.</small>
           </div>
 
           <div className={styles.formGroup}>

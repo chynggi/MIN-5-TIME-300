@@ -43,6 +43,7 @@ function NewDiaryContent() {
   // Core form states
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [presetKey, setPresetKey] = useState<string | null>(null); // 프리셋 기본 이미지 키
   const [showDefaultImageSelect, setShowDefaultImageSelect] = useState(false);
   const [emotion, setEmotion] = useState("😊");
   const [voiceRecord, setVoiceRecord] = useState<Blob | null>(null);
@@ -97,7 +98,14 @@ function NewDiaryContent() {
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'pending' | 'success' | 'denied' | 'error'>('idle');
-  const [shareLocation, setShareLocation] = useState<boolean>(true);
+  // 전역 개인정보 설정(프로필>설정>개인정보)의 '위치 정보 자동 저장' 토글을 사용
+  const [shareLocation, setShareLocation] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true; // SSR 방어 기본 true
+    try {
+      const stored = localStorage.getItem('shareLocationEnabled');
+      return stored === null ? true : stored === 'true';
+    } catch { return true; }
+  });
   useEffect(() => {
     if (!shareLocation) return;
     if (!('geolocation' in navigator)) { setLocationStatus('error'); return; }
@@ -142,7 +150,11 @@ function NewDiaryContent() {
       return;
     }
     if (!title.trim() || !content.trim()) { setError("제목과 내용을 모두 입력해주세요."); return; }
-    if (!image && !preview) { setShowDefaultImageSelect(true); setError("이미지를 추가하거나 기본 이미지 중 하나를 선택해주세요."); return; }
+    if (!image && !preview) { 
+      setShowDefaultImageSelect(true); 
+      setError("이미지를 추가하거나 기본 이미지 중 하나를 선택해주세요."); 
+      return; 
+    }
     setLoading(true); setError("");
     try {
       const writingDuration = Math.floor((Date.now() - startTime) / 1000);
@@ -157,7 +169,32 @@ function NewDiaryContent() {
       if (shareLocation && lat != null && lng != null) { formData.append('lat', lat.toString()); formData.append('lng', lng.toString()); }
   if (questionId) formData.append('questionId', questionId);
   if (questionModel) formData.append('questionModel', questionModel);
-      if (image) formData.append('file', image);
+      // 이미지 처리: 업로드 파일 > preset 키 > (예외) preview만 존재 시 fetch
+      if (image) {
+        formData.append('file', image);
+      } else if (presetKey) {
+        formData.append('preset', presetKey);
+      } else if (preview) {
+        // 예외 케이스: presetKey가 없지만 preview 경로만 있는 경우 (레거시/임시)
+        if (preview.startsWith('/images/')) {
+          // 경로에서 키 유추 (예: /images/seasons/spring.jpg)
+          const match = preview.match(/\/images\/(?:seasons|weather)\/(.+)\.(?:jpg|png|jpeg|webp)$/);
+          if (match) {
+            formData.append('preset', match[1]);
+          } else {
+            // 마지막 fallback: fetch 업로드 (빈번하진 않음)
+            try {
+              const abs = typeof window !== 'undefined' ? `${window.location.origin}${preview}` : preview;
+              const res = await fetch(abs, { cache: 'no-store' });
+              if (res.ok) {
+                const blob = await res.blob();
+                const fileName = preview.split('/').pop() || 'image.jpg';
+                formData.append('file', new File([blob], fileName, { type: blob.type || 'image/jpeg' }));
+              }
+            } catch {/* ignore */}
+          }
+        }
+      }
       const response = await api.post("/diaries", formData, { headers: { "Content-Type": "multipart/form-data" } });
       if (response.status === 200 || response.status === 201) { 
         alert("일기가 성공적으로 저장되었습니다!\n(질문 기반 작성 내용은 자연스러운 일기 형태로 요약/정리되어 저장되었습니다.)"); 
@@ -204,59 +241,21 @@ function NewDiaryContent() {
 
 
           {/* Image Upload Component */}
-          <ImageUpload onImageSelect={handleImageSelect} preview={preview} />
-
-          {/* 위치 정보 표시/토글 */}
-          <div className="mt-4 mb-4 text-xs text-gray-600 bg-gray-50 rounded-lg p-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">현재 위치 자동 저장</span>
-              <label className="flex items-center gap-1 cursor-pointer text-[11px]">
-                <input
-                  type="checkbox"
-                  className="accent-blue-600"
-                  checked={shareLocation}
-                  onChange={(e) => {
-                    setShareLocation(e.target.checked);
-                    if (e.target.checked && locationStatus === 'idle') {
-                      // 재시도 트리거: effect에서 처리
-                    }
-                  }}
-                />
-                <span>{shareLocation ? 'ON' : 'OFF'}</span>
-              </label>
-            </div>
-            {shareLocation && (
-              <div className="text-[11px] leading-relaxed">
-                {locationStatus === 'pending' && <span className="text-gray-500">위치 가져오는 중...</span>}
-                {locationStatus === 'success' && (
-                  <span className="text-green-600">위치 확인됨</span>
-                )}
-                {locationStatus === 'denied' && (
-                  <span className="text-red-500">브라우저에서 위치 권한이 거부되었습니다. (OFF로 전환하거나 브라우저 설정에서 허용 후 새로고침)</span>
-                )}
-                {locationStatus === 'error' && (
-                  <span className="text-orange-500">위치 정보를 가져오지 못했습니다. (네트워크/환경 문제)</span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* 기본 이미지 선택 안내 및 UI */}
-          {showDefaultImageSelect && (
+          <ImageUpload
+            onImageSelect={(file) => { setImage(file); if (file) { setPresetKey(null); } }}
+            preview={preview}
+            onDefaultImageSelect={(url, key) => {
+              setPreview(url);
+              setPresetKey(key || null);
+              setImage(null);
+              setShowDefaultImageSelect(false);
+              setError('');
+            }}
+          />
+          {showDefaultImageSelect && !preview && (
             <div className="my-4">
-              <div className="text-sm text-red-500 font-semibold mb-2">이미지를 추가하거나 아래 기본 이미지 중 하나를 선택하세요.</div>
-              <div className="grid grid-cols-2 gap-3">
-                {defaultImages.map((url, idx) => (
-                  <button
-                    key={url}
-                    type="button"
-                    className={`border-2 rounded-lg overflow-hidden focus:ring-2 focus:ring-blue-400 ${preview === url ? 'border-blue-500 ring-2' : 'border-gray-200'}`}
-                    onClick={() => handleDefaultImageSelect(url)}
-                  >
-                    <img src={url} alt={`기본 이미지 ${idx+1}`} className="w-full h-24 object-cover" />
-                  </button>
-                ))}
-              </div>
+              <div className="text-sm text-red-500 font-semibold mb-2">이미지를 추가하거나 기본 이미지를 선택해주세요.</div>
+              {/* 기본이미지는 이제 ImageUpload 컴포넌트 내 토글 사용 */}
             </div>
           )}
 

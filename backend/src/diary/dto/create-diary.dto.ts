@@ -32,6 +32,11 @@ export class CreateDiaryDto {
   @IsString()
   mediaType?: string;
 
+  // 기본 프리셋 이미지 키 (spring, summer, autumn, winter, sunny, night, rain, snow)
+  @IsOptional()
+  @IsString()
+  preset?: string;
+
   @IsNumberString()
   writingDuration: string; // FormData에서 문자열로 전달
   

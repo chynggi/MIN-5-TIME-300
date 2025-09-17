@@ -31,6 +31,8 @@ export default function ProfileSettingsPage() {
   const [followVisibility, setFollowVisibility] = useState<{followers: VisibilityLevel; following: VisibilityLevel}>({ followers: 'PUBLIC', following: 'PUBLIC' });
   const [allowDM, setAllowDM] = useState(true);
   const [showOnline, setShowOnline] = useState(true);
+  // 위치 자동 저장 (일기 작성 시 위치 첨부 허용) 글로벌 설정
+  const [shareLocationEnabled, setShareLocationEnabled] = useState<boolean>(true);
 
   // Blocked users state
   const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]);
@@ -56,6 +58,13 @@ export default function ProfileSettingsPage() {
       } catch (e) {
         console.log('상세 개인정보 설정 로드 실패(스텁일 수 있음)', e);
       }
+      // 위치 저장 기본 설정 로드 (로컬 - 서버 동기화 전 단계)
+      try {
+        const stored = localStorage.getItem('shareLocationEnabled');
+        if (stored !== null) {
+          setShareLocationEnabled(stored === 'true');
+        }
+      } catch {/* ignore */}
       // Load notification toggles (for DM fallback)
       try {
         const notif = await notificationApi.getSettings();
@@ -87,7 +96,12 @@ export default function ProfileSettingsPage() {
   const handleSavePrivacy = async () => {
     setSaving(true);
     try {
-      await notificationApi.updateSettings({ messageNotification: allowDM });
+      // 알림 설정은 실패하더라도 개인정보 저장을 막지 않도록 별도 예외 처리
+      try {
+        await notificationApi.updateSettings({ messageNotification: allowDM });
+      } catch (e) {
+        console.log('알림 설정 저장 실패(무시 가능):', e);
+      }
       try {
         await privacyApi.updateDetailedPrivacySettings({
           followersVisibility: followVisibility.followers,
@@ -96,6 +110,8 @@ export default function ProfileSettingsPage() {
           allowDirectMessages: allowDM,
         });
       } catch (e) { console.log('상세 개인정보 업데이트 실패(스텁 가능)', e); }
+      // 위치 저장 설정은 아직 서버 스키마가 없을 수 있어 로컬 우선 저장
+      try { localStorage.setItem('shareLocationEnabled', String(shareLocationEnabled)); } catch {/* ignore */}
       alert('개인정보 설정이 저장되었습니다.');
     } catch (e) {
       console.error(e);
@@ -219,6 +235,7 @@ export default function ProfileSettingsPage() {
                 <div style={{ display: 'grid', gap: '.9rem' }}>
                   {renderToggle('DM 수신 허용', allowDM, () => setAllowDM(p=>!p), '다른 사용자가 메시지를 보낼 수 있습니다')}
                   {renderToggle('온라인 상태 표시', showOnline, () => setShowOnline(p=>!p), '내 접속 상태를 다른 사용자에게 노출')}
+                  {renderToggle('위치 정보 자동 저장', shareLocationEnabled, () => setShareLocationEnabled(p=>!p), '일기 작성 시 위치(GPS)를 자동 첨부')}
                 </div>
                 <div style={{ display: 'grid', gap: '.9rem', marginTop: '.5rem' }}>
                   <div style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--c-text-soft)', textTransform: 'uppercase', letterSpacing: '.5px' }}>팔로우 목록 공개범위</div>

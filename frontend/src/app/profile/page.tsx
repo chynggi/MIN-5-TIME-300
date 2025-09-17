@@ -339,10 +339,6 @@ export default function ProfilePage() {
     router.push('/profile/edit');
   };
 
-  const handleTogglePublic = () => {
-    router.push('/profile/privacy');
-  };
-
   const handleStatsClick = (type: 'followers' | 'following') => {
     router.push(`/profile/follow-list?tab=${type}`);
   };
@@ -477,9 +473,6 @@ export default function ProfilePage() {
             <div className={styles.actionRow}>
               <button onClick={handleEditProfile} className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}>
                 ✏️ 프로필 편집
-              </button>
-              <button onClick={handleTogglePublic} className={`${styles.actionBtn} ${styles.actionBtnOutline}`}>
-                🔒 공개 설정
               </button>
             </div>
           </div>

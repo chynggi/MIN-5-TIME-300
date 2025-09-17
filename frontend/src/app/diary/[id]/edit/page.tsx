@@ -45,6 +45,7 @@ function EditDiaryInner() {
   // Core form states
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null); // 기존 이미지 or 기본이미지
+  const [presetKey, setPresetKey] = useState<string | null>(null); // 프리셋 선택 키
   const [showDefaultImageSelect, setShowDefaultImageSelect] = useState(false);
   const [emotion, setEmotion] = useState("😊");
   const [voiceRecord, setVoiceRecord] = useState<Blob | null>(null);
@@ -65,11 +66,9 @@ function EditDiaryInner() {
     weather: "sunny" as "sunny" | "cloudy" | "rainy" | "snowy"
   });
 
-  // Location (수정 시 기본적으로 기존 값 유지, 새로 켜면 다시 요청)
+  // Location: 기존 일기에 포함된 좌표는 유지만 하고 UI로 편집하지 않음 (위치 섹션 제거 요구사항)
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'pending' | 'success' | 'denied' | 'error'>('idle');
-  const [shareLocation, setShareLocation] = useState<boolean>(false); // 기존 값 있으면 true로 바꿀 예정
 
   // Misc states
   const [error, setError] = useState("");
@@ -104,10 +103,17 @@ function EditDiaryInner() {
           weather: (d.weather as any) || 'sunny'
         });
         if (d.mediaUrl && d.mediaType?.includes('image')) {
-          setPreview(d.mediaUrl.startsWith('http') ? d.mediaUrl : `https://chynggi.cafe24.com/${d.mediaUrl}`);
+          // 서버 저장된 mediaUrl이 프리셋 경로(/images/...)인지 검사 후 presetKey 추론
+          if (d.mediaUrl.startsWith('/images/')) {
+            setPreview(d.mediaUrl);
+            const match = d.mediaUrl.match(/\/images\/(?:seasons|weather)\/(.+)\.(?:jpg|png|jpeg|webp)$/);
+            if (match) setPresetKey(match[1]);
+          } else {
+            setPreview(d.mediaUrl.startsWith('http') ? d.mediaUrl : `https://chynggi.cafe24.com/${d.mediaUrl}`);
+          }
         }
         if (d.lat && d.lng) {
-          setLat(d.lat); setLng(d.lng); setShareLocation(true); setLocationStatus('success');
+          setLat(d.lat); setLng(d.lng); // 표시/편집 UI 제거: 단순 보존
         }
         if (d.question) {
           setOriginalQuestion(d.question);
@@ -123,24 +129,7 @@ function EditDiaryInner() {
     fetchDiary();
   }, [id]);
 
-  // 위치 재확인(사용자가 토글 ON 한 경우)
-  useEffect(() => {
-    if (!shareLocation) return;
-    if (!('geolocation' in navigator)) { setLocationStatus('error'); return; }
-    if (lat && lng) return; // 기존 위치가 이미 있으면 재요청 생략
-    setLocationStatus('pending');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLat(pos.coords.latitude);
-        setLng(pos.coords.longitude);
-        setLocationStatus('success');
-      },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) setLocationStatus('denied'); else setLocationStatus('error');
-      },
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60_000 }
-    );
-  }, [shareLocation, lat, lng]);
+  // 위치 재요청 로직 제거 (위치 편집 UI 삭제)
 
   const handleImageSelect = (file: File | null) => {
     setImage(file);
@@ -167,9 +156,17 @@ function EditDiaryInner() {
       formData.append('isPublic', isPublic.toString());
       formData.append('contentVisibility', diarySettings.contentVisibility);
       formData.append('weather', diarySettings.weather);
-      if (shareLocation && lat != null && lng != null) { formData.append('lat', lat.toString()); formData.append('lng', lng.toString()); }
+  if (lat != null && lng != null) { formData.append('lat', lat.toString()); formData.append('lng', lng.toString()); }
       if (questionId) formData.append('questionId', questionId);
-      if (image) formData.append('file', image);
+      if (image) {
+        formData.append('file', image);
+      } else if (presetKey) {
+        formData.append('preset', presetKey);
+      } else if (preview && preview.startsWith('/images/')) {
+        // preset 추론
+        const match = preview.match(/\/images\/(?:seasons|weather)\/(.+)\.(?:jpg|png|jpeg|webp)$/);
+        if (match) formData.append('preset', match[1]);
+      }
       // TODO: music, voiceRecord 처리 로직 (작성 페이지에 있는 경우 동일하게 확장 필요)
 
       const response = await api.put(`/diaries/${id}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -200,39 +197,18 @@ function EditDiaryInner() {
             <h1 className="text-xl font-bold text-gray-800">일기 수정</h1>
           </div>
 
-          <ImageUpload onImageSelect={handleImageSelect} preview={preview} />
+          <ImageUpload 
+            onImageSelect={(file) => { setImage(file); if (file) { setPresetKey(null); } }} 
+            preview={preview} 
+            onDefaultImageSelect={(url, key) => {
+              setPreview(url);
+              setPresetKey(key || null);
+              setImage(null);
+              setError("");
+            }}
+          />
 
-          {/* 위치 정보 토글 */}
-          <div className="mt-4 mb-4 text-xs text-gray-600 bg-gray-50 rounded-lg p-3 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold">현재 위치 저장</span>
-              <label className="flex items-center gap-1 cursor-pointer text-[11px]">
-                <input
-                  type="checkbox"
-                  className="accent-blue-600"
-                  checked={shareLocation}
-                  onChange={(e) => {
-                    setShareLocation(e.target.checked);
-                  }}
-                />
-                <span>{shareLocation ? 'ON' : 'OFF'}</span>
-              </label>
-            </div>
-            {shareLocation && (
-              <div className="text-[11px] leading-relaxed">
-                {locationStatus === 'pending' && <span className="text-gray-500">위치 가져오는 중...</span>}
-                {locationStatus === 'success' && (
-                  <span className="text-green-600">위치 확인됨</span>
-                )}
-                {locationStatus === 'denied' && (
-                  <span className="text-red-500">브라우저에서 위치 권한이 거부되었습니다.</span>
-                )}
-                {locationStatus === 'error' && (
-                  <span className="text-orange-500">위치 정보를 가져오지 못했습니다.</span>
-                )}
-              </div>
-            )}
-          </div>
+          {/* 위치 저장 섹션 제거됨: 전역 개인정보 설정에서 제어. 기존 일기 좌표만 보존. */}
 
           <EmotionVoice 
             emotion={emotion}

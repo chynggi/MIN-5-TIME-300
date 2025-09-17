@@ -6,7 +6,7 @@ import Map from "@/components/Map";
 import FriendSearch from "@/components/FriendSearch";
 import NearbyProfilesBar from "@/components/NearbyProfilesBar";
 import ChatSidebar from "@/components/chat/ChatSidebar";
-import { isWithinRadius, haversineDistanceMeters } from "@/utils/distance";
+import { haversineDistanceMeters } from "@/utils/distance"; // isWithinRadius 제거 (미사용)
 // DiaryPin 타입을 이 파일에서 정의하여 lat/lng를 number | undefined로 허용
 export interface DiaryPin {
   id: string; // diary id
@@ -144,9 +144,9 @@ export default function CommunityListPage() {
           </div>
         </div>
       </div>
-      {/* 지도 영역 */}
-      <div className="relative flex-1 flex justify-center py-6">
-        <div className="relative w-full md:w-2/3 xl:w-7/12 2xl:w-1/2 h-[560px] md:h-[620px] bg-white/75 dark:bg-neutral-900/60 backdrop-blur rounded-2xl border border-white/40 dark:border-neutral-700/40 shadow-sm overflow-hidden">
+      {/* 지도 섹션 (지도 자체 높이만 차지) */}
+      <div className="flex justify-center mt-6 px-4">
+        <div className="relative w-full md:w-2/3 xl:w-7/12 2xl:w-1/2 bg-white/75 dark:bg-neutral-900/60 backdrop-blur rounded-2xl border border-white/40 dark:border-neutral-700/40 shadow-sm overflow-hidden">
           {!loading && !error && <Map pins={diaryPins} />}
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-600 bg-white/60 backdrop-blur-sm z-10">불러오는 중...</div>
@@ -157,17 +157,24 @@ export default function CommunityListPage() {
           {!loading && !error && diaryPins.length === 0 && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-white text-gray-600 text-xs px-4 py-2 rounded shadow">표시할 위치가 있는 공개 일기가 없습니다.</div>
           )}
-          <div className="absolute inset-x-0 bottom-0 z-30 pointer-events-none">
-            <NearbyProfilesBar
-              profiles={nearbyProfiles}
-              isLoadingLocation={locLoading}
-              locationError={locError}
-            />
-          </div>
         </div>
-        {/* 전역 fixed 이므로 body 최상단에서 잘리거나 가려지지 않음 */}
-        <ChatSidebar isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
       </div>
+
+      {/* 내 주변 섹션: 지도 바로 아래, 배경 카드 제거 */}
+      <div className="mt-4 mb-10 px-4 flex justify-center">
+        <div className="w-full md:w-2/3 xl:w-7/12 2xl:w-1/2">
+          <h2 className="text-xs font-semibold mb-2 text-neutral-600 dark:text-neutral-300 tracking-wide">내 주변</h2>
+          <NearbyProfilesBar
+            profiles={nearbyProfiles}
+            isLoadingLocation={locLoading}
+            locationError={locError}
+            inlineMode
+          />
+        </div>
+      </div>
+
+      {/* 전역 fixed 사이드바 */}
+      <ChatSidebar isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
     </div>
   );
 }

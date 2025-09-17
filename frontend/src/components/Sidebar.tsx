@@ -3,7 +3,8 @@ import { usePathname } from "next/navigation";
 
 const sidebarItems = [
   { href: "/dashboard", label: "대시보드" },
-  { href: "/diary", label: "일기" },
+  // /diary 목록 페이지 제거 -> 대체 경로로 인기 일기(/diaries) 사용
+  { href: "/diaries", label: "일기" },
   { href: "/community", label: "커뮤니티" },
   { href: "/chat", label: "채팅" },
   { href: "/statistics", label: "통계" },

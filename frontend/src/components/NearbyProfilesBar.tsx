@@ -16,6 +16,7 @@ interface NearbyProfilesBarProps {
   profiles: NearbyProfileItem[];
   isLoadingLocation: boolean;
   locationError?: string;
+  inlineMode?: boolean; // true면 하단 고정바 대신 인라인 박스 형태로 렌더
 }
 
 // 3km 내 사용자 리스트 하단 고정 바
@@ -23,6 +24,7 @@ export default function NearbyProfilesBar({
   profiles,
   isLoadingLocation,
   locationError,
+  inlineMode = false,
 }: NearbyProfilesBarProps) {
   const content = useMemo(() => {
     if (isLoadingLocation) {
@@ -81,9 +83,22 @@ export default function NearbyProfilesBar({
     );
   }, [profiles, isLoadingLocation, locationError]);
 
+  if (inlineMode) {
+    return (
+      <div className="rounded-2xl border border-green-200 bg-white/80 dark:bg-neutral-900/70 shadow-sm">
+        <div className="flex items-center justify-between px-4 pt-3 pb-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-green-700">내 주변 (3km)</span>
+          </div>
+        </div>
+        {content}
+      </div>
+    );
+  }
+
   return (
     <div className="fixed left-0 right-0 bottom-0 z-30 pointer-events-none">
-      <div className="max-w-2xl mx-auto pb-safe">{/* iOS safe area */}
+      <div className="max-w-2xl mx-auto pb-safe">
         <div className="pointer-events-auto m-3 rounded-3xl shadow-lg bg-white/90 backdrop-blur border border-green-200">
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <div className="flex items-center gap-2">

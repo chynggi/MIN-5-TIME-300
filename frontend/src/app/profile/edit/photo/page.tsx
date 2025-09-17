@@ -183,7 +183,6 @@ export default function PhotoEditPage() {
               • 권장 크기: 400x400px 이상<br />
               • 지원 형식: JPG, PNG, GIF<br />
               • 최대 용량: 5MB<br />
-              * 프로필 사진 업로드는 백엔드 구현 대기 중입니다.
             </small>
           </div>
 

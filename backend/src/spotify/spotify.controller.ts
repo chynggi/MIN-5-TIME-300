@@ -17,4 +17,12 @@ export class SpotifyController {
   ): Promise<{ tracks: SpotifyTrackFormatted[] }> {
     return await this.spotifyService.getPopular(category, limit);
   }
+
+  @Get('recommendations')
+  async recommendations(
+    @Query('seedGenres') seedGenres?: string,
+    @Query('limit') limit?: string,
+  ): Promise<{ tracks: SpotifyTrackFormatted[] }> {
+    return await this.spotifyService.getRecommendations(seedGenres, limit);
+  }
 }
