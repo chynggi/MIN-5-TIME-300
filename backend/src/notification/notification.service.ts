@@ -381,6 +381,13 @@ export class NotificationService {
           deepLink: `/diary/${notification.objectId}`
         };
 
+      case NotificationType.WELLBEING_SEVERE:
+        return {
+          title: '도움이 필요할 수 있어요',
+          body: '최근 지표들이 많이 힘들어 보여요. 가까운 사람과 이야기하거나, 전문 도움을 고려해보세요.',
+          deepLink: '/help' // 도움말/리소스 페이지로 연결
+        };
+
       default:
         return {
           title: '새로운 알림이 있습니다'

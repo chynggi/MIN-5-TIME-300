@@ -31,6 +31,9 @@ export class DiaryService {
     private readonly realtimeGateway: RealtimeGateway,
     private readonly activityService: ActivityService,
     private readonly diarySummaryService: DiarySummaryService,
+    // 조언 갱신 훅
+    private readonly adviceService: import('../advice/advice.service').AdviceService,
+    private readonly streakBadgeService: import('../activity/streak-badge.service').StreakBadgeService,
   ) {}
 
   /**
@@ -486,8 +489,9 @@ export class DiaryService {
       return n;
     })();
     
-    // diaryDate 처리 - 전달되면 사용, 없으면 현재 시각
-    const diaryDate = dto.diaryDate ? new Date(dto.diaryDate) : new Date();
+  // diaryDate 처리 - 전달되면 사용, 없으면 현재 시각
+  const diaryDate = dto.diaryDate ? new Date(dto.diaryDate) : new Date();
+  const dayStart = new Date(diaryDate.getFullYear(), diaryDate.getMonth(), diaryDate.getDate());
     
     // createdAt도 과거 회고 작성 시 diaryDate로 고정 (미래는 이미 필터됨)
     // Prisma에서는 createdAt default(now()) 대신 명시적으로 넣을 수 있음
@@ -499,41 +503,48 @@ export class DiaryService {
     const lat = dto.lat !== undefined && dto.lat !== null && dto.lat !== '' ? parseFloat(dto.lat) : undefined;
     const lng = dto.lng !== undefined && dto.lng !== null && dto.lng !== '' ? parseFloat(dto.lng) : undefined;
 
-    // Q&A 기반 작성 감지 -> 요약 시도
+    // Q&A 기반 작성 감지 -> (정책 변경) 최종 일기 저장 버튼에서는 요약을 하지 않음
     let finalContent = dto.content;
-    let summaryMeta: { modelUsed: string; truncated: boolean; fallbackUsed: boolean } | null = null;
-    const isQuestionBased = !!dto.questionId;
-    if (isQuestionBased) {
-      try {
-  const res = await this.diarySummaryService.summarize(dto.content, { title: extractTitle(dto.content), modelId: dto.questionModel, userId });
-        finalContent = res.text;
-        summaryMeta = { modelUsed: res.modelUsed, truncated: res.truncated, fallbackUsed: res.fallbackUsed };
-      } catch (e) {
-        // 요약 실패 시 원문 유지 (이미 내부에서 로그 처리)
-      }
+    // 동일 날짜 일기 존재 시 업데이트로 전환
+    let diary = await this.prisma.journal.findFirst({ where: { userId, diaryDate: dayStart } });
+    if (diary) {
+      diary = await this.prisma.journal.update({
+        where: { id: diary.id },
+        data: {
+          content: finalContent,
+          isPublic,
+          emotion: dto.emotion,
+          // 날짜는 유지(dayStart)
+          mediaUrl,
+          mediaType,
+          writingDuration: writingDurationParsed,
+          lat,
+          lng,
+        },
+      });
+    } else {
+      diary = await this.prisma.journal.create({
+        data: {
+          userId,
+          content: finalContent,
+          isPublic,
+          emotion: dto.emotion, // 감정 이모지 저장
+          diaryDate: dayStart, // 일기 날짜는 정규화된 00:00:00으로 저장
+          ...(useCustomCreatedAt ? { createdAt: dayStart } : {}),
+          mediaUrl,
+          mediaType,
+          writingDuration: writingDurationParsed,
+          emotionScore: 0,
+          lat,
+          lng,
+          summaryModel: undefined,
+          summaryTruncated: undefined,
+          summaryFallbackUsed: undefined,
+        },
+      });
     }
 
-    const diary = await this.prisma.journal.create({
-      data: {
-        userId,
-        content: finalContent,
-        isPublic,
-        emotion: dto.emotion, // 감정 이모지 저장
-        diaryDate, // 일기 날짜 저장
-        ...(useCustomCreatedAt ? { createdAt: diaryDate } : {}),
-        mediaUrl,
-        mediaType,
-        writingDuration: writingDurationParsed,
-        emotionScore: 0,
-        lat,
-        lng,
-        summaryModel: summaryMeta?.modelUsed,
-        summaryTruncated: summaryMeta?.truncated,
-        summaryFallbackUsed: summaryMeta?.fallbackUsed,
-      },
-    });
-
-    // 일기 저장 후 임베딩 생성 및 Pinecone upsert (VectorDbService 래퍼 사용)
+    // 일기 저장/업데이트 후 임베딩 생성 및 Pinecone upsert (VectorDbService 래퍼 사용)
     try {
       const embedding = await this.vectorDbService.getCombinedEmbedding([diary.content]);
       if (embedding) {
@@ -570,6 +581,9 @@ export class DiaryService {
       lng: (diary as any).lng ?? null,
     };
 
+    // 스트릭/배지 업데이트
+    this.streakBadgeService.onDiaryOrCheckin(userId, diaryDate).catch(() => {});
+
     // 일기 작성 후 최신 일기 수 카운트 및 실시간 전송 (비동기, 실패해도 throw 아님)
     this.prisma.journal.count({ where: { userId } })
       .then(count => {
@@ -589,7 +603,81 @@ export class DiaryService {
       console.warn('활동지수 일기 가점 실패:', err.message);
     });
 
+    // 일기 저장 직후 오늘의 한마디 갱신 시도 (비동기, 오류는 무시)
+    this.adviceService.generateWithCache(userId, true).catch(err => {
+      // eslint-disable-next-line no-console
+      console.warn('조언 갱신 실패 (무시):', err.message);
+    });
+
     return result;
+  }
+
+  /**
+   * 질문 답변 저장: Q&A를 커밋하고 즉시 요약을 생성/저장한다.
+   * - 기존 일기가 있으면 업데이트, 없으면 생성(최초 저장 시 선택 질문 텍스트/도메인도 저장)
+   */
+  async saveQuestionAnswers(req: any, dto: { qa: Array<{ domain: string; question: string; answer: string }>; modelId?: string; diaryDate?: string }) {
+    const userId = req.user.userId;
+    const date = dto.diaryDate ? new Date(dto.diaryDate) : new Date();
+    const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    // 기존 일기 조회(해당 날짜)
+    let journal = await this.prisma.journal.findFirst({ where: { userId, diaryDate: dayStart } });
+
+    // Q&A를 단일 텍스트로 병합 (요약 입력)
+    const qaText = dto.qa.map((q, i) => `[${q.domain}] Q${i+1}: ${q.question}\nA: ${q.answer}`).join('\n\n');
+    const title = extractTitle(qaText) || '오늘의 Q&A';
+
+    // 즉시 요약 생성
+    const sum = await this.diarySummaryService.summarize(qaText, { title, modelId: dto.modelId, userId });
+    const finalContent = sum.text;
+
+    if (!journal) {
+      // 최초 생성: 선택 질문 저장
+      journal = await this.prisma.journal.create({
+        data: {
+          userId,
+          diaryDate: dayStart,
+          content: finalContent,
+          isPublic: false,
+          writingDuration: 0,
+          emotionScore: 0,
+          summaryModel: sum.modelUsed,
+          summaryTruncated: sum.truncated,
+          summaryFallbackUsed: sum.fallbackUsed,
+          selectedQuestionDomains: dto.qa.map(q => q.domain),
+          selectedQuestionTexts: dto.qa.map(q => q.question),
+        },
+      });
+    } else {
+      // 업데이트: 내용과 요약 메타만 갱신(질문 배열은 최초 생성 시에만 저장)
+      journal = await this.prisma.journal.update({
+        where: { id: journal.id },
+        data: {
+          content: finalContent,
+          summaryModel: sum.modelUsed,
+          summaryTruncated: sum.truncated,
+          summaryFallbackUsed: sum.fallbackUsed,
+        },
+      });
+    }
+
+    // 활동지수 가점(질문 기반 작성)
+    this.activityService.addDiaryScore(userId, true).catch(() => {});
+
+    // 조언 갱신 트리거
+    this.adviceService.generateWithCache(userId, true).catch(() => {});
+
+    return {
+      id: journal.id,
+      content: journal.content,
+      createdAt: journal.createdAt.toISOString(),
+      isPublic: journal.isPublic,
+      question: '',
+      diaryDate: journal.diaryDate.toISOString(),
+      summary: { modelUsed: sum.modelUsed, truncated: sum.truncated, fallbackUsed: sum.fallbackUsed },
+      selectedQuestions: journal.selectedQuestionTexts?.map((t, i) => ({ domain: journal!.selectedQuestionDomains?.[i], text: t })) || [],
+    };
   }
 
   async rateDiary(req: any, id: string, dto: RateDiaryDto): Promise<{ id: string; emotionScore: number; updatedAt: string }> {

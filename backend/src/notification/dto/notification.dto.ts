@@ -17,6 +17,7 @@ export enum NotificationType {
   MENTION_CREATED = 'mention_created',
   FRIEND_ACCEPTED = 'friend_accepted',
   DIARY_PUBLISHED = 'diary_published'
+  , WELLBEING_SEVERE = 'wellbeing_severe'
 }
 
 export class CreateNotificationDto {

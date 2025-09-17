@@ -28,6 +28,8 @@ interface MyProfile {
   profileImageUrl?: string;
   profileColor?: string;
   activityScore?: number; // 활동지수 (0-100)
+  mentalIndex?: number;   // 멘탈지수 (0-100)
+  activityKpis?: { clickRate: number; diaryContinuationRate: number; nextDayRevisitRate: number };
 }
 
 interface CalendarDay {
@@ -85,6 +87,7 @@ export default function ProfilePage() {
     mbti: 'INFJ',
     profileColor: undefined,
     activityScore: 0,
+    mentalIndex: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -265,6 +268,8 @@ export default function ProfilePage() {
         profileImageUrl: profileData.profileImageUrl,
         profileColor: (profileData as any).profileColor,
         activityScore: profileData.activityScore ?? prev.activityScore ?? 0,
+        mentalIndex: (profileData as any).mentalIndex ?? prev.mentalIndex ?? 0,
+        activityKpis: (profileData as any).activityKpis,
       }));
       // 전역에 사용자 ID 기억 (간단한 공유)
       (window as any)._myProfileUserId = profileData.id;
@@ -451,7 +456,24 @@ export default function ProfilePage() {
                 <span className={styles.statLabelModern}>ACTIVITY</span>
                 {/* 향후: 히트맵/미니 바 추가 가능 */}
               </div>
+              {/* 멘탈지수 카드 */}
+              <div
+                className={styles.statCard}
+                aria-label={`멘탈지수 ${profile.mentalIndex ?? 0}%`}
+                role="presentation"
+              >
+                <span className={styles.statValue}>{profile.mentalIndex ?? 0}%</span>
+                <span className={styles.statLabelModern}>MENTAL</span>
+              </div>
             </div>
+            {/* 활동 KPI 미니 표기 (선택 표시) */}
+            {profile.activityKpis && (
+              <div className={styles.kpiRow}>
+                <div className={styles.kpiItem} title="조언 상호작용률(최근 30일)">CTR {(profile.activityKpis.clickRate*100).toFixed(0)}%</div>
+                <div className={styles.kpiItem} title="최근 30일 중 작성한 날 비율">지속률 {(profile.activityKpis.diaryContinuationRate*100).toFixed(0)}%</div>
+                <div className={styles.kpiItem} title="작성 다음날 재방문율">재방문 {(profile.activityKpis.nextDayRevisitRate*100).toFixed(0)}%</div>
+              </div>
+            )}
             <div className={styles.actionRow}>
               <button onClick={handleEditProfile} className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}>
                 ✏️ 프로필 편집

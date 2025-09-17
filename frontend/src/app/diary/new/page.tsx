@@ -18,6 +18,9 @@ import WritingMode from "@/components/diary/WritingMode";
 import DiarySettings from "@/components/diary/DiarySettings";
 import AIQuestionWriter from "@/components/diary/AIQuestionWriter";
 import FreeWriter from "@/components/diary/FreeWriter";
+import TemperatureBar from "@/components/checkin/TemperatureBar";
+import CheckinForm from "@/components/checkin/CheckinForm";
+import { checkinApi } from "@/services/checkin-api";
 
 
 interface SpotifyTrack {
@@ -49,6 +52,9 @@ function NewDiaryContent() {
   const [questionId, setQuestionId] = useState("");
   const [questionModel, setQuestionModel] = useState("");
   const [startTime] = useState<number>(Date.now());
+  // Check-in/온도 바 상태
+  const [checkinPercent, setCheckinPercent] = useState<number>(0);
+  const [showCheckinForm, setShowCheckinForm] = useState<boolean>(false);
 
   // Date param handling
   const searchParams = useSearchParams();
@@ -69,6 +75,16 @@ function NewDiaryContent() {
     const newParam = searchParams?.get('date');
     setSelectedDate(parseValidDate(newParam));
   }, [searchParams]);
+
+  // 오늘(또는 선택 날짜)의 체크인 퍼센트 조회
+  useEffect(() => {
+    let mounted = true;
+    checkinApi.getToday().then((res) => {
+      if (!mounted) return;
+      setCheckinPercent(res?.percent ?? 0);
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, []);
 
   // Diary settings
   const [diarySettings, setDiarySettings] = useState({
@@ -121,6 +137,10 @@ function NewDiaryContent() {
   const handleFreeWriteComplete = (data: { title: string; content: string }) => { setTitle(data.title); setContent(data.content); setCurrentView('main'); };
 
   const handleSubmit = async () => {
+    if (checkinPercent < 100) {
+      setError('하루의 온도 체크인을 완료해야 일기 저장이 가능합니다. 상단의 Check 버튼을 눌러 설문을 저장해주세요.');
+      return;
+    }
     if (!title.trim() || !content.trim()) { setError("제목과 내용을 모두 입력해주세요."); return; }
     if (!image && !preview) { setShowDefaultImageSelect(true); setError("이미지를 추가하거나 기본 이미지 중 하나를 선택해주세요."); return; }
     setLoading(true); setError("");
@@ -162,6 +182,25 @@ function NewDiaryContent() {
           <div className="mb-4">
             <h1 className="text-xl font-bold text-gray-800">오늘의 일기</h1>
           </div>
+
+          {/* 하루의 온도 바 */}
+          <TemperatureBar
+            percent={checkinPercent}
+            onCheck={() => setShowCheckinForm(true)}
+          />
+
+          {/* 설문 폼 모달 대체: 간단히 조건부 렌더링 */}
+          {showCheckinForm && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+              <div className="w-full max-w-md p-4">
+                <CheckinForm
+                  defaultDate={selectedDate}
+                  onSaved={(r) => { setCheckinPercent(r.percent); setShowCheckinForm(false); }}
+                  onCancel={() => setShowCheckinForm(false)}
+                />
+              </div>
+            </div>
+          )}
 
 
           {/* Image Upload Component */}
@@ -300,7 +339,7 @@ function NewDiaryContent() {
             </Link>
             <button
               onClick={handleSubmit}
-              disabled={loading || !title.trim() || !content.trim()}
+              disabled={loading || !title.trim() || !content.trim() || checkinPercent < 100}
               className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
             >
               {loading ? "저장 중..." : "일기 저장"}

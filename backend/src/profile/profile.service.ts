@@ -36,10 +36,16 @@ export class ProfileService {
         createdAt: true,
         interests: true,
         activityPublic: true,
+        streakDays: true,
+        badges: { select: { type: true, awardedAt: true } },
       },
     });
     if (!user) throw new NotFoundException('유저를 찾을 수 없습니다.');
-    const activityScore = await this.calculateActivityScore(userId);
+    const [activityScore, mentalIndex, activityKpis] = await Promise.all([
+      this.calculateActivityScore(userId),
+      this.calculateMentalIndex(userId),
+      this.calculateActivityKpis(userId),
+    ]);
     return {
       id: user.id,
       email: user.email,
@@ -51,8 +57,18 @@ export class ProfileService {
       profileImageUrl: user.profileImageUrl || '',
       interests: user.interests.map(i => ({ id: i.id, interest: i.interest, priority: i.priority })),
       createdAt: user.createdAt.toISOString(),
-      activityScore,
-      activityPublic: user.activityPublic,
+  activityScore,
+      // 확장 지표 추가
+      // @ts-ignore - DTO 확장에 맞춰 프론트 타입도 업데이트 필요
+      mentalIndex,
+      // @ts-ignore
+      activityKpis,
+  activityPublic: user.activityPublic,
+  // streak/badges 노출
+  // @ts-ignore
+  streakDays: user.streakDays,
+  // @ts-ignore
+  badges: (user.badges || []).map(b => ({ type: b.type, awardedAt: b.awardedAt.toISOString() })),
     };
   }
   /**
@@ -72,6 +88,8 @@ export class ProfileService {
         showDiariesToFriends: true,
         privacySettings: true,
         activityPublic: true,
+        streakDays: true,
+        badges: { select: { type: true, awardedAt: true } },
       },
     });
     if (!otherUser) throw new NotFoundException('유저를 찾을 수 없습니다.');
@@ -161,6 +179,11 @@ export class ProfileService {
       }
     }
 
+    const [otherActivityScore, otherMentalIndex] = await Promise.all([
+      this.calculateActivityScore(otherUserId),
+      this.calculateMentalIndex(otherUserId),
+    ]);
+
     return {
       id: otherUser.id,
       username: otherUser.username,
@@ -173,8 +196,14 @@ export class ProfileService {
       isPublic: true,
       mbti: otherUser.mbti || '',
       canViewCalendar,
-      activityScore: await this.calculateActivityScore(otherUserId),
+  activityScore: otherActivityScore,
+      // @ts-ignore
+      mentalIndex: otherMentalIndex,
       activityPublic: otherUser.activityPublic,
+  // @ts-ignore
+  streakDays: (otherUser as any).streakDays,
+  // @ts-ignore
+  badges: ((otherUser as any).badges || []).map((b: any) => ({ type: b.type, awardedAt: b.awardedAt.toISOString() })),
     };
   }
 
@@ -749,6 +778,119 @@ export class ProfileService {
 
     const total = diaryScore + messageScore + followerScore + followingScore + interestScore + profileCompletenessScore;
     return Math.round(Math.min(100, total));
+  }
+
+  /**
+   * 최근 30일 멘탈지수(0-100)
+   * - 체크인 기반 정규화 점수의 가중 평균
+   * - 없으면 베이스라인 또는 기본값 50
+   */
+  private async calculateMentalIndex(userId: string): Promise<number> {
+    const today = new Date();
+    const since = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    since.setDate(since.getDate() - 29); // 오늘 포함 30일 창
+
+    const [checks, baseline] = await Promise.all([
+      this.prisma.dailyCheckin.findMany({ where: { userId, diaryDate: { gte: since, lte: today } }, orderBy: { diaryDate: 'asc' } }),
+      this.prisma.userBaselineCheckin.findUnique({ where: { userId } }),
+    ]);
+
+    const norm = (x: number) => (x - 1) / 9; // 1~10 -> 0~1
+    const hoursBucket = (h: number) => {
+      if (h <= 4) return 0.2;
+      if (h <= 6) return 0.6;
+      return 1.0; // 7~9+
+    };
+    const sleepScore = (hours1to9p?: number, quality1to10?: number) => {
+      if (!hours1to9p || !quality1to10) return undefined;
+      return 0.6 * hoursBucket(hours1to9p) + 0.4 * norm(quality1to10);
+    };
+
+    // 개별 일자 점수 계산
+    const dayScores: number[] = [];
+    for (const c of checks) {
+      const mood = c.mood_1to10 ? norm(c.mood_1to10) : undefined;
+      const stressInv = c.stress_1to10 ? (1 - norm(c.stress_1to10)) : undefined;
+      const energy = c.energy_1to10 ? norm(c.energy_1to10) : undefined;
+      const sleep = sleepScore(c.sleep_hours_1to9p as any, c.sleep_quality_1to10 as any);
+      const vitality = (energy !== undefined && sleep !== undefined) ? (0.5 * energy + 0.5 * sleep) : (energy ?? sleep);
+      const focus = c.focus_1to10 ? norm(c.focus_1to10) : undefined;
+      const fatigueInv = c.fatigue_1to10 ? (1 - norm(c.fatigue_1to10)) : undefined;
+      const socialSat = c.social_satisfaction_1to10 ? norm(c.social_satisfaction_1to10) : undefined;
+
+      const parts: Array<[number, number]> = [];
+      if (mood !== undefined) parts.push([mood, 0.25]);
+      if (stressInv !== undefined) parts.push([stressInv, 0.2]);
+      if (vitality !== undefined) parts.push([vitality, 0.2]);
+      if (focus !== undefined) parts.push([focus, 0.15]);
+      if (fatigueInv !== undefined) parts.push([fatigueInv, 0.1]);
+      if (socialSat !== undefined) parts.push([socialSat, 0.1]);
+      if (!parts.length) continue;
+      const wsum = parts.reduce((a, [_, w]) => a + w, 0);
+      const score01 = parts.reduce((a, [v, w]) => a + v * (w / wsum), 0);
+      dayScores.push(score01);
+    }
+
+    let avg01: number;
+    if (dayScores.length) {
+      avg01 = dayScores.reduce((a, b) => a + b, 0) / dayScores.length;
+    } else if (baseline) {
+      // 베이스라인만 있는 경우 간이 계산
+      const bMood = norm(baseline.mood_1to10);
+      const bStressInv = 1 - norm(baseline.stress_1to10);
+      const bEnergy = norm(baseline.energy_1to10);
+      const bSleep = sleepScore(baseline.sleep_hours_1to9p as any, baseline.sleep_quality_1to10 as any) ?? 0.5;
+      avg01 = 0.25 * bMood + 0.2 * bStressInv + 0.2 * (0.5 * bEnergy + 0.5 * bSleep) + 0.35 * 0.5; // 나머지 항목 평균치
+    } else {
+      // 데이터 없으면 중립 0.5
+      avg01 = 0.5;
+    }
+    return Math.round(Math.max(0, Math.min(100, avg01 * 100)));
+  }
+
+  /**
+   * 최근 30일 활동 KPI
+   * - clickRate: 조언 상호작용(피드백) / 조언 수
+   * - diaryContinuationRate: 30일 중 작성한 날 비율
+   * - nextDayRevisitRate: 작성일 다음날에도 작성한 비율
+   */
+  private async calculateActivityKpis(userId: string): Promise<{ clickRate: number; diaryContinuationRate: number; nextDayRevisitRate: number }> {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    start.setDate(start.getDate() - 29); // 30일 창
+
+    const [adviceCount, feedbackCount, diaries] = await Promise.all([
+      this.prisma.advice.count({ where: { userId, createdAt: { gte: start, lte: today } } }),
+      this.prisma.adviceFeedback.count({ where: { userId, createdAt: { gte: start, lte: today } } }),
+      this.prisma.journal.findMany({ where: { userId, diaryDate: { gte: start, lte: today } }, select: { diaryDate: true }, orderBy: { diaryDate: 'asc' } }),
+    ]);
+
+    // clickRate: 상호작용 비율(0~1)
+    const clickRate = adviceCount > 0 ? Math.min(1, feedbackCount / adviceCount) : 0;
+
+    // unique 작성일 세트
+    const daysSet = new Set<string>();
+    for (const d of diaries) {
+      const key = d.diaryDate.toISOString().split('T')[0];
+      daysSet.add(key);
+    }
+    const writtenDays = daysSet.size;
+    const windowDays = 30;
+    const diaryContinuationRate = windowDays > 0 ? writtenDays / windowDays : 0;
+
+    // next-day revisit: 일기가 있는 날 중, 다음날에도 있는 날의 비율
+    const datesSorted = Array.from(daysSet).sort();
+    let revisitNumerator = 0;
+    for (let i = 0; i < datesSorted.length; i++) {
+      const cur = new Date(datesSorted[i]);
+      const next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+      const key = next.toISOString().split('T')[0];
+      if (daysSet.has(key)) revisitNumerator += 1;
+    }
+    const denominator = datesSorted.length; // 작성일 수 기준
+    const nextDayRevisitRate = denominator > 0 ? revisitNumerator / denominator : 0;
+
+    return { clickRate, diaryContinuationRate, nextDayRevisitRate };
   }
 
   // === 활동지수 공개/초기화 관련 메서드 ===

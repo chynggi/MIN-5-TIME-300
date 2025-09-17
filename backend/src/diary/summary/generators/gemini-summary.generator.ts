@@ -12,7 +12,7 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
     const apiKey = process.env.GEMINI_API_KEY || '';
     if (!apiKey) {
       return {
-        text: req.rawContent,
+        text: this.enforceRange(this.maskPII(req.rawContent)),
         modelUsed: this.modelName,
         truncated: false,
         fallbackUsed: true,
@@ -20,15 +20,7 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
     }
 
     const maxChars = req.maxChars ?? 1200;
-    const looksLikeQA = typeof req.looksLikeQA === 'boolean'
-      ? req.looksLikeQA
-      : /(\?|:).*\n/.test(req.rawContent) || /\n\n.+\n\n/.test(req.rawContent);
-
-    const prompt = this.buildPrompt(req.rawContent, {
-      title: req.title,
-      looksLikeQA,
-      maxChars,
-    });
+    const prompt = this.buildPrompt(req.rawContent, { maxChars });
 
     const modelToUse = req.modelId || this.modelName;
 
@@ -40,28 +32,28 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
           thinkingConfig: { thinkingBudget: 0 },
         },
       });
-      const text: string = (result as any)?.text || '';
-      if (!text.trim()) {
+      const raw: string = (result as any)?.text || '';
+      const diary = this.extractDiary(raw);
+      if (!diary) {
         return {
-          text: req.rawContent,
+          text: this.enforceRange(this.maskPII(req.rawContent)),
           modelUsed: modelToUse,
           truncated: false,
           fallbackUsed: true,
           rawOutput: JSON.stringify(result).slice(0, 1000),
         };
       }
-      const trimmed = text.trim();
-      const { text: limited, truncated } = this.applyLengthLimit(trimmed, maxChars);
+      const limited = this.enforceRange(this.maskPII(diary));
       return {
         text: limited,
         modelUsed: modelToUse,
-        truncated,
+        truncated: false,
         fallbackUsed: false,
-        rawOutput: process.env.NODE_ENV === 'development' ? trimmed : undefined,
+        rawOutput: process.env.NODE_ENV === 'development' ? raw : undefined,
       };
     } catch (error: any) {
       return {
-        text: req.rawContent,
+        text: this.enforceRange(this.maskPII(req.rawContent)),
         modelUsed: modelToUse,
         truncated: false,
         fallbackUsed: true,
@@ -70,7 +62,28 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
     }
   }
 
-  private buildPrompt(raw: string, ctx: { title?: string; looksLikeQA: boolean; maxChars: number }): string {
-    return `다음은 사용자가 오늘 작성한 일기의 초안입니다.\n초안은 AI 질문에 대한 답변들이 나열된 형태일 수 있습니다.\n이를 자연스럽고 감정이 잘 드러나는 1인칭 한국어 일기 본문으로 재구성해 주세요.\n조건:\n1) 과도한 창작을 하지 말고, 주어진 내용 범위 내에서 자연스러운 연결 문장과 흐름을 만드세요.\n2) 질문 문장은 제거하거나 간접화하여 문단 흐름에 녹여 주세요.\n3) 핵심 감정, 행동, 관계, 회복/휴식, 내일의 작은 목표가 있다면 모두 포함하세요.\n4) 가능하면 2~5개의 짧은 문단으로 나누고, 한 문단은 너무 길지 않게 (2~4문장).\n5) 1인칭 과거 혹은 현재 시제로 자연스럽게 서술하세요.\n6) 출력은 순수 본문만, 불필요한 머리말/꼬리말/마크다운/따옴표 금지.\n7) 최대 ${ctx.maxChars}자 이내.\n${ctx.title ? `사용자가 생각한 제목(참고, 반드시 그대로 사용할 필요 없음): ${ctx.title}\n` : ''}\n--- 원문 시작 ---\n${raw}\n--- 원문 끝 ---\n이제 위 내용을 기반으로 정제된 일기 본문만 출력하세요.`;
+  private buildPrompt(raw: string, ctx: { maxChars: number }): string {
+    return `요약 프롬프트 최종본\n\n당신은 '일기 서술화 편집자'입니다. 오늘의 Q&A 데이터를 사람이 쓴 듯 자연스럽고 솔직한 1인칭 일기 한 문단으로 변환하세요.\n내부 분석은 출력하지 말고, 최종 결과는 반드시 JSON 형식으로만 출력합니다.\n\n[변환 목표]\n- 길이 표준화: 항상 200~400자\n- 사람다움: Q&A 나열이 아닌 한 편의 일기(구어체·숨결 있는 표현 허용)\n- 흐름: 가능하면 감정 → 관계/맥락 → 회복 → 행동 → 목표 순서\n- 사실성: Q&A에 없는 구체 사실·수치·기관명 생성 금지(가벼운 연결어는 허용)\n- 익명화: 실명/기관명/개인정보는 일반 역할명으로 치환\n\n[편집 규칙]\n- 질문 문구/도메인 라벨/불릿·해시태그 금지\n- 1인칭 어조, 친구처럼 담백하고 다정한 톤(설교·단정 금지)\n- 답변이 매우 짧으면 질문의 맥락으로 자연스레 보강, 매우 길면 중복 제거\n- 연결어 활용(그래서/그때/그러다 보니/덕분에/한편)\n\n[안전 가드레일]\n- 금지: 신체치수/외모/출신학교·정확 수치/개인정보 노출, 성 고정관념·연령/학력 차별\n- 허용: 연령/역할/자기돌봄은 간접 힌트 수준으로만\n\n[출력(JSON)]\n{\n  \"diary\": \"사람이 쓴 것처럼 자연스럽고 솔직한 1인칭 일기 문단(200~400자).\"\n}\n\n--- 원문 시작 ---\n${raw}\n--- 원문 끝 ---`;
+  }
+  private extractDiary(raw: string): string | null {
+    try {
+      const cleaned = (raw || '').replace(/```[\s\S]*?```/g, '').trim();
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      const json = match ? JSON.parse(match[0]) : JSON.parse(cleaned);
+      const d = json?.diary;
+      return typeof d === 'string' && d.trim() ? d.trim() : null;
+    } catch { return null; }
+  }
+  private maskPII(text: string) {
+    return (text||'')
+      .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[이메일]')
+      .replace(/\b\d{2,3}-\d{3,4}-\d{4}\b/g, '[연락처]')
+      .replace(/\b\d{10,11}\b/g, '[연락처]');
+  }
+  private enforceRange(text: string) {
+    const t = text.trim();
+    if (t.length < 200) return t.padEnd(200, ' ').slice(0, 200);
+    if (t.length > 400) return t.slice(0, 400);
+    return t;
   }
 }

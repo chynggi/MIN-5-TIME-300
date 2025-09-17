@@ -6,6 +6,7 @@ import {
   AIModel,
   GeneratedQuestionItem
 } from '../interfaces/question-generator.interface';
+import { tryParseQuestionJson } from '../validators/question-schema';
 
 export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
   private readonly genai: GoogleGenAI;
@@ -66,18 +67,15 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
     const tryParse = (text?: string) => {
       if (!text) return false;
       try {
-        const obj = JSON.parse(text);
-        if (Array.isArray(obj.questions)) {
-          for (const q of obj.questions) {
-            if (q && typeof q.text === 'string' && typeof q.domain === 'string') {
-              const trimmed = q.text.trim().replace(/^['"`]+|['"`]+$/g, '');
-              if (this.autoQualityFilter(trimmed)) {
-                questions.push({ domain: q.domain, text: trimmed });
-              }
-            }
+        const valid = tryParseQuestionJson(text);
+        if (valid) {
+          for (const q of valid.questions) {
+            const trimmed = q.text.trim().replace(/^['"`]+|['"`]+$/g, '');
+            if (this.autoQualityFilter(trimmed)) questions.push({ domain: q.domain, text: trimmed });
           }
+          return questions.length > 0;
         }
-        return questions.length > 0;
+        return false;
       } catch {
         return false;
       }

@@ -50,6 +50,20 @@ export interface TodayQuestionsResponse {
   questions: GeneratedQuestionItem[]; // 오늘의 질문 세트 (5개)
 }
 
+export interface SaveAnswersPayloadItem {
+  domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal';
+  question: string;
+  answer: string;
+}
+export interface SaveAnswersResponse {
+  id: string;
+  content: string; // 요약 결과(미리보기)
+  diaryDate: string;
+  isPublic: boolean;
+  summary?: { modelUsed?: string; truncated?: boolean; fallbackUsed?: boolean };
+  selectedQuestions: { domain?: string; text: string }[];
+}
+
 export const diaryApi = {
   // 일기 목록 조회
   getDiaries: (params?: {
@@ -116,6 +130,14 @@ export const diaryApi = {
     return apiRequest(`/diaries/${id}/share`, {
       method: 'PUT',
       body: JSON.stringify({ isPublic }),
+    });
+  },
+
+  // 질문 답변 저장 + 즉시 요약 생성
+  saveAnswers: (data: { qa: SaveAnswersPayloadItem[]; modelId?: string; diaryDate?: string }): Promise<SaveAnswersResponse> => {
+    return apiRequest('/diaries/save-answers', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   },
 };

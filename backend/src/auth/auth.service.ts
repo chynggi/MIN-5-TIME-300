@@ -74,6 +74,29 @@ export class AuthService {
       });
     }
 
+    // 베이스라인 체크인 저장(선택)
+    if (dto.baseline) {
+      const b = dto.baseline as any;
+      // 운동 포함 시 강도 필수 보정(없으면 0)
+      const needsIntensity = Array.isArray(b.activity_types) && b.activity_types.includes('운동');
+      await this.prisma.userBaselineCheckin.create({
+        data: {
+          userId: user.id,
+          mood_1to10: b.mood_1to10,
+          energy_1to10: b.energy_1to10,
+          stress_1to10: b.stress_1to10,
+          sleep_hours_1to9p: b.sleep_hours_1to9p,
+          sleep_quality_1to10: b.sleep_quality_1to10,
+          activity_types: b.activity_types || [],
+          workout_intensity_1to10: needsIntensity ? (b.workout_intensity_1to10 || 1) : 0,
+          focus_1to10: b.focus_1to10,
+          fatigue_1to10: b.fatigue_1to10,
+          social_count_1to10: b.social_count_1to10,
+          social_satisfaction_1to10: b.social_satisfaction_1to10,
+        }
+      });
+    }
+
     const token = this.jwtService.sign({ sub: user.id, email: user.email });
     return {
       id: user.id,

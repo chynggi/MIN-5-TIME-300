@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import AdviceBar from "@/components/advice/AdviceBar";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/axios";
@@ -364,6 +365,10 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-bold text-lg text-gray-800">🔥 인기 일기 Top 10</h2>
             <Link href="/diaries?sort=popularity" className="text-sm text-pink-700 font-medium hover:underline">전체보기</Link>
+          </div>
+          {/* 오늘의 한마디 - 인기 일기 섹션 하단 배치 */}
+          <div className="mt-2 mb-3">
+            <AdviceBar variant="inline" title="오늘의 한마디" />
           </div>
           {popularDiaries.length === 0 && (
             <div className="bg-white/60 rounded-lg p-6 text-center text-sm text-gray-600">아직 인기 일기가 없습니다. 첫 번째 감정 일기를 남겨보세요!</div>

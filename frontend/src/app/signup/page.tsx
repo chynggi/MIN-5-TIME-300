@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import CheckinForm from "@/components/checkin/CheckinForm";
 import { useApi } from "@/lib/useApi";
 import { useRouter } from "next/navigation";
 
@@ -210,7 +211,7 @@ const SignupPage = () => {
 
   // 회원가입 내부 페이지 단계
   const [step, setStep] = useState(0);
-  const steps = ["기본정보", "MBTI", "관심사 카테고리", "관심사 선택", "라이프스타일 카테고리", "라이프스타일 선택", "프로필 컬러"];
+  const steps = ["기본정보", "MBTI", "관심사 카테고리", "관심사 선택", "라이프스타일 카테고리", "라이프스타일 선택", "프로필 컬러", "나의 온도"];
   // 관심사/라이프스타일 카테고리 인덱스
   const [interestCategoryIndex, setInterestCategoryIndex] = useState(0);
   const [selectedInterestCategories, setSelectedInterestCategories] = useState<string[]>([]);
@@ -236,10 +237,19 @@ const SignupPage = () => {
     interests: [] as { category: string; item: string }[],
     lifestyle: [] as { category: string; item: string }[],
     profileColor: PROFILE_COLORS[0],
+    // baseline 저장용
+    baseline: null as null | {
+      mood_1to10: number; energy_1to10: number; stress_1to10: number;
+      sleep_hours_1to9p: number; sleep_quality_1to10: number;
+      activity_types: string[]; workout_intensity_1to10: number; focus_1to10: number;
+      fatigue_1to10: number; social_count_1to10: number; social_satisfaction_1to10: number;
+    },
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [baselineSaved, setBaselineSaved] = useState(false);
   const [stepErrors, setStepErrors] = useState<{ [key: string]: string }>({});
   // 닉네임 실시간 상태 (중복 여부 등 확장을 대비)
   const [usernameStatus, setUsernameStatus] = useState<{ validFormat: boolean; isEmailFormat: boolean }>({ validFormat: true, isEmailFormat: false });
@@ -524,7 +534,7 @@ const SignupPage = () => {
         question: `${life.category} - ${life.item}`,
         answer: "선택",
       }));
-      const payload = {
+      const payload: any = {
         email: form.email,
         password: form.password,
         username: form.username,
@@ -539,12 +549,19 @@ const SignupPage = () => {
         interests,
         lifestyle,
       };
+      if (form.baseline) {
+        payload.baseline = form.baseline;
+      }
       const data = await signupApi.request(payload);
       if (data && data.token) {
         localStorage.setItem("token", data.token);
       }
       setSuccess(true);
-      router.push("/dashboard");
+      setToast('가입이 완료되었습니다! 잠시 후 대시보드로 이동합니다.');
+      setTimeout(() => setToast(null), 2500);
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 1200);
     } catch (err: any) {
       setError(err.message || "오류가 발생했습니다.");
     } finally {
@@ -574,6 +591,7 @@ const SignupPage = () => {
               {step === 4 && "라이프스타일 카테고리를 선택해 주세요."}
               {step === 5 && "선택한 카테고리의 세부 라이프스타일을 선택해 주세요."}
               {step === 6 && "프로필 컬러를 선택해 주세요."}
+              {step === 7 && "평소 본인이 느끼는 가장 기본적인 상태를 체크해주세요."}
             </div>
             {/* 예시 이미지/일러스트 영역 (원한다면 추가) */}
             {/* <img src="/signup-illustration.svg" alt="회원가입 안내" className="w-40 h-40 object-contain" /> */}
@@ -1571,8 +1589,53 @@ const SignupPage = () => {
               </p>
             </div>
           )}
+          {step === 7 && (
+            <div className="w-full max-w-xl mx-auto">
+              <CheckinForm
+                mode="baseline"
+                defaultDate={new Date().toISOString().slice(0,10)}
+                onCancel={() => setStep(6)}
+                onSaved={(r) => {
+                  if (r.values) {
+                    const v = r.values;
+                    setForm(f => ({
+                      ...f,
+                      baseline: {
+                        mood_1to10: v.mood_1to10,
+                        energy_1to10: v.energy_1to10,
+                        stress_1to10: v.stress_1to10,
+                        sleep_hours_1to9p: v.sleep_hours_1to9p,
+                        sleep_quality_1to10: v.sleep_quality_1to10,
+                        activity_types: v.activity_types,
+                        workout_intensity_1to10: v.workout_intensity_1to10,
+                        focus_1to10: v.focus_1to10,
+                        fatigue_1to10: v.fatigue_1to10,
+                        social_count_1to10: v.social_count_1to10,
+                        social_satisfaction_1to10: v.social_satisfaction_1to10,
+                      }
+                    }));
+                    setBaselineSaved(true);
+                    setToast('베이스라인이 저장되었습니다. 회원가입을 완료해 주세요.');
+                    setTimeout(()=> setToast(null), 2500);
+                  }
+                }}
+              />
+              <div className="mt-3 text-[12px] text-gray-600">
+                이 단계에서는 "회원가입용 베이스라인"으로 저장됩니다. 운동을 선택하면 강도를 꼭 입력해 주세요.
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button type="button" className="flex-1 bg-gray-200 text-gray-800 py-3 rounded-lg" onClick={()=> setStep(6)}>이전</button>
+                <button type="submit" disabled={!baselineSaved || loading} className="flex-1 bg-blue-600 text-white py-3 rounded-lg disabled:opacity-50">
+                  {loading ? '가입 중...' : '회원가입'}
+                </button>
+              </div>
+              {!baselineSaved && (
+                <div className="text-[12px] text-red-500 mt-2">설문을 저장해야 회원가입을 완료할 수 있습니다.</div>
+              )}
+            </div>
+          )}
           {/* 하단 버튼/상태 */}
-          {![3,5].includes(step) && (
+          {![3,5,7].includes(step) && (
             <div className="flex gap-2 mt-4 md:mt-8">
               {step > 0 && (
                 <button type="button" onClick={() => setStep(step - 1)} className="flex-1 py-3 rounded-lg bg-gray-200 text-gray-700 font-semibold text-lg shadow hover:bg-gray-300 transition">이전</button>
@@ -1592,11 +1655,26 @@ const SignupPage = () => {
             </div>
           )}
           {error && <div className="text-red-500 text-sm text-center">{error}</div>}
-          {success && <div className="text-green-600 text-sm text-center">회원가입이 완료되었습니다! 로그인 해주세요.</div>}
           <div className="text-center text-sm mt-2">
             이미 계정이 있으신가요? <a href="/login" className="text-blue-600 hover:underline">로그인</a>
           </div>
         </form>
+        {/* 가입 완료 오버레이 */}
+        {success && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-2xl p-6 text-center shadow-2xl max-w-sm mx-auto">
+              <div className="text-4xl mb-2">🎉</div>
+              <div className="text-xl font-bold mb-1">가입이 완료되었습니다!</div>
+              <div className="text-gray-600 text-sm">잠시 후 대시보드로 이동합니다...</div>
+            </div>
+          </div>
+        )}
+        {/* 간단 토스트 */}
+        {toast && (
+          <div className="fixed bottom-24 left-0 right-0 z-50 flex justify-center">
+            <div className="bg-black text-white text-sm px-4 py-2 rounded-full shadow-lg opacity-90">{toast}</div>
+          </div>
+        )}
       </div>
     </div>
   );

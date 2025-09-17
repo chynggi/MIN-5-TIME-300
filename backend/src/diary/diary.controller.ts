@@ -10,6 +10,9 @@ import { TodayQuestionResponseDto } from './dto/today-question-response.dto';
 import { VectorDbService } from '../vector-db/vector-db.service';
 import { diaryMediaUploadOptions } from '../common/config/multer.config';
 import { FileUploadExceptionFilter } from '../common/filters/file-upload-exception.filter';
+import { DiarySummaryService } from './summary.service';
+import { IsArray, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/diaries')
@@ -17,6 +20,7 @@ export class DiaryController {
   constructor(
     private readonly diaryService: DiaryService,
     private readonly vectorDbService: VectorDbService,
+    private readonly summaryService: DiarySummaryService,
   ) {}
 
   @Get('today-question')
@@ -90,6 +94,29 @@ export class DiaryController {
     return this.diaryService.searchSimilarDiaries(req, text, limit);
   }
 
+  /**
+   * 요약 API: 원문 텍스트를 받아 200~400자 서술형 일기로 변환하여 반환
+   * POST /api/v1/diaries/summarize
+   * body: { rawContent: string; title?: string; modelId?: string }
+   */
+  @Post('summarize')
+  async summarize(@Req() req, @Body('rawContent') rawContent: string, @Body('title') title?: string, @Body('modelId') modelId?: string) {
+    if (!rawContent || typeof rawContent !== 'string') {
+      return { ok: false, message: 'rawContent가 필요합니다.' };
+    }
+    const res = await this.summaryService.summarize(rawContent, { title, modelId, userId: req.user?.userId });
+    return { ok: true, ...res };
+  }
+
+  /**
+   * 질문 답변 저장 + 즉시 요약 생성
+   * POST /api/v1/diaries/save-answers
+   */
+  @Post('save-answers')
+  async saveQuestionAnswers(@Req() req, @Body() dto: SaveQuestionAnswersDto) {
+    return this.diaryService.saveQuestionAnswers(req, dto);
+  }
+
 
   // === Reactions (Like) ===
   @Post(':id/like')
@@ -102,3 +129,26 @@ export class DiaryController {
     return this.diaryService.getLikeStatus(req, id);
   }
 }
+
+// 질문 답변 저장용 DTO 및 엔드포인트 추가
+class QAItemDto {
+  @IsString() domain!: string; // emotion|relationship|recovery|action|goal
+  @IsString() question!: string;
+  @IsString() answer!: string;
+}
+
+class SaveQuestionAnswersDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => QAItemDto)
+  qa!: QAItemDto[]; // 정확히 1~5개 기대
+
+  @IsOptional()
+  @IsString()
+  modelId?: string; // 요약/생성 모델 동기화용
+
+  @IsOptional()
+  @IsString()
+  diaryDate?: string; // 지정 시 해당 날짜 일기(없으면 생성)로 저장
+}
+

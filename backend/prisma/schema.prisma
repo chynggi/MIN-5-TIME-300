@@ -48,6 +48,11 @@ model User {
   lifestyleAnswers LifestyleAnswer[]
   journals         Journal[]
   recordScores     RecordScore[]
+  // 체크인/베이스라인/한마디
+  checkins         DailyCheckin[]
+  baselineCheckin  UserBaselineCheckin?
+  advices          Advice[]
+  adviceFeedbacks  AdviceFeedback[]
   sentMessages     ChatMessage[]    @relation("SentMessages")
   messageDeliveries MessageDelivery[] @relation("MessageDeliveries")
   conversationParticipants ConversationParticipant[]
@@ -73,6 +78,9 @@ model User {
   // 활동지수 공개 및 초기화 정보
   activityPublic    Boolean  @default(true)
   activityResetAt   DateTime?
+  // 스트릭/배지
+  streakDays        Int      @default(0)
+  badges            Badge[]
 }
 
 
@@ -131,6 +139,11 @@ model Journal {
   summaryModel        String?  // 요약에 실제 사용된 모델명
   summaryTruncated    Boolean? @default(false) // 길이 제한으로 잘렸는지 여부
   summaryFallbackUsed Boolean? @default(false) // 폴백 사용 여부
+  // 질문 기반 작성 시, 사용자가 선택한 질문들의 도메인/텍스트(옵션)
+  selectedQuestionDomains String[]
+  selectedQuestionTexts   String[]
+  // 체크인 연결 (옵션)
+  checkin       DailyCheckin?
 }
 
 
@@ -450,6 +463,19 @@ model OutboxEvent {
   @@index([processedAt])
 }
 
+// 배지/업적
+model Badge {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  type      String   // 예: 'streak_3', 'streak_7', 'streak_30'
+  awardedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, type])
+}
+
 enum NotificationStatus {
   UNREAD
   READ
@@ -462,4 +488,94 @@ enum DeliveryStatus {
   FAILED
   THROTTLED
   SKIPPED
+}
+
+// ==========================
+// Check-in & Advice Feature
+// ==========================
+
+// 하루 체크인(일기/날짜 1:1)
+model DailyCheckin {
+  id                    String   @id @default(uuid())
+  user                  User     @relation(fields: [userId], references: [id])
+  userId                String
+  journal               Journal? @relation(fields: [journalId], references: [id], onDelete: SetNull)
+  journalId             String?
+  diaryDate             DateTime @default(now())
+  // 1~10 고정 (앱 단/서버 단 검증)
+  mood_1to10            Int
+  energy_1to10          Int
+  stress_1to10          Int
+  // 수면 시간: 1~9 (9=9시간 이상)
+  sleep_hours_1to9p     Int
+  sleep_quality_1to10   Int
+  // 활동: ["운동","명상","스트레칭","산책"] 중 0~N개
+  activity_types        String[]
+  // 운동 포함 시 1~10, 아니면 0
+  workout_intensity_1to10 Int @default(0)
+  focus_1to10           Int
+  fatigue_1to10         Int
+  social_count_1to10    Int
+  social_satisfaction_1to10 Int
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([userId, diaryDate])
+  @@unique([journalId])
+  @@index([userId, diaryDate])
+}
+
+// 회원가입 시 최초 베이스라인(1:1)
+model UserBaselineCheckin {
+  id                      String   @id @default(uuid())
+  user                    User     @relation(fields: [userId], references: [id])
+  userId                  String   @unique
+  mood_1to10              Int
+  energy_1to10            Int
+  stress_1to10            Int
+  sleep_hours_1to9p       Int
+  sleep_quality_1to10     Int
+  activity_types          String[]
+  workout_intensity_1to10 Int @default(0)
+  focus_1to10             Int
+  fatigue_1to10           Int
+  social_count_1to10      Int
+  social_satisfaction_1to10 Int
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+// 오늘의 한마디 저장
+model Advice {
+  id        String          @id @default(uuid())
+  user      User            @relation(fields: [userId], references: [id])
+  userId    String
+  advice    String
+  tags      String[]
+  risk      AdviceRiskFlag  @default(NONE)
+  createdAt DateTime        @default(now())
+  // feedback relation
+  feedbacks AdviceFeedback[]
+
+  @@index([userId, createdAt])
+}
+
+model AdviceFeedback {
+  id         String   @id @default(uuid())
+  advice     Advice   @relation(fields: [adviceId], references: [id], onDelete: Cascade)
+  adviceId   String
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  isHelpful  Boolean
+  createdAt  DateTime @default(now())
+
+  @@unique([adviceId, userId])
+  @@index([userId, createdAt])
+}
+
+enum AdviceRiskFlag {
+  NONE
+  MILD
+  MODERATE
+  SEVERE
 }

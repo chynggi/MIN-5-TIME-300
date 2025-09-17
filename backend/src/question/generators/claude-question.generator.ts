@@ -6,6 +6,7 @@ import {
   AIModel,
   GeneratedQuestionItem
 } from '../interfaces/question-generator.interface';
+import { tryParseQuestionJson } from '../validators/question-schema';
 
 export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
   private readonly anthropic: Anthropic;
@@ -58,18 +59,15 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
     const tryParse = (candidate?: string) => {
       if (!candidate) return false;
       try {
-        const obj = JSON.parse(candidate);
-        if (Array.isArray(obj.questions)) {
-          for (const q of obj.questions) {
-            if (q?.text && q?.domain) {
-              const text = q.text.trim().replace(/^['"`]+|['"`]+$/g,'');
-              if (this.autoQualityFilter(text)) {
-                questions.push({ domain: q.domain, text });
-              }
-            }
+        const valid = tryParseQuestionJson(candidate);
+        if (valid) {
+          for (const q of valid.questions) {
+            const text = q.text.trim().replace(/^['"`]+|['"`]+$/g,'');
+            if (this.autoQualityFilter(text)) questions.push({ domain: q.domain, text });
           }
+          return questions.length > 0;
         }
-        return questions.length > 0;
+        return false;
       } catch { return false; }
     };
 
