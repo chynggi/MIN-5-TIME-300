@@ -93,6 +93,11 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarData, setCalendarData] = useState<CalendarDay[]>([]);
+  // 멘탈 그래프 토글 및 데이터 상태
+  const [showMentalGraph, setShowMentalGraph] = useState(false);
+  const [mentalTrend, setMentalTrend] = useState<Array<{ date: string; score: number }>>([]);
+  const [mentalLoading, setMentalLoading] = useState(false);
+  const [mentalError, setMentalError] = useState<string | null>(null);
 
   // 감정 이모지 매핑
   const emotionEmojis: { [key: string]: string } = {
@@ -335,6 +340,24 @@ export default function ProfilePage() {
     }
   };
 
+  const toggleMentalGraph = async () => {
+    const next = !showMentalGraph;
+    setShowMentalGraph(next);
+    if (next && mentalTrend.length === 0 && !mentalLoading) {
+      try {
+        setMentalLoading(true);
+        setMentalError(null);
+        const stats = await statisticsApi.getDashboardStats('week');
+        setMentalTrend(stats.emotionTrend || []);
+      } catch (e: any) {
+        console.error('멘탈 그래프 로드 실패:', e);
+        setMentalError('그래프를 불러오지 못했습니다.');
+      } finally {
+        setMentalLoading(false);
+      }
+    }
+  };
+
   const handleEditProfile = () => {
     router.push('/profile/edit');
   };
@@ -429,6 +452,7 @@ export default function ProfilePage() {
           <div className={styles.basicInfo}>
             <h1 className={styles.nicknameModern}>{profile.name}</h1>
             <p className={styles.bioModern}>{profile.message}</p>
+            {/* 1행: 다이어리/팔로워/팔로잉 */}
             <div className={styles.statsModern}>
               <button className={styles.statCard} onClick={() => handleStatsClick('followers')} aria-label={`일기 ${profile.diaryCount}개`}>
                 <span className={styles.statValue}>{profile.diaryCount}</span>
@@ -442,7 +466,9 @@ export default function ProfilePage() {
                 <span className={styles.statValue}>{profile.followingCount}</span>
                 <span className={styles.statLabelModern}>FOLLOWING</span>
               </button>
-              {/* 활동지수 카드: 다른 statCard와 동일한 구조 */}
+            </div>
+            {/* 2행: 활동지수/멘탈지수 - 아래로 분리 배치 */}
+            <div className={styles.statsModern}>
               <div
                 className={styles.statCard}
                 aria-label={`활동지수 ${profile.activityScore ?? 0}%`}
@@ -450,28 +476,90 @@ export default function ProfilePage() {
               >
                 <span className={styles.statValue}>{profile.activityScore ?? 0}%</span>
                 <span className={styles.statLabelModern}>ACTIVITY</span>
-                {/* 향후: 히트맵/미니 바 추가 가능 */}
               </div>
-              {/* 멘탈지수 카드 */}
-              <div
+              <button
+                type="button"
                 className={styles.statCard}
-                aria-label={`멘탈지수 ${profile.mentalIndex ?? 0}%`}
-                role="presentation"
+                aria-label={`멘탈지수 ${profile.mentalIndex ?? 0}%, 클릭 시 그래프 표시`}
+                onClick={toggleMentalGraph}
+                title="멘탈 그래프 보기"
               >
                 <span className={styles.statValue}>{profile.mentalIndex ?? 0}%</span>
                 <span className={styles.statLabelModern}>MENTAL</span>
-              </div>
+              </button>
             </div>
-            {/* 활동 KPI 미니 표기 (선택 표시) */}
-            {profile.activityKpis && (
-              <div className={styles.kpiRow}>
-                <div className={styles.kpiItem} title="조언 상호작용률(최근 30일)">CTR {(profile.activityKpis.clickRate*100).toFixed(0)}%</div>
-                <div className={styles.kpiItem} title="최근 30일 중 작성한 날 비율">지속률 {(profile.activityKpis.diaryContinuationRate*100).toFixed(0)}%</div>
-                <div className={styles.kpiItem} title="작성 다음날 재방문율">재방문 {(profile.activityKpis.nextDayRevisitRate*100).toFixed(0)}%</div>
+            {showMentalGraph && (
+              <div
+                role="region"
+                aria-label="최근 감정 추세 그래프"
+                style={{
+                  marginTop: '0.75rem',
+                  padding: '0.75rem',
+                  borderRadius: '12px',
+                  background: 'var(--c-accent-soft, rgba(99,102,241,0.12))',
+                }}
+              >
+                {mentalLoading && (
+                  <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>불러오는 중…</div>
+                )}
+                {mentalError && (
+                  <div style={{ color: '#f43f5e', fontSize: '0.875rem' }}>{mentalError}</div>
+                )}
+                {!mentalLoading && !mentalError && (
+                  (() => {
+                    const data = (mentalTrend && mentalTrend.length > 0)
+                      ? mentalTrend
+                      : [];
+                    const w = 320;
+                    const h = 72;
+                    const pad = 8;
+                    const scores = data.map(d => typeof d.score === 'number' ? d.score : Number(d.score));
+                    const n = scores.length;
+                    const min = n ? Math.min(...scores) : 0;
+                    const max = n ? Math.max(...scores) : 100;
+                    const range = Math.max(1, max - min);
+                    const toX = (i: number) => {
+                      if (n <= 1) return pad;
+                      return pad + (i * (w - 2 * pad)) / (n - 1);
+                    };
+                    const toY = (v: number) => {
+                      const norm = (v - min) / range;
+                      return h - pad - norm * (h - 2 * pad);
+                    };
+                    const points = (n ? scores : [0, 0, 0]).map((v, i) => `${toX(i)},${toY(v)}`).join(' ');
+                    const accent = 'rgb(var(--c-accent-rgb, 99 102 241))';
+                    const gridColor = 'rgba(0,0,0,0.08)';
+                    const label = data.map(d => d.date.slice(5)).join(' · ');
+                    return (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+                          <strong style={{ fontSize: '0.9rem' }}>최근 감정 추세</strong>
+                          {data.length > 0 && (
+                            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>최근 7일</span>
+                          )}
+                        </div>
+                        <svg width={w} height={h} role="img" aria-label="감정 추세 스파크라인">
+                          {/* 가이드 라인 */}
+                          <line x1={pad} y1={toY(min)} x2={w - pad} y2={toY(min)} stroke={gridColor} strokeDasharray="4 4" />
+                          <line x1={pad} y1={toY(max)} x2={w - pad} y2={toY(max)} stroke={gridColor} strokeDasharray="4 4" />
+                          {/* 라인 */}
+                          <polyline fill="none" stroke={accent} strokeWidth={2} points={points} />
+                          {/* 포인트 */}
+                          {scores.map((v, i) => (
+                            <circle key={i} cx={toX(i)} cy={toY(v)} r={2.5} fill={accent} />
+                          ))}
+                        </svg>
+                        {data.length > 0 && (
+                          <div style={{ marginTop: '4px', fontSize: '0.7rem', opacity: 0.6 }}>{label}</div>
+                        )}
+                      </div>
+                    );
+                  })()
+                )}
               </div>
             )}
             <div className={styles.actionRow}>
-              <button onClick={handleEditProfile} className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}>
+              <button onClick={handleEditProfile} className={`${styles.actionBtn} ${styles.actionBtnPrimary} ${styles.actionBtnCompact}`}>
                 ✏️ 프로필 편집
               </button>
             </div>

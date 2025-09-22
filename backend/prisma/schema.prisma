@@ -118,6 +118,7 @@ model Journal {
   id              String            @id @default(uuid())
   user            User              @relation(fields: [userId], references: [id])
   userId          String
+  title           String?           // 일기 제목 (사용자 입력)
   content         String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

@@ -141,6 +141,9 @@ export class QuestionService {
     
     // 8. 다중 모델 폴백으로 질문 생성 시도
     const response = await this.generateWithFallback(questionRequest, selectedModel);
+    try {
+      console.log(`[QGen] requested=${selectedModel} used=${response.modelUsed} fallback=${response.fallbackUsed ?? false}`);
+    } catch {}
 
     // 새 다중 질문 응답 구조
     return {

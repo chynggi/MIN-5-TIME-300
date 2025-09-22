@@ -215,7 +215,7 @@ export default function DashboardPage() {
 
       {/* 메인 콘텐츠 */}
       <div className="flex-1 space-y-6">
-        {/* 오늘의 일기 (맞팔 친구들 오늘 공개 일기) - 없으면 안내 문구 */}
+  {/* 오늘의 일기 (맞팔 친구들 오늘 공개 일기) - 없으면 안내 문구 */}
         <section className="bg-white rounded-xl shadow p-4">
           <div className="flex justify-between items-center mb-3">
             <h2 className="font-bold text-lg">오늘의 일기</h2>
@@ -242,6 +242,11 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
+        </section>
+
+        {/* 오늘의 한마디 바: 오늘의 일기와 캘린더 사이에, 같은 너비로 분리 배치 */}
+        <section>
+          <AdviceBar variant="inline" title="오늘의 한마디" fullWidth />
         </section>
 
         {/* 캘린더 섹션 */}
@@ -344,18 +349,14 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* Top10 인기 일기 - 단일 로테이션 (프로필 + 말풍선 + 아이콘 + 닉네임/작성일) */}
-        <section className="relative bg-gradient-to-r from-pink-200 to-pink-300 rounded-xl shadow p-4">
-          <div className="flex items-center justify-between mb-3">
+        {/* Top10 인기 일기 - 단일 로테이션 (프로필 + 말풍선 + 아이콘 + 닉네임/작성일) */}    
+        <section className="relative bg-gradient-to-r from-pink-200 to-pink-300 rounded-xl shadow p-3">
+          <div className="flex items-center justify-between mb-2">
             <h2 className="font-bold text-lg text-gray-800">🔥 인기 일기 Top 10</h2>
             <Link href="/diaries?sort=popularity" className="text-sm text-pink-700 font-medium hover:underline">전체보기</Link>
           </div>
-          {/* 오늘의 한마디 - 인기 일기 섹션 하단 배치 */}
-          <div className="mt-2 mb-3">
-            <AdviceBar variant="inline" title="오늘의 한마디" />
-          </div>
           {popularDiaries.length === 0 && (
-            <div className="bg-white/60 rounded-lg p-6 text-center text-sm text-gray-600">아직 인기 일기가 없습니다. 첫 번째 감정 일기를 남겨보세요!</div>
+            <div className="bg-white/60 rounded-lg p-4 text-center text-sm text-gray-600">아직 인기 일기가 없습니다. 첫 번째 감정 일기를 남겨보세요!</div>
           )}
           {popularDiaries.length > 0 && (() => {
             const active = popularDiaries[currentPopularIndex];
@@ -376,12 +377,15 @@ export default function DashboardPage() {
                   className={`absolute inset-0 flex items-start gap-3 ${isPrev ? outClass + ' pointer-events-none' : inClass}`}
                   style={{willChange:'transform,opacity'}}
                 >
+                     {/* 순위 배지 */}
+                   <span className="absolute top-0 left-0 bg-pink-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow z-10">{(isPrev ? previousPopularIndex : currentPopularIndex)! + 1}</span>
                   <button
                     onClick={() => window.location.href = `/diary/${d.id}`}
-                    className="relative w-16 h-16 rounded-2xl border-2 border-cyan-300 bg-white flex items-center justify-center text-xl font-semibold shadow overflow-hidden shrink-0 hover:shadow-lg transition"
+                    className="relative w-14 h-14 rounded-2xl border-2 border-cyan-300 bg-white flex items-center justify-center text-base font-semibold shadow overflow-hidden shrink-0 hover:shadow-lg transition"
                     title={d.username || '익명'}
                   >
-                    <span className="absolute -top-1 -left-1 bg-pink-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full shadow">{(isPrev ? previousPopularIndex : currentPopularIndex)! + 1}</span>
+                 
+                    
                     {(d as any).profileImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={(d as any).profileImageUrl} alt={d.username || '익명'} className="w-full h-full object-cover" />
@@ -393,14 +397,13 @@ export default function DashboardPage() {
                     onClick={() => window.location.href = `/diary/${d.id}`}
                     className="relative flex-1 text-left"
                   >
-                    <div className="relative bg-cyan-400 text-black rounded-3xl px-8 py-4 flex items-center gap-10 shadow hover:shadow-xl transition min-h-[80px]">
-                      <span className="font-semibold text-2xl tracking-wide tabular-nums">{timeStr}</span>
-                      <div className="flex items-center gap-6 ml-auto text-2xl select-none">
+                    <div className="relative bg-cyan-400 text-black rounded-3xl px-5 py-2.5 flex items-center gap-4 shadow hover:shadow-xl transition h-14">
+                      <span className="font-semibold text-base tracking-wide tabular-nums">{timeStr}</span>
+                      <div className="flex items-center gap-3 ml-auto text-base select-none">
                         <span title={hasImage ? '이미지 첨부 있음' : '이미지 없음'} className={hasImage ? 'text-black drop-shadow-sm' : 'text-black/30'}>📷</span>
                         <span title={hasAudio ? '음성 메시지 있음' : '음성 메시지 없음'} className={hasAudio ? 'text-black drop-shadow-sm' : 'text-black/30'}>🔊</span>
                         <span title={hasSpotify ? 'Spotify 음악 있음' : 'Spotify 음악 없음'} className={hasSpotify ? 'text-black drop-shadow-sm' : 'text-black/30'}>🎧</span>
                       </div>
-                      <span className="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-cyan-400 rotate-45 rounded-sm" />
                     </div>
                   </button>
                 </div>
@@ -409,17 +412,17 @@ export default function DashboardPage() {
 
             return (
               <div className="relative group">
-                <div className="relative min-h-[120px] overflow-hidden">
+                <div className="relative min-h-[68px] overflow-hidden">
                   {buildCard(prev, true)}
                   {buildCard(active)}
                 </div>
-                <div className="mt-6 flex justify-center gap-2 relative">
+                <div className="mt-2 flex justify-center gap-2 relative">
                   {popularDiaries.slice(0,10).map((_, i) => (
                     <button
                       key={i}
                       onClick={() => changePopularIndex(i)}
                       aria-label={`순위 ${i+1}번 보기`}
-                      className={`w-2.5 h-2.5 rounded-full transition-all ${i === currentPopularIndex ? 'bg-pink-600 scale-110' : 'bg-white/60 hover:bg-white/90'}`}
+                      className={`w-2 h-2 rounded-full transition-all ${i === currentPopularIndex ? 'bg-pink-600 scale-110' : 'bg-white/60 hover:bg-white/90'}`}
                     />
                   ))}
                 </div>

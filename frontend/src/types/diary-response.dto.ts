@@ -27,6 +27,7 @@ export interface DiaryDetailResponseDto {
   id: string;
   content: string;
   createdAt: string;
+  diaryDate?: string;
   updatedAt: string;
   isPublic: boolean;
   emotionScore: number;
@@ -35,4 +36,5 @@ export interface DiaryDetailResponseDto {
   question: string;
   writingDuration: number;
   reactions: DiaryDetailReactionDto[];
+  selectedQuestions?: { domain?: string; text: string }[];
 }

@@ -126,6 +126,8 @@ function NewDiaryContent() {
   // Misc states
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // 질문형 작성 선택 질문 보관
+  const [selectedQuestions, setSelectedQuestions] = useState<Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>>([]);
 
   // Handlers
   const handleImageSelect = (file: File | null) => {
@@ -135,11 +137,12 @@ function NewDiaryContent() {
   };
   const handleDefaultImageSelect = (url: string) => { setImage(null); setPreview(url); setShowDefaultImageSelect(false); };
   const handleWritingModeSelect = (mode: "question" | "free") => { setCurrentView(mode === 'question' ? 'ai-question' : 'free-write'); };
-  const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string; questionModel: string }) => { 
+  const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string; questionModel?: string; selectedQuestions: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }> }) => { 
     setTitle(data.title); 
     setContent(data.content); 
     setQuestionId(data.questionId); 
-    setQuestionModel(data.questionModel);
+    if (data.questionModel) setQuestionModel(data.questionModel);
+    setSelectedQuestions(data.selectedQuestions || []);
     setCurrentView('main'); 
   };
   const handleFreeWriteComplete = (data: { title: string; content: string }) => { setTitle(data.title); setContent(data.content); setCurrentView('main'); };
@@ -194,6 +197,13 @@ function NewDiaryContent() {
             } catch {/* ignore */}
           }
         }
+      }
+      // 선택 질문 배열 동봉(JSON 문자열로 전송 -> 서버에서 정규화)
+      if (selectedQuestions && selectedQuestions.length > 0) {
+        const domains = selectedQuestions.map(q => q.domain);
+        const texts = selectedQuestions.map(q => q.text);
+        formData.append('selectedQuestionDomains', JSON.stringify(domains));
+        formData.append('selectedQuestionTexts', JSON.stringify(texts));
       }
       const response = await api.post("/diaries", formData, { headers: { "Content-Type": "multipart/form-data" } });
       if (response.status === 200 || response.status === 201) { 

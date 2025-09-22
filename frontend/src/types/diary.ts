@@ -70,8 +70,15 @@ export interface DiarySettingsProps {
 }
 
 export interface AIQuestionWriterProps {
-  onComplete: (data: { title: string; content: string; questionId: string }) => void;
+  onComplete: (data: {
+    title: string;
+    content: string;
+    questionId: string;
+    questionModel?: string;
+    selectedQuestions: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>;
+  }) => void;
   onBack: () => void;
+  initialQuestions?: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>;
 }
 
 export interface FreeWriterProps {

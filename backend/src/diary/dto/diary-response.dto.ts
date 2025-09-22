@@ -1,5 +1,6 @@
 export class DiaryListItemDto {
   id: string;
+  title?: string; // 사용자 지정 제목 (없을 수 있음)
   content: string;
   createdAt: string;
   updatedAt: string;
@@ -37,6 +38,7 @@ export class DiaryDetailReactionDto {
 
 export class DiaryDetailResponseDto {
   id: string;
+  title?: string; // 사용자 지정 제목 (없을 수 있음)
   content: string;
   createdAt: string;
   updatedAt: string;
@@ -52,6 +54,11 @@ export class DiaryDetailResponseDto {
    *  - 향후 제거 시 프론트 응답 타입에서 삭제 필요.
    */
   question: string; // deprecated
+  /**
+   * 사용자가 당시 선택했던 질문 세트(질문형 작성 재편집 시 재활용)
+   * - save-answers로 최초 저장 시 Journal.selectedQuestion* 배열에 보관됨
+   */
+  selectedQuestions?: Array<{ domain: string; text: string }>;
   writingDuration: number;
   reactions: DiaryDetailReactionDto[];
   lat?: number;

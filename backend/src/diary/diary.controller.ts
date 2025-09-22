@@ -88,6 +88,29 @@ export class DiaryController {
   }
 
   /**
+   * 일기 수정 (파일/프리셋/공개여부/감정 등 포함)
+   * - 편집 시에도 요약 로직을 재적용하여 내용 업데이트를 반영
+   */
+  @Put(':id')
+  @UseInterceptors(FileInterceptor('file', diaryMediaUploadOptions))
+  @UseFilters(FileUploadExceptionFilter)
+  async updateDiary(
+    @Req() req,
+    @Param('id') id: string,
+    @Body() dto: CreateDiaryDto,
+    @UploadedFile() file?: Multer.File,
+  ) {
+    // 디버깅: 들어온 FormData 필드 로그
+    try {
+      console.log('[UpdateDiary] id:', id, 'dto:', dto);
+      if (file) {
+        console.log('[UpdateDiary] uploaded file:', { originalname: file.originalname, mimetype: file.mimetype, size: file.size });
+      }
+    } catch {}
+    return this.diaryService.updateDiary(req, id, dto, file);
+  }
+
+  /**
    * 입력 텍스트(또는 최근 일기) 기반 유사 일기 추천
    */
   @Post('search-similar')

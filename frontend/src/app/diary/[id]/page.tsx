@@ -583,13 +583,7 @@ export default function DiaryDetailPage() {
               </div>
             </div>
 
-            {/* Question */}
-            {diary.question && (
-              <div className="bg-gradient-to-br from-indigo-600 to-rose-500 rounded-2xl shadow-md p-6 text-white">
-                <div className="text-[11px] font-semibold uppercase tracking-wider opacity-80 mb-2">오늘의 질문</div>
-                <div className="text-sm font-medium leading-relaxed">{diary.question}</div>
-              </div>
-            )}
+            {/* (요청) 질문/답 패널 제거: 완성본만 노출 */}
 
             {/* Extra Stats (placeholder if more metadata later) */}
             {(diary.writingDuration || diary.emotionScore) && (

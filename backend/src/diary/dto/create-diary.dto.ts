@@ -12,6 +12,15 @@ export class CreateDiaryDto {
   @IsString()
   questionModel?: string; // 질문 생성에 사용된 AI 모델 id (요약 모델 동기화 목적)
 
+  // 사용자가 선택한 질문 세트(질문형 작성 재편집용): 도메인/텍스트 배열
+  // FormData로 전송 시 selectedQuestionDomains[]=emotion&selectedQuestionDomains[]=action 형태 또는
+  // JSON 문자열("[\"emotion\",\"action\"]")를 허용하며, 서비스에서 배열로 정규화합니다.
+  @IsOptional()
+  selectedQuestionDomains?: string[] | string; // multipart: 반복 키 배열 or JSON 문자열
+
+  @IsOptional()
+  selectedQuestionTexts?: string[] | string; // multipart: 반복 키 배열 or JSON 문자열
+
   @IsOptional()
   @IsBooleanString()
   isPublic?: string; // 'true' | 'false'
@@ -47,4 +56,9 @@ export class CreateDiaryDto {
   @IsOptional()
   @IsNumberString()
   lng?: string;
+
+  // 일기 완성하기 버튼 여부: 'true'일 때 최종 요약 실행
+  @IsOptional()
+  @IsBooleanString()
+  finalize?: string;
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SummaryGeneratorFactory } from './summary/summary-generator.factory';
 
 /**
@@ -9,7 +9,9 @@ import { SummaryGeneratorFactory } from './summary/summary-generator.factory';
  */
 @Injectable()
 export class DiarySummaryService {
-  private readonly DEFAULT_MODEL = 'gemini-2.5-flash';
+  private readonly DEFAULT_MODEL = process.env.DIARY_SUMMARY_MODEL || 'gemini-2.5-flash';
+  private readonly DEBUG = process.env.DIARY_SUMMARY_DEBUG === '1' || process.env.DIARY_SUMMARY_DEBUG === 'true';
+  private readonly logger = new Logger(DiarySummaryService.name);
   // 간단한 메모리 캐시: key = SHA256(content + modelId + maxChars)
   private cache = new Map<string, { value: { text: string; modelUsed: string; truncated: boolean; fallbackUsed: boolean }; ts: number }>();
   private readonly CACHE_TTL_MS = 1000 * 60 * 10; // 10분
@@ -45,9 +47,14 @@ export class DiarySummaryService {
     const modelId = options?.modelId || this.DEFAULT_MODEL;
     const maxChars = options?.maxChars ?? 1200;
     const looksLikeQA = /(\?|:).*\n/.test(rawContent) || /\n\n.+\n\n/.test(rawContent);
+    const startedAt = Date.now();
+    if (this.DEBUG) {
+      this.logger.log(`[DEBUG] summarize:start model=${modelId} user=${options?.userId ?? '-'} rawLen=${rawContent?.length ?? 0} maxChars=${maxChars} looksLikeQA=${looksLikeQA}`);
+    }
 
     // Rate limit
     if (!this.checkRateLimit(options?.userId)) {
+      this.logger.warn(`summarize:rate-limited user=${options?.userId ?? '-'}`);
       return { text: rawContent, modelUsed: modelId, truncated: false, fallbackUsed: true, rateLimited: true };
     }
 
@@ -55,6 +62,9 @@ export class DiarySummaryService {
     const cacheKey = this.hash(`${modelId}|${maxChars}|${rawContent}`);
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.ts < this.CACHE_TTL_MS) {
+      if (this.DEBUG) {
+        this.logger.log(`[DEBUG] summarize:cache-hit key=${cacheKey.slice(0, 8)} outLen=${cached.value.text.length}`);
+      }
       return { ...cached.value, cached: true };
     } else if (cached) {
       this.cache.delete(cacheKey);
@@ -70,9 +80,16 @@ export class DiarySummaryService {
       });
       const value = { text: res.text, modelUsed: res.modelUsed, truncated: res.truncated, fallbackUsed: res.fallbackUsed };
       this.cache.set(cacheKey, { value, ts: Date.now() });
+      try {
+        this.logger.log(`[Summary] requested=${modelId} used=${res.modelUsed} fallback=${res.fallbackUsed}`);
+      } catch {}
+      if (this.DEBUG) {
+        const took = Date.now() - startedAt;
+        this.logger.log(`[DEBUG] summarize:done tookMs=${took} modelUsed=${res.modelUsed} truncated=${res.truncated} fallbackUsed=${res.fallbackUsed} outLen=${res.text.length}`);
+      }
       return value;
     } catch (e: any) {
-      console.warn('[DiarySummaryService] summarize 실패 - 원문 폴백', e?.message || e);
+      this.logger.error(`summarize:error ${e?.message || e}`);
       return { text: rawContent, modelUsed: modelId, truncated: false, fallbackUsed: true };
     }
   }

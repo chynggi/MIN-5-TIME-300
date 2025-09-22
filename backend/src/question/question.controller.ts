@@ -27,7 +27,7 @@ export class QuestionController {
     @Query('model') model?: string
   ): Promise<any> { // 다중 질문 세트 반환
     const userId = req.user.userId;
-    if (!this.rate.isAllowed(`qgen:${userId}`, 2)) {
+    if (!this.rate.isAllowed(`qgen:${userId}`, 20)) {
       return { ok: false, message: '질문 생성 요청이 너무 잦아요. 잠시 후 다시 시도해주세요.' };
     }
     const aiModel = model && Object.values(AIModel).includes(model as AIModel) 

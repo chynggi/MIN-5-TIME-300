@@ -13,8 +13,13 @@ interface Question {
 }
 
 interface AIQuestionWriterProps {
-  onComplete: (data: { title: string; content: string; questionId: string; questionModel: string }) => void;
+  onComplete: (data: { title: string; content: string; questionId: string; questionModel?: string; selectedQuestions: Array<{ domain: Question['domain']; text: string }> }) => void;
   onBack: () => void;
+  /**
+   * 편집 모드: 기존에 저장된 질문들을 그대로 불러와 답변만 작성하도록 전달
+   * 전달되면 질문 재생성(fetch/generate) 없이 이 배열을 사용
+   */
+  initialQuestions?: Array<{ domain: Question['domain']; text: string }>;
 }
 
 interface AIModel {
@@ -51,10 +56,11 @@ const availableModels: AIModel[] = [
 
 const emojiOptions = ["😊", "😢", "😡", "😴", "🤔", "😍", "😎", "🥳", "😅", "🤗", "😰", "🙄"];
 
-export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWriterProps) {
+export default function AIQuestionWriter({ onComplete, onBack, initialQuestions }: AIQuestionWriterProps) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const [title, setTitle] = useState("");
   const [showAnswerInput, setShowAnswerInput] = useState(false);
   const [currentAnswer, setCurrentAnswer] = useState("");
@@ -62,20 +68,46 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
   const [selectedEmoji, setSelectedEmoji] = useState("");
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [selectedModel, setSelectedModel] = useState<string>("claude-sonnet-4"); // 기본값은 Claude
+  // 실제 질문 생성에 사용된 모델을 저장해 요약 시에도 동일 모델을 사용
+  const [generationModel, setGenerationModel] = useState<string | null>(null);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [enabledModels, setEnabledModels] = useState<string[]>([]);
+  // 최초 1회 자동 생성 여부 (mount 당 메모리)
+  const [autoGenAttempted, setAutoGenAttempted] = useState(false);
 
-  // 초기 설정: 사용 가능한 모델 조회
+  // 초기 설정: 사용 가능한 모델 조회 (편집 모드라도 모델 목록은 UI용으로 조회)
   useEffect(() => {
     fetchAvailableModels();
   }, []);
 
-  // 초기 질문 생성
+  // 초기 질문 준비: initialQuestions가 있으면 그것을 사용, 없으면 생성
   useEffect(() => {
-    if (enabledModels.length > 0) {
+    if (initialQuestions && initialQuestions.length > 0) {
+      const mapped: Question[] = initialQuestions.map((q, idx) => ({
+        id: `saved-${idx}`,
+        domain: q.domain,
+        text: q.text,
+        answered: false,
+        answer: '',
+        answerType: 'text',
+        emoji: ''
+      }));
+      setQuestions(mapped);
+      setIsGenerating(false);
+    } else if (enabledModels.length > 0 && !autoGenAttempted) {
+      setAutoGenAttempted(true);
       generateQuestions();
     }
-  }, [enabledModels]);
+  }, [enabledModels, initialQuestions, autoGenAttempted]);
+
+  // 마운트 즉시 한 번 더 시도(모델 목록 지연 시 폴백)
+  useEffect(() => {
+    if ((!initialQuestions || initialQuestions.length === 0) && !autoGenAttempted) {
+      setAutoGenAttempted(true);
+      generateQuestions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 드롭다운 외부 클릭시 닫기
   useEffect(() => {
@@ -109,12 +141,21 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
     }
   };
 
-  const generateQuestions = async () => {
+  const generateQuestions = async (modelOverride?: string) => {
+    // 편집 모드에서는 생성 차단
+    if (initialQuestions && initialQuestions.length > 0) return;
     setIsGenerating(true);
     try {
-      const res = await api.post(`/questions/generate?model=${selectedModel}`);
+      const modelToUse = modelOverride || selectedModel;
+      const res = await api.post(`/questions/generate?model=${encodeURIComponent(modelToUse)}`);
       // 기대 스키마: { questions: [ { domain, text }, ...5 ] }
       const data = res.data;
+      if (data && data.ok === false) {
+        // 서버 레이트리밋/오류 메시지 표준 처리
+        const msg = data.message || '질문 생성이 제한되었습니다. 잠시 후 다시 시도해주세요.';
+        console.warn('질문 생성 응답 실패:', msg);
+        throw new Error(msg);
+      }
       const list = Array.isArray(data.questions) ? data.questions : [];
       if (list.length !== 5) {
         console.warn('질문 개수 비정상:', list.length);
@@ -130,7 +171,12 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
       }));
       // 도메인/텍스트 누락 대비 필터링
       const filtered = mapped.filter(m => m.text && m.domain);
-      setQuestions(filtered);
+      if (!filtered.length) {
+        throw new Error('유효한 질문이 없습니다.');
+      }
+  setQuestions(filtered);
+  // 실제 사용된 모델 저장 (백엔드 응답 우선, 없으면 요청 모델)
+  setGenerationModel(typeof data?.model === 'string' && data.model ? data.model : modelToUse);
     } catch (error) {
       console.error('질문 생성 실패:', error);
       // 최소 폴백 (도메인 매핑된 기본 세트)
@@ -186,7 +232,7 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
     setAnswerType("text");
   };
 
-  const generateDiary = () => {
+  const generateDiary = async () => {
     // 사용자가 아무 답변도 저장하지 않은 경우: 현재 선택된 질문을 기반으로 빈 답변 템플릿 생성
     const anyAnswered = questions.some(q => q.answered);
     let working = questions;
@@ -215,12 +261,49 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
       finalTitle = working[0].text.slice(0, 18) + '...';
     }
 
-    onComplete({
-      title: finalTitle,
-      content: contentLines.join('\n\n').trim(),
-      questionId: ids.join(','),
-      questionModel: selectedModel,
-    });
+    // 모든 답변 완료 시에만 최종 요약 실행
+    const shouldSummarize = working.length > 0 && working.every(q => q.answered) && questions.length > 0 && questions.every(q => q.answered);
+    const rawContent = contentLines.join('\n\n').trim();
+
+    if (shouldSummarize) {
+      try {
+        setIsSummarizing(true);
+        // 백엔드 요약 API 호출
+        const res = await api.post(`/diaries/summarize`, {
+          rawContent,
+          title: finalTitle,
+             modelId: generationModel && generationModel !== 'fallback' ? generationModel : selectedModel,
+        });
+        const summarized = res?.data?.text || rawContent;
+        onComplete({
+          title: finalTitle,
+          content: summarized,
+          questionId: ids.join(','),
+             questionModel: generationModel && generationModel !== 'fallback' ? generationModel : selectedModel,
+          selectedQuestions: working.map(q => ({ domain: q.domain, text: q.text })),
+        });
+      } catch (e) {
+        console.error('요약 실패, 원문으로 대체합니다:', e);
+        onComplete({
+          title: finalTitle,
+          content: rawContent,
+          questionId: ids.join(','),
+             questionModel: generationModel && generationModel !== 'fallback' ? generationModel : selectedModel,
+          selectedQuestions: working.map(q => ({ domain: q.domain, text: q.text })),
+        });
+      } finally {
+        setIsSummarizing(false);
+      }
+    } else {
+      // 부분 저장: 즉시 원문 전달
+      onComplete({
+        title: finalTitle,
+        content: rawContent,
+        questionId: ids.join(','),
+           questionModel: generationModel && generationModel !== 'fallback' ? generationModel : selectedModel,
+        selectedQuestions: working.map(q => ({ domain: q.domain, text: q.text })),
+      });
+    }
   };
 
   const answeredCount = questions.filter(q => q.answered).length;
@@ -242,17 +325,26 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
 
   const progressPercent = totalCount > 0 ? (answeredCount / totalCount) * 100 : 0;
 
-  if (isGenerating) {
+  if (isGenerating || isSummarizing) {
     const currentModel = availableModels.find(m => m.id === selectedModel);
     return (
       <div className="flex flex-col items-center justify-center py-16">
         <div className="text-7xl mb-6 animate-pulse">{currentModel?.icon || "🤖"}</div>
-        <h2 className="text-2xl font-bold mb-2">
-          {currentModel?.name || "AI"}가 개인화된 질문을 생성 중...
-        </h2>
-        <p className="text-gray-600 mb-6">
-          {currentModel?.description || "잠시만 기다려주세요"}
-        </p>
+        {isGenerating ? (
+          <>
+            <h2 className="text-2xl font-bold mb-2">
+              {currentModel?.name || "AI"}가 개인화된 질문을 생성 중...
+            </h2>
+            <p className="text-gray-600 mb-6">
+              {currentModel?.description || "잠시만 기다려주세요"}
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-2xl font-bold mb-2">{currentModel?.name || 'AI'}가 일기를 요약 중...</h2>
+            <p className="text-gray-600 mb-6">응답을 정리해 자연스러운 일기 형태로 다듬고 있어요.</p>
+          </>
+        )}
         <div className="w-full max-w-lg">
           <div className="h-3 rounded-full bg-gray-200 overflow-hidden">
             <div className="w-full h-full bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 animate-[pulse_1.5s_ease-in-out_infinite]" />
@@ -276,46 +368,50 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
           >
             ← 뒤로
           </button>
-          <div className="relative model-selector">
-            <button
-              onClick={() => setShowModelSelector(!showModelSelector)}
-              className={`${btn.base} ${btn.outline} ${btn.sm} flex items-center space-x-2`}
-            >
-              <span>{availableModels.find(m => m.id === selectedModel)?.icon || "🤖"}</span>
-              <span className="font-semibold hidden sm:inline">{availableModels.find(m => m.id === selectedModel)?.name || "AI 모델"}</span>
-              <span className="text-[10px]">▼</span>
-            </button>
-            {showModelSelector && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-30 min-w-[300px] overflow-hidden">
-                <div className="max-h-[360px] overflow-y-auto">
-                  {availableModels.filter(m => enabledModels.includes(m.id)).map(model => (
-                    <button
-                      key={model.id}
-                      onClick={() => { setSelectedModel(model.id); setShowModelSelector(false); generateQuestions(); }}
-                      className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors border-b last:border-b-0 ${selectedModel === model.id ? 'bg-blue-50/70' : 'hover:bg-gray-50'}`}
-                    >
-                      <span className="text-2xl pt-0.5">{model.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-800 truncate">{model.name}</span>
-                          <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-md font-medium">{model.confidence}</span>
+          {!initialQuestions?.length && (
+            <div className="relative model-selector">
+              <button
+                onClick={() => setShowModelSelector(!showModelSelector)}
+                className={`${btn.base} ${btn.outline} ${btn.sm} flex items-center space-x-2`}
+              >
+                <span>{availableModels.find(m => m.id === selectedModel)?.icon || "🤖"}</span>
+                <span className="font-semibold hidden sm:inline">{availableModels.find(m => m.id === selectedModel)?.name || "AI 모델"}</span>
+                <span className="text-[10px]">▼</span>
+              </button>
+              {showModelSelector && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-30 min-w-[300px] overflow-hidden">
+                  <div className="max-h-[360px] overflow-y-auto">
+                    {availableModels.filter(m => enabledModels.includes(m.id)).map(model => (
+                      <button
+                        key={model.id}
+                        onClick={() => { setSelectedModel(model.id); setShowModelSelector(false); generateQuestions(model.id); }}
+                        className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors border-b last:border-b-0 ${selectedModel === model.id ? 'bg-blue-50/70' : 'hover:bg-gray-50'}`}
+                      >
+                        <span className="text-2xl pt-0.5">{model.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-800 truncate">{model.name}</span>
+                            <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-md font-medium">{model.confidence}</span>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1 leading-relaxed">{model.description}</p>
                         </div>
-                        <p className="text-xs text-gray-600 mt-1 leading-relaxed">{model.description}</p>
-                      </div>
-                      {selectedModel === model.id && <span className="text-blue-600 text-xs font-bold">✓</span>}
-                    </button>
-                  ))}
+                        {selectedModel === model.id && <span className="text-blue-600 text-xs font-bold">✓</span>}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={generateQuestions}
-            disabled={isGenerating}
-            className={`${btn.base} ${btn.secondary} ${btn.sm}`}
-          >
-            🔄 재생성
-          </button>
+              )}
+            </div>
+          )}
+          {!initialQuestions?.length && (
+            <button
+              onClick={() => generateQuestions()}
+              disabled={isGenerating}
+              className={`${btn.base} ${btn.secondary} ${btn.sm}`}
+            >
+              🔄 재생성
+            </button>
+          )}
           <div className="flex-1 min-w-[160px] hidden md:flex items-center gap-3">
             <div className="flex-1 h-2 rounded-full bg-gray-200 overflow-hidden">
               <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300" style={{ width: `${progressPercent}%` }} />
@@ -344,7 +440,7 @@ export default function AIQuestionWriter({ onComplete, onBack }: AIQuestionWrite
       </div>
 
       {/* 모델 정보 배너 */}
-      {enabledModels.length > 0 && (
+      {!initialQuestions?.length && enabledModels.length > 0 && (
         <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-xl px-4 py-3 border border-blue-100 flex items-start gap-3">
           <span className="text-3xl leading-none mt-0.5">
             {availableModels.find(m => m.id === selectedModel)?.icon || '🤖'}

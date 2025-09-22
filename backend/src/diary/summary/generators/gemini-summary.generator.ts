@@ -5,7 +5,9 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
   private readonly genai: GoogleGenAI;
   constructor() {
     super('gemini-2.5-flash'); // 기본 요약 모델 (질문 생성과 동기화 가능)
-    this.genai = new GoogleGenAI({});
+    const apiKey = process.env.GEMINI_API_KEY;
+    // SDK는 환경변수로도 키를 인식하지만, 명시적으로 전달하여 런타임 환경차 이슈를 최소화
+    this.genai = new GoogleGenAI(apiKey ? { apiKey } as any : {} as any);
   }
 
   async summarize(req: DiarySummaryRequest): Promise<DiarySummaryResponse> {

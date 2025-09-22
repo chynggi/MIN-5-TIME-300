@@ -26,6 +26,7 @@ interface DiaryDataResponse {
   isPublic?: boolean;
   contentVisibility?: string;
   question?: string;
+  selectedQuestions?: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>; // 기존 선택 질문들
   writingDuration?: number;
   mediaUrl?: string;
   mediaType?: string;
@@ -53,7 +54,11 @@ function EditDiaryInner() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [questionId, setQuestionId] = useState(""); // 기존 작성 로직과 동일 구조 유지
+  const [questionModel, setQuestionModel] = useState<string | undefined>(undefined);
   const [originalQuestion, setOriginalQuestion] = useState<string | null>(null);
+  const [initialQuestions, setInitialQuestions] = useState<
+    Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>
+  >([]);
   const [startTime] = useState<number>(Date.now());
 
   // Date (기존 일기 날짜 유지 - 수정시 변경 허용 안한다고 가정)
@@ -119,6 +124,9 @@ function EditDiaryInner() {
           setOriginalQuestion(d.question);
           // questionId는 서버에서 별도 제공한다면 세팅 필요 (현재 응답 구조 미확인) -> 유지
         }
+        if (Array.isArray(d.selectedQuestions) && d.selectedQuestions.length > 0) {
+          setInitialQuestions(d.selectedQuestions);
+        }
         if (d.diaryDate) setSelectedDate(d.diaryDate.substring(0,10));
       } catch (e) {
         setError('일기 정보를 불러오지 못했습니다.');
@@ -137,7 +145,16 @@ function EditDiaryInner() {
   };
   const handleDefaultImageSelect = (url: string) => { setImage(null); setPreview(url); setShowDefaultImageSelect(false); };
   const handleWritingModeSelect = (mode: "question" | "free") => { setCurrentView(mode === 'question' ? 'ai-question' : 'free-write'); };
-  const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string }) => { setTitle(data.title); setContent(data.content); setQuestionId(data.questionId); setCurrentView('main'); };
+  const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string; questionModel?: string; selectedQuestions: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }> }) => {
+    setTitle(data.title);
+    setContent(data.content);
+    setQuestionId(data.questionId);
+    setQuestionModel(data.questionModel);
+    if (Array.isArray(data.selectedQuestions)) {
+      setInitialQuestions(data.selectedQuestions);
+    }
+    setCurrentView('main');
+  };
   const handleFreeWriteComplete = (data: { title: string; content: string }) => { setTitle(data.title); setContent(data.content); setCurrentView('main'); };
 
   const handleSubmit = async () => {
@@ -158,6 +175,7 @@ function EditDiaryInner() {
       formData.append('weather', diarySettings.weather);
   if (lat != null && lng != null) { formData.append('lat', lat.toString()); formData.append('lng', lng.toString()); }
       if (questionId) formData.append('questionId', questionId);
+      if (questionModel) formData.append('questionModel', questionModel);
       if (image) {
         formData.append('file', image);
       } else if (presetKey) {
@@ -166,6 +184,11 @@ function EditDiaryInner() {
         // preset 추론
         const match = preview.match(/\/images\/(?:seasons|weather)\/(.+)\.(?:jpg|png|jpeg|webp)$/);
         if (match) formData.append('preset', match[1]);
+      }
+      // 선택 질문 배열 전송(JSON 문자열)
+      if (initialQuestions && initialQuestions.length > 0) {
+        formData.append('selectedQuestionDomains', JSON.stringify(initialQuestions.map(q => q.domain)));
+        formData.append('selectedQuestionTexts', JSON.stringify(initialQuestions.map(q => q.text)));
       }
       // TODO: music, voiceRecord 처리 로직 (작성 페이지에 있는 경우 동일하게 확장 필요)
 
@@ -240,7 +263,7 @@ function EditDiaryInner() {
                 </div>
               )}
               <button
-                onClick={() => { setCurrentView(questionId || originalQuestion ? 'ai-question' : 'free-write'); }}
+                onClick={() => { setCurrentView((initialQuestions && initialQuestions.length > 0) ? 'ai-question' : (questionId || originalQuestion ? 'ai-question' : 'free-write')); }}
                 className="text-xs text-blue-600 underline mt-2"
               >
                 수정하기
@@ -302,6 +325,7 @@ function EditDiaryInner() {
               onComplete={handleAIQuestionComplete}
               onBack={() => setCurrentView('main')}
               // 기존 질문 표시만 (컴포넌트가 prop 지원한다면 확장)
+              initialQuestions={initialQuestions}
             />
           </div>
         </div>

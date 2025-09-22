@@ -24,6 +24,47 @@ function extractTitle(content: string): string | undefined {
   return undefined;
 }
 
+// 본문에서 제목 라인을 제거하여 저장용 텍스트를 반환한다
+// 규칙:
+// 1) [제목] 라인이 존재하면 그 라인을 제목으로 사용하고 제거
+// 2) 없으면 첫 번째 비어있지 않은 라인을 제목으로 간주하고 제거
+function splitTitleAndBody(content: string): { title?: string; body: string } {
+  if (!content) return { body: '' };
+  const lines = content.split(/\r?\n/);
+  // 먼저 [제목] 라인 탐색 (어느 줄이든 허용하되 가장 먼저 등장하는 라인 사용)
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^\[제목\]\s*(.+)$/);
+    if (m) {
+      const title = m[1].trim().slice(0, 50);
+      const rest = [...lines.slice(0, i), ...lines.slice(i + 1)].join('\n');
+      // 본문 선행 공백/빈 줄 정리(필요 최소한)
+      const body = rest.replace(/^\s*(\r?\n)+/, '');
+      return { title, body };
+    }
+  }
+  // [제목] 라인이 없으면 첫 번째 비어있지 않은 라인을 제목으로 사용
+  const firstIdx = lines.findIndex(l => l.trim().length > 0);
+  if (firstIdx === -1) return { body: '' };
+  const title = lines[firstIdx].trim().slice(0, 50);
+  const rest = [...lines.slice(0, firstIdx), ...lines.slice(firstIdx + 1)].join('\n');
+  const body = rest.replace(/^\s*(\r?\n)+/, '');
+  return { title, body };
+}
+
+// 문자열/JSON/FormData 다양한 입력을 문자열 배열로 정규화
+function normalizeStringArray(v: any): string[] | undefined {
+  if (v == null) return undefined;
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === 'string') {
+    try {
+      const parsed = JSON.parse(v);
+      if (Array.isArray(parsed)) return parsed.map(String);
+    } catch {}
+    return v.split(',').map((s: string) => s.trim()).filter(Boolean);
+  }
+  return undefined;
+}
+
 @Injectable()
 export class DiaryService {
   constructor(
@@ -178,7 +219,7 @@ export class DiaryService {
       // 좋아요 수 집계 후 상위 limit
       const popular = await this.prisma.journal.findMany({
         where: publicWhere,
-        select: { id: true, content: true, createdAt: true, updatedAt: true, diaryDate: true, isRetrospective: true as any, isPublic: true, emotionScore: true, emotion: true, mediaUrl: true, mediaType: true, user: { select: { username: true } }, reactions: { select: { reactionType: true } } },
+        select: { id: true, content: true, createdAt: true, updatedAt: true, diaryDate: true, isRetrospective: true as any, isPublic: true, emotionScore: true, emotion: true, mediaUrl: true, mediaType: true, user: { select: { username: true, profileImageUrl: true } }, reactions: { select: { reactionType: true } } },
         orderBy: [
           { reactions: { _count: 'desc' } },
           { createdAt: 'desc' },
@@ -190,6 +231,7 @@ export class DiaryService {
       return {
         diaries: popular.map(p => ({
           id: p.id,
+          title: (p as any).title ?? extractTitle(p.content) ?? undefined,
           content: p.content,
           createdAt: p.createdAt.toISOString(),
           updatedAt: p.updatedAt.toISOString(),
@@ -205,6 +247,7 @@ export class DiaryService {
           lng: (p as any).lng,
           likes: p.reactions?.filter(r => r.reactionType === 'like').length || 0,
           username: p.user?.username,
+          profileImageUrl: (p as any).user?.profileImageUrl || null,
         })),
         totalCount,
         page,
@@ -232,6 +275,7 @@ export class DiaryService {
     return {
       diaries: diaries.map(d => ({
         id: d.id,
+        title: (d as any).title ?? extractTitle(d.content) ?? undefined,
         content: d.content,
         createdAt: d.createdAt.toISOString(),
         updatedAt: d.updatedAt.toISOString(),
@@ -386,6 +430,7 @@ export class DiaryService {
     
     return {
       id: diary.id,
+      title: (diary as any).title ?? extractTitle(diary.content) ?? undefined,
       content: diary.content,
       createdAt: diary.createdAt.toISOString(),
       updatedAt: diary.updatedAt.toISOString(),
@@ -397,6 +442,12 @@ export class DiaryService {
       mediaUrl: diary.mediaUrl ?? undefined,
       mediaType: diary.mediaType ?? undefined,
       question: '', // 추후 질문 연동
+      selectedQuestions: Array.isArray((diary as any).selectedQuestionTexts) && Array.isArray((diary as any).selectedQuestionDomains)
+        ? ((diary as any).selectedQuestionTexts as string[]).map((text: string, i: number) => ({
+            text,
+            domain: (diary as any).selectedQuestionDomains?.[i] ?? 'emotion',
+          }))
+        : undefined,
       writingDuration: diary.writingDuration,
       reactions: [], // TODO: 상세 reaction 조회 필요 시 확장
       userId: diary.userId, // 소유자 ID 추가
@@ -521,15 +572,35 @@ export class DiaryService {
     const lat = dto.lat !== undefined && dto.lat !== null && dto.lat !== '' ? parseFloat(dto.lat) : undefined;
     const lng = dto.lng !== undefined && dto.lng !== null && dto.lng !== '' ? parseFloat(dto.lng) : undefined;
 
-    // Q&A 기반 작성 감지 -> (정책 변경) 최종 일기 저장 버튼에서는 요약을 하지 않음
-    let finalContent = dto.content;
+  // finalize=true일 때 최종 요약 실행, 그 외에는 원문 저장
+  let finalContent = dto.content;
+  const isFinalize = (dto as any).finalize === 'true' || (dto as any).finalize === true;
+  let summaryMeta: { modelUsed: string; truncated: boolean; fallbackUsed: boolean } | null = null;
+  if (isFinalize) {
+    try {
+      const sum = await this.diarySummaryService.summarize(finalContent, {
+        title: extractTitle(finalContent),
+        modelId: dto.questionModel,
+        userId,
+      });
+      finalContent = sum.text;
+      summaryMeta = { modelUsed: sum.modelUsed, truncated: sum.truncated, fallbackUsed: sum.fallbackUsed };
+    } catch (e) {
+      // 요약 실패 시 원문 유지
+    }
+  }
+  // 제목 저장: 프론트가 별도 title을 보낼 수 없으므로 [제목] 패턴/첫 줄에서 추출
+  const { title: resolvedTitle, body: cleanedContent } = splitTitleAndBody(finalContent);
+    const selectedQuestionDomains = normalizeStringArray((dto as any).selectedQuestionDomains);
+    const selectedQuestionTexts = normalizeStringArray((dto as any).selectedQuestionTexts);
+
     // 동일 날짜 일기 존재 시 업데이트로 전환
     let diary = await this.prisma.journal.findFirst({ where: { userId, diaryDate: dayStart } });
     if (diary) {
       diary = await this.prisma.journal.update({
         where: { id: diary.id },
         data: {
-          content: finalContent,
+          content: cleanedContent,
           isPublic,
           emotion: dto.emotion,
           // 날짜는 유지(dayStart)
@@ -538,13 +609,25 @@ export class DiaryService {
           writingDuration: writingDurationParsed,
           lat,
           lng,
+          title: resolvedTitle,
+          // 선택 질문은 생성 시 또는 이후에도 업데이트 허용 (있을 때만 덮어쓰기)
+          ...(selectedQuestionDomains ? { selectedQuestionDomains } : {}),
+          ...(selectedQuestionTexts ? { selectedQuestionTexts } : {}),
+          // finalize=true인 경우에만 summary* 메타 저장
+          ...(summaryMeta
+            ? {
+                summaryModel: summaryMeta.modelUsed,
+                summaryTruncated: summaryMeta.truncated,
+                summaryFallbackUsed: summaryMeta.fallbackUsed,
+              }
+            : {}),
         },
       });
     } else {
       diary = await this.prisma.journal.create({
         data: {
           userId,
-          content: finalContent,
+          content: cleanedContent,
           isPublic,
           emotion: dto.emotion, // 감정 이모지 저장
           diaryDate: dayStart, // 일기 날짜는 정규화된 00:00:00으로 저장
@@ -555,9 +638,16 @@ export class DiaryService {
           emotionScore: 0,
           lat,
           lng,
-          summaryModel: undefined,
-          summaryTruncated: undefined,
-          summaryFallbackUsed: undefined,
+          title: resolvedTitle,
+          selectedQuestionDomains: selectedQuestionDomains ?? [],
+          selectedQuestionTexts: selectedQuestionTexts ?? [],
+          ...(summaryMeta
+            ? {
+                summaryModel: summaryMeta.modelUsed,
+                summaryTruncated: summaryMeta.truncated,
+                summaryFallbackUsed: summaryMeta.fallbackUsed,
+              }
+            : {}),
         },
       });
     }
@@ -589,6 +679,7 @@ export class DiaryService {
 
     const result = {
       id: diary.id,
+      title: (diary as any).title ?? resolvedTitle ?? undefined,
   content: diary.content,
       createdAt: diary.createdAt.toISOString(),
       isPublic: diary.isPublic,
@@ -727,6 +818,155 @@ export class DiaryService {
       id: updated.id,
       isPublic: updated.isPublic,
       updatedAt: updated.updatedAt.toISOString(),
+    };
+  }
+
+  /**
+   * 일기 수정: 생성 로직과 동일한 업로드/프리셋 매핑을 재사용하고, Q&A 흔적이 있거나 questionModel이 있으면 재요약 반영
+   */
+  async updateDiary(
+    req: any,
+    id: string,
+    dto: CreateDiaryDto,
+    file?: Multer.File,
+  ) {
+    const userId = req.user.userId;
+    const diary = await this.prisma.journal.findUnique({ where: { id } });
+    if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
+    if (diary.userId !== userId) throw new ForbiddenException('본인 일기만 수정할 수 있습니다.');
+
+    // 파일 업로드 처리 (선택)
+    let mediaUrl: string | undefined = diary.mediaUrl ?? undefined;
+    let mediaType: string | undefined = diary.mediaType ?? undefined;
+    if (file) {
+      try {
+        const config = this.fileUploadService.getUploadConfig('diary');
+        const uploadResult = await this.fileUploadService.uploadFile(
+          file,
+          config.uploadPath,
+          config.allowedTypes,
+          config.maxSize
+        );
+        mediaUrl = uploadResult.fileUrl;
+        mediaType = file.mimetype;
+      } catch (error) {
+        console.error('파일 업로드 오류:', error);
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+        throw new BadRequestException('파일 업로드 중 오류가 발생했습니다.');
+      }
+    } else if (dto.preset) {
+      const presetMap: Record<string, string> = {
+        spring: '/images/seasons/spring.jpg',
+        summer: '/images/seasons/summer.jpg',
+        autumn: '/images/seasons/autumn.jpg',
+        winter: '/images/seasons/winter.jpg',
+        sunny: '/images/weather/sunny.jpg',
+        night: '/images/weather/night.jpg',
+        rain: '/images/weather/rain.jpg',
+        snow: '/images/weather/snow.jpg',
+      };
+      const candidate = presetMap[dto.preset];
+      if (candidate) {
+        mediaUrl = candidate;
+        mediaType = 'image/jpeg';
+      }
+    }
+
+    // 타입 변환
+    const isPublic = (dto.isPublic as any) === true || (dto.isPublic as any) === 'true';
+    const writingDurationParsed = (() => {
+      const n = parseInt(dto.writingDuration as any, 10);
+      if (Number.isNaN(n) || n < 0) return 0;
+      return n;
+    })();
+    const lat = dto.lat !== undefined && dto.lat !== null && dto.lat !== '' ? parseFloat(dto.lat) : (diary as any).lat;
+    const lng = dto.lng !== undefined && dto.lng !== null && dto.lng !== '' ? parseFloat(dto.lng) : (diary as any).lng;
+
+    // finalize=true일 때만 요약 적용
+    let finalContent = dto.content;
+    const isFinalize = (dto as any).finalize === 'true' || (dto as any).finalize === true;
+    let summaryMeta: { modelUsed: string; truncated: boolean; fallbackUsed: boolean } | null = null;
+    if (isFinalize) {
+      try {
+        const sum = await this.diarySummaryService.summarize(finalContent, {
+          title: extractTitle(finalContent),
+          modelId: dto.questionModel,
+          userId,
+        });
+        finalContent = sum.text;
+        summaryMeta = { modelUsed: sum.modelUsed, truncated: sum.truncated, fallbackUsed: sum.fallbackUsed };
+      } catch {}
+    }
+
+    const { title: resolvedTitle, body: cleanedContent } = splitTitleAndBody(finalContent);
+
+    const updated = await this.prisma.journal.update({
+      where: { id },
+      data: {
+        content: cleanedContent,
+        isPublic,
+        emotion: dto.emotion,
+        mediaUrl,
+        mediaType,
+        writingDuration: writingDurationParsed,
+        lat,
+        lng,
+        title: resolvedTitle,
+        // 선택 질문 업데이트 허용
+        ...(() => {
+          const d = normalizeStringArray((dto as any).selectedQuestionDomains);
+          const t = normalizeStringArray((dto as any).selectedQuestionTexts);
+          return {
+            ...(d ? { selectedQuestionDomains: d } : {}),
+            ...(t ? { selectedQuestionTexts: t } : {}),
+          };
+        })(),
+        // finalize=true인 경우에만 summary* 메타 갱신
+        ...(summaryMeta
+          ? {
+              summaryModel: summaryMeta.modelUsed,
+              summaryTruncated: summaryMeta.truncated,
+              summaryFallbackUsed: summaryMeta.fallbackUsed,
+            }
+          : {}),
+      },
+    });
+
+    // 임베딩 갱신(베스트 에포치: 내용 변경 시)
+    try {
+      const embedding = await this.vectorDbService.getCombinedEmbedding([updated.content]);
+      if (embedding) {
+        (this.prisma as any).journal.update({ where: { id: updated.id }, data: { embedding } })
+          .catch((err: any) => console.warn('임베딩 DB 저장 실패:', err.message));
+        await this.vectorDbService.upsert([
+          {
+            id: updated.id,
+            values: embedding,
+            metadata: {
+              userId,
+              type: 'diary',
+              createdAt: updated.createdAt.toISOString(),
+              visibility: updated.isPublic ? 'public' : 'private',
+              modelVersion: 'gemini-embedding-001',
+            },
+          },
+        ]);
+      }
+    } catch {}
+
+    return {
+      id: updated.id,
+      title: (updated as any).title ?? resolvedTitle ?? undefined,
+      content: updated.content,
+      createdAt: updated.createdAt.toISOString(),
+      isPublic: updated.isPublic,
+      question: '',
+      mediaUrl,
+      mediaType,
+      lat: (updated as any).lat ?? null,
+      lng: (updated as any).lng ?? null,
     };
   }
 

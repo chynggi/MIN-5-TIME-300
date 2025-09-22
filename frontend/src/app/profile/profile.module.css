@@ -133,7 +133,8 @@
   max-width: var(--profile-max-width);
   margin: 0 auto;
   background: var(--c-bg);
-  padding: 1.25rem clamp(1rem,2vw,2rem) 4rem;
+  /* 좌우 여백을 약 2/3로 축소 */
+  padding: 1.1rem clamp(0.75rem,1.3vw,1.35rem) 3rem;
   box-sizing: border-box;
   position: relative;
 }
@@ -303,7 +304,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: .9rem;
+  gap: .6rem; /* 상단 정보 섹션 간격 축소 */
 }
 
 .nicknameModern {
@@ -317,7 +318,7 @@
 }
 
 .bioModern {
-  font-size: .95rem;
+  font-size: .9rem; /* 소개 텍스트 크기 약간 축소 */
   line-height: 1.5;
   color: var(--c-text-soft);
   max-width: 52ch;
@@ -400,25 +401,25 @@
 /* 통계 카드 */
 .statsModern {
   display: flex;
-  gap: 1.2rem;
+  gap: .75rem; /* 카드 간격 축소 */
   flex-wrap: wrap;
 }
 
 .statCard {
-  flex: 1 1 100px;
-  min-width: 110px;
+  flex: 1 1 96px;
+  min-width: 100px; /* 최소 너비 약간 축소 */
   background: var(--c-bg);
   border: 1px solid var(--c-border);
   border-radius: 18px;
-  padding: .9rem .95rem .95rem;
+  padding: .7rem .8rem .8rem; /* 내부 여백 축소 */
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: .35rem;
+  gap: .25rem; /* 수직 간격 축소 */
   cursor: pointer;
   transition: border-color .25s, transform .25s, box-shadow .25s;
   box-shadow: var(--shadow-sm);
-  align-items: center; /* 가운데 정렬 추가 */
+  align-items: center; /* 가운데 정렬 */
   text-align: center;  /* 텍스트 중앙 정렬 */
 }
 
@@ -429,7 +430,7 @@
 }
 
 .statValue {
-  font-size: 1.6rem;
+  font-size: 1.35rem; /* 수치 폰트 축소 */
   font-weight: 700;
   letter-spacing: .5px;
   background: linear-gradient(120deg,var(--c-accent) 0%, #8b5cf6 50%, var(--c-accent) 100%);
@@ -439,9 +440,9 @@
 }
 
 .statLabelModern {
-  font-size: .70rem;
+  font-size: .62rem; /* 라벨 폰트 축소 */
   font-weight: 600;
-  letter-spacing: 1.2px;
+  letter-spacing: .9px; /* 자간 약간 감소 */
   color: var(--c-text-soft);
   text-transform: uppercase;
 }
@@ -574,6 +575,13 @@
 .actionBtnBlocked:hover {
   transform: none;
   box-shadow: none;
+}
+
+/* 버튼 컴팩트 변형: 카드 2행 배치 후 높이에 맞춰 조정 */
+.actionBtnCompact {
+  padding: .7rem 1rem .8rem;
+  font-size: .82rem;
+  min-width: 140px;
 }
 
 /* 캘린더 신형 */

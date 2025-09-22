@@ -4,7 +4,7 @@ import { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import Navigation from '../components/Navigation';
 import BottomNav from '../components/BottomNav';
-import AdviceBar from '../components/advice/AdviceBar';
+// AdviceBar 전역 노출 제거 (대시보드에서만 사용)
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -31,8 +31,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
       {/* 하단 네비게이션 - 모든 환경과 모든 페이지에서 표시 (로그인/회원가입 제외) */}
       {showNavigation && <BottomNav />}
 
-      {/* 오늘의 한마디 바 */}
-      {showNavigation && <AdviceBar />}
+      {/* 오늘의 한마디 바 (전역 노출 제거: 대시보드에서만 노출) */}
+      {/* intentionally removed */}
     </div>
   );
 }
