@@ -34,6 +34,7 @@ export class AuthService {
         birthDate: dto.birthDate,
         gender: dto.gender,
         bio: dto.bio,
+        profileColor: (dto as any).profileColor,
         // 추가 필드들 (나중에 확장 가능)
         // height: dto.height,
         // weight: dto.weight,

@@ -60,6 +60,11 @@ export class SignupDto {
   @IsString()
   bio?: string;
 
+  // 프로필 배경색 (선택)
+  @IsOptional()
+  @IsString()
+  profileColor?: string;
+
   @IsOptional()
   @IsString()
   height?: string;
