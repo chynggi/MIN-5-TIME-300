@@ -348,7 +348,7 @@ export default function ProfilePage() {
         setMentalLoading(true);
         setMentalError(null);
         const stats = await statisticsApi.getDashboardStats('week');
-        setMentalTrend(stats.emotionTrend || []);
+        setMentalTrend((stats.mentalTrend && stats.mentalTrend.length ? stats.mentalTrend : stats.emotionTrend) || []);
       } catch (e: any) {
         console.error('멘탈 그래프 로드 실패:', e);
         setMentalError('그래프를 불러오지 못했습니다.');
@@ -491,7 +491,7 @@ export default function ProfilePage() {
             {showMentalGraph && (
               <div
                 role="region"
-                aria-label="최근 감정 추세 그래프"
+                aria-label="최근 멘탈 추세 그래프"
                 style={{
                   marginTop: '0.75rem',
                   padding: '0.75rem',
@@ -533,12 +533,12 @@ export default function ProfilePage() {
                     return (
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
-                          <strong style={{ fontSize: '0.9rem' }}>최근 감정 추세</strong>
+                          <strong style={{ fontSize: '0.9rem' }}>최근 멘탈 추세</strong>
                           {data.length > 0 && (
                             <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>최근 7일</span>
                           )}
                         </div>
-                        <svg width={w} height={h} role="img" aria-label="감정 추세 스파크라인">
+                        <svg width={w} height={h} role="img" aria-label="멘탈 추세 스파크라인">
                           {/* 가이드 라인 */}
                           <line x1={pad} y1={toY(min)} x2={w - pad} y2={toY(min)} stroke={gridColor} strokeDasharray="4 4" />
                           <line x1={pad} y1={toY(max)} x2={w - pad} y2={toY(max)} stroke={gridColor} strokeDasharray="4 4" />

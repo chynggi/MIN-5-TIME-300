@@ -20,11 +20,10 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
 
   async generateQuestion(request: QuestionGenerationRequest): Promise<QuestionGenerationResponse> {
     try {
-      const systemPrompt = this.createSystemPrompt();
-      const userPrompt = this.createUserPrompt(request);
-      const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+  const systemPrompt = this.createSystemPrompt();
+  const userPrompt = this.createUserPrompt(request);
 
-      const raw = await this.callAPI(fullPrompt);
+  const raw = await this.callAPI(userPrompt, systemPrompt);
       const parsed = this.parseQuestions(raw);
 
       if (!parsed.questions.length) throw new Error('파싱된 질문이 없습니다');
@@ -111,7 +110,6 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
 
   protected async callAPI(prompt: string, systemPrompt?: string): Promise<string> {
     try {
-      // 시스템 프롬프트와 사용자 프롬프트를 합쳐서 하나의 컨텐츠로 구성
       const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
 
       const response = await this.genai.models.generateContent({

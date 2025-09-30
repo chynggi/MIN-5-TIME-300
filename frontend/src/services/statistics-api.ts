@@ -30,6 +30,10 @@ export interface DashboardStatistics {
     date: string;
     score: number;
   }>;
+  mentalTrend?: Array<{
+    date: string;
+    score: number;
+  }>;
   writingDurationAvg: number;
   mostActiveTime: string;
   consistencyScore: number;

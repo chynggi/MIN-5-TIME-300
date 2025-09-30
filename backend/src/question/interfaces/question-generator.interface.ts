@@ -505,7 +505,7 @@ Step 5) 감정 → 관계/맥락 → 회복 → 행동 → 목표 흐름의 5문
     const emotionTagsInfo = (request.emotionTags ?? []).map(t => `${t.tag}:${t.intensity}`).join(', ');
 
     const modeLine = hasPast ? '모드: Past-Aware Mode' : '모드: Baseline Mode';
-
+    console.log(modeLine);
     return `# INPUT (출력 금지 — 분석용)
 ${modeLine}
 

@@ -55,10 +55,24 @@ export class QuestionService {
     });
     if (!user) throw new ForbiddenException('유저 정보 없음');
     
+    let computedAge: number | undefined;
+    if (user.birthDate) {
+      const birthDate = new Date(user.birthDate);
+      if (!Number.isNaN(birthDate.getTime())) {
+        const diff = Date.now() - birthDate.getTime();
+        const age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+        if (age > 0 && age < 120) {
+          computedAge = age;
+        }
+      }
+    }
+
     const userProfile: UserProfile = {
       mbti: user.mbti ?? '',
       interests: user.interests.map(i => i.interest),
       lifestyleAnswers: user.lifestyleAnswers.map(a => ({ question: a.question, answer: a.answer })),
+      gender: user.gender ?? undefined,
+      age: computedAge,
     };
 
     // 2. 최근 7일 일기
@@ -66,13 +80,81 @@ export class QuestionService {
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 7,
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        emotionScore: true,
+        writingDuration: true,
+        selectedQuestionTexts: true,
+        selectedQuestionDomains: true,
+      },
     });
+
     const recentJournals: RecentJournal[] = recentJournalsRaw.map(j => ({
       date: j.createdAt.toISOString().slice(0, 10),
       content: j.content,
-      question: '', // JournalQuestion 모델 제거로 질문 텍스트 저장 안 함
+      question: (j.selectedQuestionTexts ?? []).join(' / '),
       emotionScore: j.emotionScore,
     }));
+
+    const structuredDiaries = recentJournalsRaw
+      .filter(j => (j.selectedQuestionTexts?.length ?? 0) > 0)
+      .map(j => ({
+        date: j.createdAt.toISOString().slice(0, 10),
+        content: j.content,
+        question: (j.selectedQuestionTexts ?? []).join(' / '),
+        emotionScore: j.emotionScore,
+      }));
+
+    const freeformDiaries = recentJournalsRaw
+      .filter(j => !(j.selectedQuestionTexts?.length))
+      .map(j => ({
+        date: j.createdAt.toISOString().slice(0, 10),
+        content: j.content,
+        emotionScore: j.emotionScore,
+      }));
+
+    // 2-b. 최근 체크인 및 베이스라인
+    const [checkinsRaw, baselineRaw] = await Promise.all([
+      this.prisma.dailyCheckin.findMany({
+        where: { userId },
+        orderBy: { diaryDate: 'desc' },
+        take: 7,
+      }),
+      this.prisma.userBaselineCheckin.findUnique({ where: { userId } }),
+    ]);
+
+    const checkins = checkinsRaw.map(c => ({
+      date: c.diaryDate.toISOString().slice(0, 10),
+      mood_1to10: c.mood_1to10,
+      energy_1to10: c.energy_1to10,
+      stress_1to10: c.stress_1to10,
+      sleep_hours_1to9p: c.sleep_hours_1to9p,
+      sleep_quality_1to10: c.sleep_quality_1to10,
+      activity_types: c.activity_types ?? [],
+      workout_intensity_1to10: c.workout_intensity_1to10,
+      focus_1to10: c.focus_1to10,
+      fatigue_1to10: c.fatigue_1to10,
+      social_count_1to10: c.social_count_1to10,
+      social_satisfaction_1to10: c.social_satisfaction_1to10,
+    }));
+
+    const baseline = baselineRaw
+      ? {
+          mood_1to10: baselineRaw.mood_1to10,
+          energy_1to10: baselineRaw.energy_1to10,
+          stress_1to10: baselineRaw.stress_1to10,
+          sleep_hours_1to9p: baselineRaw.sleep_hours_1to9p,
+          sleep_quality_1to10: baselineRaw.sleep_quality_1to10,
+          activity_types: baselineRaw.activity_types ?? [],
+          workout_intensity_1to10: baselineRaw.workout_intensity_1to10,
+          focus_1to10: baselineRaw.focus_1to10,
+          fatigue_1to10: baselineRaw.fatigue_1to10,
+          social_count_1to10: baselineRaw.social_count_1to10,
+          social_satisfaction_1to10: baselineRaw.social_satisfaction_1to10,
+        }
+      : undefined;
 
     // 3. 메타 정보(요일/시간대/반응)
     const now = new Date();
@@ -102,10 +184,16 @@ export class QuestionService {
     }
 
     // 5. 페르소나/목표 정보 (추후 확장)
-    const personaAndGoals: PersonaAndGoals = {
-      persona: undefined, // 추후 persona 필드 추가시 구현
-      goals: [], // 추후 goals 테이블 추가시 구현
-    };
+    let personaAndGoals: PersonaAndGoals = {};
+    try {
+      const personaData = await this.profileService.getPersonaAndGoals(userId);
+      personaAndGoals = {
+        persona: personaData.persona,
+        goals: personaData.goals,
+      };
+    } catch (error) {
+      console.log('페르소나/목표 조회 실패:', error);
+    }
 
     // 6. AI 모델 선택 및 폴백 시스템
     const selectedModel = preferredModel || QuestionGeneratorFactory.getDefaultModel();
@@ -119,9 +207,7 @@ export class QuestionService {
     const averageAnswerLength = validJournals.length
       ? Math.round(validJournals.reduce((acc, j) => acc + j.content.length, 0) / validJournals.length)
       : undefined;
-    // 무응답 비율: 질문이 있었지만 내용이 매우 짧거나 없는 경우 (threshold < 5 chars)
-  // 기존: 질문 텍스트 기반 무응답 비율 계산 제거 (Question 모델 삭제)
-  const noResponseCount = 0;
+    const noResponseCount = validJournals.filter(j => !j.content || j.content.trim().length < 5).length;
     const noResponseRate = validJournals.length ? noResponseCount / validJournals.length : undefined;
 
     const regenerationCount = 0; // TODO: 재생성 로그 테이블 도입 후 실제 값 반영
@@ -137,6 +223,10 @@ export class QuestionService {
       averageWritingTimeSec,
       averageAnswerLength,
       noResponseRate,
+      structuredDiaries,
+      freeformDiaries,
+      checkins,
+      baseline,
     };
     
     // 8. 다중 모델 폴백으로 질문 생성 시도

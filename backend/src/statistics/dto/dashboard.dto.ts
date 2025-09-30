@@ -19,4 +19,5 @@ export class DashboardStatisticsDto {
   mostActiveTime: string;
   consistencyScore: number;
   recordScores: RecordScoreDto[];
+  mentalTrend?: EmotionTrendDto[];
 }

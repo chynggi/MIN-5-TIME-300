@@ -44,12 +44,14 @@ export default function NearbyProfilesBar({
     }
     return (
       <div className="flex gap-3 overflow-x-auto scrollbar-thin px-3 py-2">
-        {profiles.map(p => (
-          <Link
-            key={p.userId}
-            href={`/profile/${p.userId}`}
-            className="flex-shrink-0 flex items-center gap-2 bg-green-100 hover:bg-green-200 transition-colors rounded-2xl px-3 py-2 border border-green-200 min-w-[160px]"
-          >
+        {profiles.map(p => {
+          const profileSlug = p.username || p.userId;
+          return (
+            <Link
+              key={p.userId}
+              href={`/profile/${profileSlug}`}
+              className="flex-shrink-0 flex items-center gap-2 bg-green-100 hover:bg-green-200 transition-colors rounded-2xl px-3 py-2 border border-green-200 min-w-[160px]"
+            >
             <div
               className="relative w-10 h-10 rounded-full overflow-hidden flex items-center justify-center text-white font-semibold"
               style={{
@@ -77,8 +79,9 @@ export default function NearbyProfilesBar({
                   : "-"}
               </span>
             </div>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
     );
   }, [profiles, isLoadingLocation, locationError]);
