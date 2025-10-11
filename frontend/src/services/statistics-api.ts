@@ -52,7 +52,7 @@ export const statisticsApi = {
   },
 
   // 대시보드 통계 조회
-  getDashboardStats: (period?: 'week' | 'month' | 'year'): Promise<DashboardStatistics> => {
+  getDashboardStats: (period?: 'recent7' | 'week' | 'month' | 'year'): Promise<DashboardStatistics> => {
     const params = period ? `?period=${period}` : '';
     return api(`/statistics/dashboard${params}`);
   },

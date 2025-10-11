@@ -347,7 +347,7 @@ export default function ProfilePage() {
       try {
         setMentalLoading(true);
         setMentalError(null);
-        const stats = await statisticsApi.getDashboardStats('week');
+  const stats = await statisticsApi.getDashboardStats('recent7');
         setMentalTrend((stats.mentalTrend && stats.mentalTrend.length ? stats.mentalTrend : stats.emotionTrend) || []);
       } catch (e: any) {
         console.error('멘탈 그래프 로드 실패:', e);

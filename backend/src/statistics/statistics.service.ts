@@ -44,7 +44,10 @@ export class StatisticsService {
     };
   }
 
-  async getDashboard(req: any, period?: 'week' | 'month' | 'year'): Promise<DashboardStatisticsDto & { feedbackStats: any }> {
+  async getDashboard(
+    req: any,
+    period?: 'recent7' | 'week' | 'month' | 'year',
+  ): Promise<DashboardStatisticsDto & { feedbackStats: any }> {
     const userId = req.user.userId;
     const now = new Date();
     let from: Date;
@@ -52,6 +55,10 @@ export class StatisticsService {
       from = new Date(now.getFullYear(), now.getMonth(), 1);
     } else if (period === 'year') {
       from = new Date(now.getFullYear(), 0, 1);
+    } else if (period === 'recent7') {
+      from = new Date(now);
+      from.setHours(0, 0, 0, 0);
+      from.setDate(from.getDate() - 6);
     } else {
       const day = now.getDay();
       from = new Date(now);
