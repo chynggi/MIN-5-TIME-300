@@ -12,6 +12,7 @@ import { ProfileResponse } from '../../types/api';
 // ActivityIndicator 제거: 활동지수를 다른 statCard들과 동일한 비주얼로 통일
 import { setAuthToken, testConnection } from '../../lib/api';
 import { authApi } from '../../services/auth-api';
+import { mentalTrendSample } from '@/mock/mental-trend-sample';
 
 interface MyProfile {
   name: string;
@@ -98,6 +99,7 @@ export default function ProfilePage() {
   const [mentalTrend, setMentalTrend] = useState<Array<{ date: string; score: number }>>([]);
   const [mentalLoading, setMentalLoading] = useState(false);
   const [mentalError, setMentalError] = useState<string | null>(null);
+  const [mentalDataSource, setMentalDataSource] = useState<'api' | 'sample' | null>(null);
 
   // 감정 이모지 매핑
   const emotionEmojis: { [key: string]: string } = {
@@ -347,11 +349,22 @@ export default function ProfilePage() {
       try {
         setMentalLoading(true);
         setMentalError(null);
-  const stats = await statisticsApi.getDashboardStats('recent7');
-        setMentalTrend((stats.mentalTrend && stats.mentalTrend.length ? stats.mentalTrend : stats.emotionTrend) || []);
+        setMentalTrend([...mentalTrendSample]);
+        setMentalDataSource('sample');
+        const stats = await statisticsApi.getDashboardStats('recent7');
+        const apiData = (stats.mentalTrend && stats.mentalTrend.length ? stats.mentalTrend : stats.emotionTrend) || [];
+        if (apiData.length > 0) {
+          setMentalTrend(apiData);
+          setMentalDataSource('api');
+        } else {
+          setMentalTrend([...mentalTrendSample]);
+          setMentalDataSource('sample');
+        }
       } catch (e: any) {
         console.error('멘탈 그래프 로드 실패:', e);
         setMentalError('그래프를 불러오지 못했습니다.');
+        setMentalTrend([...mentalTrendSample]);
+        setMentalDataSource('sample');
       } finally {
         setMentalLoading(false);
       }
@@ -538,6 +551,9 @@ export default function ProfilePage() {
                             <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>최근 7일</span>
                           )}
                         </div>
+                        {mentalDataSource === 'sample' && (
+                          <div style={{ fontSize: '0.7rem', color: '#2563eb', marginBottom: '4px' }}>디버그: 샘플 데이터 표시 중</div>
+                        )}
                         <svg width={w} height={h} role="img" aria-label="멘탈 추세 스파크라인">
                           {/* 가이드 라인 */}
                           <line x1={pad} y1={toY(min)} x2={w - pad} y2={toY(min)} stroke={gridColor} strokeDasharray="4 4" />
