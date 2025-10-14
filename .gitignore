@@ -61,3 +61,7 @@ $RECYCLE.BIN/
 # DB 덤프
 *.sql
 *.dump
+
+# 환경파일 제외 (보안)
+.env
+.env.*
