@@ -1,10 +1,10 @@
 import { Anthropic } from '@anthropic-ai/sdk';
-import { 
-  QuestionGeneratorInterface, 
-  QuestionGenerationRequest, 
-  QuestionGenerationResponse, 
+import {
+  QuestionGeneratorInterface,
+  QuestionGenerationRequest,
+  QuestionGenerationResponse,
   AIModel,
-  GeneratedQuestionItem
+  GeneratedQuestionItem,
 } from '../interfaces/question-generator.interface';
 import { tryParseQuestionJson } from '../validators/question-schema';
 
@@ -13,18 +13,20 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
 
   constructor() {
     super(AIModel.CLAUDE_SONNET_4);
-    
+
     // API 키 검증
     if (!process.env.CLAUDE_API_KEY) {
       throw new Error('Claude API 키가 설정되지 않았습니다');
     }
-    
+
     this.anthropic = new Anthropic({
       apiKey: process.env.CLAUDE_API_KEY,
     });
   }
 
-  async generateQuestion(request: QuestionGenerationRequest): Promise<QuestionGenerationResponse> {
+  async generateQuestion(
+    request: QuestionGenerationRequest,
+  ): Promise<QuestionGenerationResponse> {
     try {
       const systemPrompt = this.createSystemPrompt();
       const userPrompt = this.createUserPrompt(request);
@@ -46,7 +48,7 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
 
   private parseQuestions(raw: string): { questions: GeneratedQuestionItem[] } {
     const questions: GeneratedQuestionItem[] = [];
-    const sanitized = raw.replace(/```+json?/gi,'```');
+    const sanitized = raw.replace(/```+json?/gi, '```');
 
     const extractJson = (): string | undefined => {
       const fence = sanitized.match(/```+\s*(?:json)?\s*([\s\S]*?)```/i);
@@ -62,24 +64,41 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
         const valid = tryParseQuestionJson(candidate);
         if (valid) {
           for (const q of valid.questions) {
-            const text = q.text.trim().replace(/^['"`]+|['"`]+$/g,'');
-            if (this.autoQualityFilter(text)) questions.push({ domain: q.domain, text });
+            const text = q.text.trim().replace(/^['"`]+|['"`]+$/g, '');
+            if (this.autoQualityFilter(text))
+              questions.push({ domain: q.domain, text });
           }
           return questions.length > 0;
         }
         return false;
-      } catch { return false; }
+      } catch {
+        return false;
+      }
     };
 
     const parsed = tryParse(extractJson()) || tryParse(sanitized);
 
     if (!parsed) {
-      const lines = sanitized.split(/\n+/)
-        .map(l => l.replace(/^[-*\d.\s]+/, '').trim())
-        .filter(l => l.length >= 4 && l.length <= 120 && !/^```/.test(l) && !/^[{}\[\]]+$/.test(l) && !/^"?questions"?\s*:/.test(l))
-        .slice(0,5);
-      const domains: GeneratedQuestionItem['domain'][] = ['emotion','action','relationship','recovery','goal'];
-      for (let i=0;i<lines.length;i++) {
+      const lines = sanitized
+        .split(/\n+/)
+        .map((l) => l.replace(/^[-*\d.\s]+/, '').trim())
+        .filter(
+          (l) =>
+            l.length >= 4 &&
+            l.length <= 120 &&
+            !/^```/.test(l) &&
+            !/^[{}\[\]]+$/.test(l) &&
+            !/^"?questions"?\s*:/.test(l),
+        )
+        .slice(0, 5);
+      const domains: GeneratedQuestionItem['domain'][] = [
+        'emotion',
+        'action',
+        'relationship',
+        'recovery',
+        'goal',
+      ];
+      for (let i = 0; i < lines.length; i++) {
         const text = lines[i];
         if (this.autoQualityFilter(text)) {
           questions.push({ domain: domains[i] || 'emotion', text });
@@ -87,10 +106,13 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
       }
     }
 
-    return { questions: questions.slice(0,5) };
+    return { questions: questions.slice(0, 5) };
   }
 
-  protected async callAPI(userPrompt: string, systemPrompt?: string): Promise<string> {
+  protected async callAPI(
+    userPrompt: string,
+    systemPrompt?: string,
+  ): Promise<string> {
     try {
       // API 키 재검증
       if (!process.env.CLAUDE_API_KEY) {
@@ -121,18 +143,19 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
           return output.trim();
         }
       }
-      
+
       throw new Error('Claude API에서 유효한 텍스트 응답을 받지 못했습니다.');
     } catch (error) {
       console.error('Claude API 호출 오류:', error);
-      
+
       // API 과부하 체크
       if (error.status === 529 || error.message?.includes('overload')) {
-        throw new Error('Claude API가 과부하 상태입니다. 잠시 후 다시 시도해주세요.');
+        throw new Error(
+          'Claude API가 과부하 상태입니다. 잠시 후 다시 시도해주세요.',
+        );
       }
-      
+
       throw new Error(`Claude API 요청 실패: ${error.message || error}`);
     }
   }
-
 }

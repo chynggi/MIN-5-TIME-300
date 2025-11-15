@@ -181,32 +181,78 @@ export class AdviceService {
   }
 
   private composeAdvice(summary: string, s: ReturnType<AdviceService['evalSignals']>, risk: RiskFlag): { advice: string; tags: string[] } {
-    // 우선순위: 회복(수면/스트레스/에너지) > 전환(반복) > 성찰(요약 기반)
-    const tags: string[] = [];
-    let sentence = '';
-    if (s.sleepLow) {
-      sentence = '어제 잠이 짧았다면 오늘은 평소보다 조금 일찍 눕는 걸 목표로 해봐요—몸이 고마워할 거예요.';
-      tags.push('수면','휴식','루틴');
-    } else if (s.stressHigh) {
-      sentence = '어제 긴장이 컸다면 3분만 호흡에 집중해요—생각은 잠시 쉬어도 괜찮아요.';
-      tags.push('스트레스','호흡','휴식');
-    } else if (s.energyLow) {
-      sentence = '기운이 달렸다면 따뜻한 음료와 5분 스트레칭으로 부드럽게 시작해봐요.';
-      tags.push('에너지','스트레칭','루틴');
-    } else if (s.repeatedNegative) {
-      sentence = '비슷한 기분이 이어졌다면 오늘은 루틴에 작은 변화를—짧은 산책이나 음악 한 곡 어떨까요?';
-      tags.push('전환','산책','음악');
-    } else {
-      sentence = '어제 마음에 남은 장면 하나만 떠올려 봐요—그중 하나를 오늘 작은 행동으로 이어가볼까요?';
-      tags.push('성찰','루틴');
+    const signal = this.buildSignalMessage(s);
+    const lead = this.buildSummaryLead(summary);
+    const tags = new Set(signal.tags);
+
+    let sentence = signal.text;
+    if (lead) {
+      sentence = `${lead.lead} ${signal.text}`.trim();
+      lead.tags.forEach(tag => tags.add(tag));
+      tags.add('개인화');
     }
+
     if (risk === 'severe') {
-      // 선택지 톤으로 가볍게 보조 문구 (문장길이 120자 제한 준수 위해 절제)
-      sentence = sentence.replace(/\.$/, '') + ' 도움이 급하면 가까운 사람이나 전문기관과 연결해도 괜찮아요.';
+      sentence = this.appendSevereNotice(sentence);
+      tags.add('지원');
     }
-    // 120자 이내로 마무리
-    sentence = sentence.slice(0, 120);
-    return { advice: sentence, tags };
+
+    sentence = this.clipSentence(sentence);
+    return { advice: sentence, tags: Array.from(tags) };
+  }
+
+  private buildSignalMessage(s: ReturnType<AdviceService['evalSignals']>): { text: string; tags: string[] } {
+    if (s.sleepLow) {
+      return { text: '어제 잠이 짧았다면 오늘은 평소보다 조금 일찍 눕는 걸 목표로 해봐요—몸이 고마워할 거예요.', tags: ['수면','휴식','루틴'] };
+    }
+    if (s.stressHigh) {
+      return { text: '어제 긴장이 컸다면 3분만 호흡에 집중해요—생각은 잠시 쉬어도 괜찮아요.', tags: ['스트레스','호흡','휴식'] };
+    }
+    if (s.energyLow) {
+      return { text: '기운이 달렸다면 따뜻한 음료와 5분 스트레칭으로 부드럽게 시작해봐요.', tags: ['에너지','스트레칭','루틴'] };
+    }
+    if (s.repeatedNegative) {
+      return { text: '비슷한 기분이 이어졌다면 오늘은 루틴에 작은 변화를—짧은 산책이나 음악 한 곡 어떨까요?', tags: ['전환','산책','음악'] };
+    }
+    return { text: '어제 마음에 남은 장면 하나만 떠올려 봐요—그중 하나를 오늘 작은 행동으로 이어가볼까요?', tags: ['성찰','루틴'] };
+  }
+
+  private buildSummaryLead(summary: string): { lead: string; tags: string[] } | null {
+    const snippet = this.pickSummarySnippet(summary);
+    if (!snippet) return null;
+
+    const patterns: Array<{ regex: RegExp; lead: string; tags: string[] }> = [
+      { regex: /(불안|걱정|긴장|압박|초조)/i, lead: `"${snippet}" 때문에 마음이 조여 있다면`, tags: ['정서','스트레스'] },
+      { regex: /(피곤|지침|무기력|번아웃|휴식)/i, lead: `"${snippet}"처럼 몸이 느려졌다면`, tags: ['휴식','회복'] },
+      { regex: /(감사|고마움|행복|설렘|뿌듯|기쁨)/i, lead: `"${snippet}" 순간이 고마웠다면`, tags: ['감사','긍정'] },
+      { regex: /(친구|가족|사람|대화|만남|관계)/i, lead: `"${snippet}"에 담긴 관계를 떠올린다면`, tags: ['관계','연결'] },
+      { regex: /(도전|시도|성장|배움|계획|목표)/i, lead: `"${snippet}" 계획을 마음에 새겼다면`, tags: ['성장','계획'] },
+    ];
+
+    for (const pattern of patterns) {
+      if (pattern.regex.test(summary)) {
+        return { lead: pattern.lead, tags: pattern.tags };
+      }
+    }
+
+    return { lead: `"${snippet}" 마음이 남아 있다면`, tags: ['성찰'] };
+  }
+
+  private pickSummarySnippet(summary: string, max = 28): string | null {
+    if (!summary) return null;
+    const compact = summary.replace(/\s+/g, ' ').trim();
+    if (!compact) return null;
+    if (compact.length <= max) return compact;
+    return `${compact.slice(0, max - 1)}…`;
+  }
+
+  private appendSevereNotice(sentence: string): string {
+    const trimmed = sentence.replace(/\.$/, '');
+    return `${trimmed} 도움이 급하면 가까운 사람이나 전문기관과 연결해도 괜찮아요.`;
+  }
+
+  private clipSentence(sentence: string): string {
+    return sentence.length > 120 ? `${sentence.slice(0, 119)}…` : sentence;
   }
 
   private toRiskEnum(r: RiskFlag) {

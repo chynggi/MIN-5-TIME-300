@@ -1,10 +1,18 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { generateDailyQuestion } from '../question/gemini-question.service';
 import type { Multer } from 'multer';
 import { CreateDiaryDto } from './dto/create-diary.dto';
 import { ActivityService } from '../activity/activity.service';
 import { RateDiaryDto } from './dto/rate-diary.dto';
-import { DiaryListResponseDto, DiaryDetailResponseDto } from './dto/diary-response.dto';
+import {
+  DiaryListResponseDto,
+  DiaryDetailResponseDto,
+} from './dto/diary-response.dto';
 import { TodayQuestionResponseDto } from './dto/today-question-response.dto';
 import { PrismaService } from '../prisma.service';
 import { VectorDbService } from '../vector-db/vector-db.service';
@@ -43,10 +51,12 @@ function splitTitleAndBody(content: string): { title?: string; body: string } {
     }
   }
   // [제목] 라인이 없으면 첫 번째 비어있지 않은 라인을 제목으로 사용
-  const firstIdx = lines.findIndex(l => l.trim().length > 0);
+  const firstIdx = lines.findIndex((l) => l.trim().length > 0);
   if (firstIdx === -1) return { body: '' };
   const title = lines[firstIdx].trim().slice(0, 50);
-  const rest = [...lines.slice(0, firstIdx), ...lines.slice(firstIdx + 1)].join('\n');
+  const rest = [...lines.slice(0, firstIdx), ...lines.slice(firstIdx + 1)].join(
+    '\n',
+  );
   const body = rest.replace(/^\s*(\r?\n)+/, '');
   return { title, body };
 }
@@ -60,7 +70,10 @@ function normalizeStringArray(v: any): string[] | undefined {
       const parsed = JSON.parse(v);
       if (Array.isArray(parsed)) return parsed.map(String);
     } catch {}
-    return v.split(',').map((s: string) => s.trim()).filter(Boolean);
+    return v
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter(Boolean);
   }
   return undefined;
 }
@@ -91,23 +104,44 @@ export class DiaryService {
 
     // 오늘 시작/끝 시간 계산
     const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const start = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      0,
+      0,
+      0,
+      0,
+    );
+    const end = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      23,
+      59,
+      59,
+      999,
+    );
 
     // 1) 내가 팔로우하는 ACTIVE followee 목록
     const following = await this.prisma.follow.findMany({
       where: { followerId: userId, status: 'ACTIVE', deletedAt: null },
-      select: { followeeId: true }
+      select: { followeeId: true },
     });
     if (!following.length) return { items: [] };
-    const followingIds = following.map(f => f.followeeId);
+    const followingIds = following.map((f) => f.followeeId);
 
     // 2) 나를 팔로우하는 ACTIVE follower 중에서 상호관계 (맞팔)만 추출
     const followers = await this.prisma.follow.findMany({
-      where: { followeeId: userId, status: 'ACTIVE', deletedAt: null, followerId: { in: followingIds } },
-      select: { followerId: true }
+      where: {
+        followeeId: userId,
+        status: 'ACTIVE',
+        deletedAt: null,
+        followerId: { in: followingIds },
+      },
+      select: { followerId: true },
     });
-    const mutualIds = followers.map(f => f.followerId);
+    const mutualIds = followers.map((f) => f.followerId);
     if (!mutualIds.length) return { items: [] };
 
     // 3) 오늘 작성된 공개 일기 조회 (isPublic=true)
@@ -119,11 +153,11 @@ export class DiaryService {
       },
       orderBy: { createdAt: 'desc' },
       include: {
-        user: { select: { id: true, username: true, profileImageUrl: true } }
-      }
+        user: { select: { id: true, username: true, profileImageUrl: true } },
+      },
     });
 
-    const items = diaries.map(d => ({
+    const items = diaries.map((d) => ({
       diaryId: d.id,
       userId: d.user.id,
       username: d.user.username,
@@ -153,11 +187,11 @@ export class DiaryService {
       orderBy: { createdAt: 'desc' },
       take: 3,
     });
-    const recentJournals = recentJournalsRaw.map(j => ({
+    const recentJournals = recentJournalsRaw.map((j) => ({
       id: j.id,
       content: j.content,
       date: j.createdAt.toISOString(),
-    question: '', // deprecated: JournalQuestion 제거로 항상 빈 문자열
+      question: '', // deprecated: JournalQuestion 제거로 항상 빈 문자열
       emotionScore: j.emotionScore,
     }));
     // 3. 메타 정보 (MetaInfo 타입에 맞게 모든 필드 포함)
@@ -179,7 +213,7 @@ export class DiaryService {
     const userProfile = {
       ...user,
       mbti: user.mbti ?? '',
-      interests: (user.interests ?? []).map(i => i.interest),
+      interests: (user.interests ?? []).map((i) => i.interest),
       lifestyleAnswers: user.lifestyleAnswers ?? [],
     };
     try {
@@ -189,7 +223,7 @@ export class DiaryService {
         metaInfo,
         userId,
         this.vectorDbService,
-        personaAndGoals
+        personaAndGoals,
       );
       return {
         question,
@@ -214,22 +248,38 @@ export class DiaryService {
       const publicWhere: any = { isPublic: true };
       // 기간 필터(선택적)
       if (query.startDate && query.endDate) {
-        publicWhere.createdAt = { gte: new Date(query.startDate), lte: new Date(query.endDate) };
+        publicWhere.createdAt = {
+          gte: new Date(query.startDate),
+          lte: new Date(query.endDate),
+        };
       }
       // 좋아요 수 집계 후 상위 limit
       const popular = await this.prisma.journal.findMany({
         where: publicWhere,
-        select: { id: true, content: true, createdAt: true, updatedAt: true, diaryDate: true, isRetrospective: true as any, isPublic: true, emotionScore: true, emotion: true, mediaUrl: true, mediaType: true, user: { select: { username: true, profileImageUrl: true } }, reactions: { select: { reactionType: true } } },
-        orderBy: [
-          { reactions: { _count: 'desc' } },
-          { createdAt: 'desc' },
-        ],
+        select: {
+          id: true,
+          content: true,
+          createdAt: true,
+          updatedAt: true,
+          diaryDate: true,
+          isRetrospective: true as any,
+          isPublic: true,
+          emotionScore: true,
+          emotion: true,
+          mediaUrl: true,
+          mediaType: true,
+          user: { select: { username: true, profileImageUrl: true } },
+          reactions: { select: { reactionType: true } },
+        },
+        orderBy: [{ reactions: { _count: 'desc' } }, { createdAt: 'desc' }],
         take: limit,
         skip,
       });
-      const totalCount = await this.prisma.journal.count({ where: publicWhere });
+      const totalCount = await this.prisma.journal.count({
+        where: publicWhere,
+      });
       return {
-        diaries: popular.map(p => ({
+        diaries: popular.map((p) => ({
           id: p.id,
           title: (p as any).title ?? extractTitle(p.content) ?? undefined,
           content: p.content,
@@ -238,14 +288,15 @@ export class DiaryService {
           diaryDate: p.diaryDate.toISOString(),
           isRetrospective: (p as any).isRetrospective ?? undefined,
           isPublic: p.isPublic,
-            emotionScore: p.emotionScore,
+          emotionScore: p.emotionScore,
           emotion: p.emotion ?? undefined,
           mediaUrl: p.mediaUrl ?? undefined,
           mediaType: p.mediaType ?? undefined,
           question: '', // deprecated
           lat: (p as any).lat,
           lng: (p as any).lng,
-          likes: p.reactions?.filter(r => r.reactionType === 'like').length || 0,
+          likes:
+            p.reactions?.filter((r) => r.reactionType === 'like').length || 0,
           username: p.user?.username,
           profileImageUrl: (p as any).user?.profileImageUrl || null,
         })),
@@ -273,7 +324,7 @@ export class DiaryService {
       this.prisma.journal.count({ where }),
     ]);
     return {
-      diaries: diaries.map(d => ({
+      diaries: diaries.map((d) => ({
         id: d.id,
         title: (d as any).title ?? extractTitle(d.content) ?? undefined,
         content: d.content,
@@ -304,12 +355,16 @@ export class DiaryService {
     const page = Number(query.page) || 1;
     const limit = Math.min(Number(query.limit) || 100, 200);
     const skip = (page - 1) * limit;
-    const latestPerUser = query.latestPerUser === '1' || query.latestPerUser === 'true';
+    const latestPerUser =
+      query.latestPerUser === '1' || query.latestPerUser === 'true';
+    const recentWindowMs = 24 * 60 * 60 * 1000; // 24시간 내 작성 일기만 노출
+    const recentSince = new Date(Date.now() - recentWindowMs);
 
     // 공개 + 위치가 있는 일기만 우선 (위치 없는 것도 필요하면 조건 제거)
     const where: any = {
       isPublic: true,
-      NOT: [ { lat: null }, { lng: null } ],
+      NOT: [{ lat: null }, { lng: null }],
+      createdAt: { gte: recentSince },
     };
 
     if (latestPerUser) {
@@ -319,7 +374,7 @@ export class DiaryService {
         where,
         orderBy: { updatedAt: 'desc' },
         take: 2000, // 안전 상한 (추후 cursor 전략 가능)
-        select: { id: true, userId: true, updatedAt: true }
+        select: { id: true, userId: true, updatedAt: true },
       });
       const pickedMap = new Map<string, { id: string; updatedAt: Date }>();
       for (const c of candidates) {
@@ -327,19 +382,27 @@ export class DiaryService {
           pickedMap.set(c.userId, { id: c.id, updatedAt: c.updatedAt });
         }
       }
-      const pickedIds = Array.from(pickedMap.values()).map(v => v.id);
+      const pickedIds = Array.from(pickedMap.values()).map((v) => v.id);
       if (!pickedIds.length) {
         return { diaries: [], totalCount: 0, page: 1, limit: pickedIds.length };
       }
       const rows = await this.prisma.journal.findMany({
         where: { id: { in: pickedIds } },
         // Prisma Client 재생성 전 profileColor 미존재 -> any 캐스팅 유지
-        include: { user: { select: { username: true, profileImageUrl: true, /* @ts-ignore */ profileColor: true } } as any }
+        include: {
+          user: {
+            select: {
+              username: true,
+              profileImageUrl: true,
+              /* @ts-ignore */ profileColor: true,
+            },
+          } as any,
+        },
       });
       // updatedAt desc 정렬 유지
       rows.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
       return {
-        diaries: rows.map(r => ({
+        diaries: rows.map((r) => ({
           id: r.id,
           content: r.content,
           createdAt: r.createdAt.toISOString(),
@@ -373,14 +436,20 @@ export class DiaryService {
           lat: true as any,
           lng: true as any,
           userId: true,
-          user: { select: { username: true, profileImageUrl: true, /* @ts-ignore */ profileColor: true } } as any,
-        }
+          user: {
+            select: {
+              username: true,
+              profileImageUrl: true,
+              /* @ts-ignore */ profileColor: true,
+            },
+          } as any,
+        },
       }),
       this.prisma.journal.count({ where }),
     ]);
 
     return {
-      diaries: rows.map(r => ({
+      diaries: rows.map((r) => ({
         id: r.id,
         content: r.content,
         createdAt: r.createdAt.toISOString(),
@@ -401,7 +470,7 @@ export class DiaryService {
 
   async getDiary(req: any, id: string): Promise<DiaryDetailResponseDto> {
     const userId = req.user.userId;
-    const diary = await this.prisma.journal.findUnique({ 
+    const diary = await this.prisma.journal.findUnique({
       where: { id },
       include: {
         user: {
@@ -410,24 +479,24 @@ export class DiaryService {
             username: true,
             showDiariesToPublic: true,
             showDiariesToFriends: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
-    
+
     if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
-    
+
     // 본인 일기가 아닌 경우 접근 권한 확인
     if (diary.userId !== userId) {
       // 개별 일기가 공개되어 있지 않으면 접근 불가
       if (!diary.isPublic) {
         throw new ForbiddenException('이 일기에 접근할 권한이 없습니다.');
       }
-      
+
       // 개별 일기가 공개되어 있으면 접근 허용
       // (사용자가 개별적으로 공개한 일기는 볼 수 있어야 함)
     }
-    
+
     return {
       id: diary.id,
       title: (diary as any).title ?? extractTitle(diary.content) ?? undefined,
@@ -435,19 +504,24 @@ export class DiaryService {
       createdAt: diary.createdAt.toISOString(),
       updatedAt: diary.updatedAt.toISOString(),
       diaryDate: diary.diaryDate.toISOString(), // 일기 날짜 포함
-  isRetrospective: (diary as any).isRetrospective ?? undefined,
+      isRetrospective: (diary as any).isRetrospective ?? undefined,
       isPublic: diary.isPublic,
       emotionScore: diary.emotionScore,
       emotion: diary.emotion ?? undefined, // 감정 이모지 포함
       mediaUrl: diary.mediaUrl ?? undefined,
       mediaType: diary.mediaType ?? undefined,
       question: '', // 추후 질문 연동
-      selectedQuestions: Array.isArray((diary as any).selectedQuestionTexts) && Array.isArray((diary as any).selectedQuestionDomains)
-        ? ((diary as any).selectedQuestionTexts as string[]).map((text: string, i: number) => ({
-            text,
-            domain: (diary as any).selectedQuestionDomains?.[i] ?? 'emotion',
-          }))
-        : undefined,
+      selectedQuestions:
+        Array.isArray((diary as any).selectedQuestionTexts) &&
+        Array.isArray((diary as any).selectedQuestionDomains)
+          ? ((diary as any).selectedQuestionTexts as string[]).map(
+              (text: string, i: number) => ({
+                text,
+                domain:
+                  (diary as any).selectedQuestionDomains?.[i] ?? 'emotion',
+              }),
+            )
+          : undefined,
       writingDuration: diary.writingDuration,
       reactions: [], // TODO: 상세 reaction 조회 필요 시 확장
       userId: diary.userId, // 소유자 ID 추가
@@ -468,27 +542,40 @@ export class DiaryService {
     const diary = await this.prisma.journal.findUnique({ where: { id } });
     if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
 
-    const existing = await this.prisma.journalReaction.findUnique({
-      where: { journalId_userId_reactionType: { journalId: id, userId, reactionType: 'like' } } as any,
-    }).catch(() => null);
+    const existing = await this.prisma.journalReaction
+      .findUnique({
+        where: {
+          journalId_userId_reactionType: {
+            journalId: id,
+            userId,
+            reactionType: 'like',
+          },
+        } as any,
+      })
+      .catch(() => null);
 
     if (existing) {
       await this.prisma.journalReaction.delete({ where: { id: existing.id } });
-      const likeCount = await this.prisma.journalReaction.count({ where: { journalId: id, reactionType: 'like' } });
+      const likeCount = await this.prisma.journalReaction.count({
+        where: { journalId: id, reactionType: 'like' },
+      });
       return { liked: false, likeCount };
     }
 
     try {
-      await this.prisma.journalReaction.create({ data: { journalId: id, userId, reactionType: 'like' } });
+      await this.prisma.journalReaction.create({
+        data: { journalId: id, userId, reactionType: 'like' },
+      });
     } catch (e) {
       // race condition 방지: unique 충돌 발생 시 재조회
     }
     // 신규 좋아요 성공 시 활동지수 증가
-    this.activityService.addLikeScore(userId).catch(err => {
-      // eslint-disable-next-line no-console
+    this.activityService.addLikeScore(userId).catch((err) => {
       console.warn('활동지수 좋아요 가점 실패:', err.message);
     });
-    const likeCount = await this.prisma.journalReaction.count({ where: { journalId: id, reactionType: 'like' } });
+    const likeCount = await this.prisma.journalReaction.count({
+      where: { journalId: id, reactionType: 'like' },
+    });
     return { liked: true, likeCount };
   }
 
@@ -496,8 +583,12 @@ export class DiaryService {
   async getLikeStatus(req: any, id: string) {
     const userId = req.user.userId;
     const [liked, likeCount] = await Promise.all([
-      this.prisma.journalReaction.findFirst({ where: { journalId: id, userId, reactionType: 'like' } }).then(r => !!r),
-      this.prisma.journalReaction.count({ where: { journalId: id, reactionType: 'like' } }),
+      this.prisma.journalReaction
+        .findFirst({ where: { journalId: id, userId, reactionType: 'like' } })
+        .then((r) => !!r),
+      this.prisma.journalReaction.count({
+        where: { journalId: id, reactionType: 'like' },
+      }),
     ]);
     return { liked, likeCount };
   }
@@ -506,7 +597,17 @@ export class DiaryService {
     req: any,
     dto: CreateDiaryDto,
     file?: Multer.File,
-  ): Promise<{ id: string; content: string; createdAt: string; isPublic: boolean; question: string; mediaUrl?: string; mediaType?: string; lat?: number | null; lng?: number | null }> {
+  ): Promise<{
+    id: string;
+    content: string;
+    createdAt: string;
+    isPublic: boolean;
+    question: string;
+    mediaUrl?: string;
+    mediaType?: string;
+    lat?: number | null;
+    lng?: number | null;
+  }> {
     const userId = req.user.userId;
     let mediaUrl: string | undefined = undefined;
     let mediaType: string | undefined = undefined;
@@ -518,9 +619,9 @@ export class DiaryService {
           file,
           config.uploadPath,
           config.allowedTypes,
-          config.maxSize
+          config.maxSize,
         );
-        
+
         mediaUrl = uploadResult.fileUrl;
         mediaType = file.mimetype;
       } catch (error) {
@@ -548,54 +649,85 @@ export class DiaryService {
         mediaType = 'image/jpeg';
       }
     }
-    
+
     // FormData로 전달된 문자열 값들을 올바른 타입으로 변환
-    const isPublic = (dto.isPublic as any) === true || (dto.isPublic as any) === 'true';
+    const isPublic =
+      (dto.isPublic as any) === true || (dto.isPublic as any) === 'true';
     // writingDuration은 DTO에서 문자열(@IsNumberString)로 들어오므로 확실하게 number로 파싱
     const writingDurationParsed = (() => {
       const n = parseInt(dto.writingDuration as any, 10);
       if (Number.isNaN(n) || n < 0) return 0; // 방어적 기본값
       return n;
     })();
-    
-  // diaryDate 처리 - 전달되면 사용, 없으면 현재 시각
-  const diaryDate = dto.diaryDate ? new Date(dto.diaryDate) : new Date();
-  const dayStart = new Date(diaryDate.getFullYear(), diaryDate.getMonth(), diaryDate.getDate());
-    
+
+    // diaryDate 처리 - 전달되면 사용, 없으면 현재 시각
+    const diaryDate = dto.diaryDate ? new Date(dto.diaryDate) : new Date();
+    const dayStart = new Date(
+      diaryDate.getFullYear(),
+      diaryDate.getMonth(),
+      diaryDate.getDate(),
+    );
+
     // createdAt도 과거 회고 작성 시 diaryDate로 고정 (미래는 이미 필터됨)
     // Prisma에서는 createdAt default(now()) 대신 명시적으로 넣을 수 있음
     const nowMid = new Date();
-    const todayMid = new Date(nowMid.getFullYear(), nowMid.getMonth(), nowMid.getDate());
+    const todayMid = new Date(
+      nowMid.getFullYear(),
+      nowMid.getMonth(),
+      nowMid.getDate(),
+    );
     const useCustomCreatedAt = diaryDate <= todayMid; // 과거/오늘만 허용
 
     // 위도/경도 문자열을 Float로 변환 (유효하지 않으면 undefined => Prisma null 저장)
-    const lat = dto.lat !== undefined && dto.lat !== null && dto.lat !== '' ? parseFloat(dto.lat) : undefined;
-    const lng = dto.lng !== undefined && dto.lng !== null && dto.lng !== '' ? parseFloat(dto.lng) : undefined;
+    const lat =
+      dto.lat !== undefined && dto.lat !== null && dto.lat !== ''
+        ? parseFloat(dto.lat)
+        : undefined;
+    const lng =
+      dto.lng !== undefined && dto.lng !== null && dto.lng !== ''
+        ? parseFloat(dto.lng)
+        : undefined;
 
-  // finalize=true일 때 최종 요약 실행, 그 외에는 원문 저장
-  let finalContent = dto.content;
-  const isFinalize = (dto as any).finalize === 'true' || (dto as any).finalize === true;
-  let summaryMeta: { modelUsed: string; truncated: boolean; fallbackUsed: boolean } | null = null;
-  if (isFinalize) {
-    try {
-      const sum = await this.diarySummaryService.summarize(finalContent, {
-        title: extractTitle(finalContent),
-        modelId: dto.questionModel,
-        userId,
-      });
-      finalContent = sum.text;
-      summaryMeta = { modelUsed: sum.modelUsed, truncated: sum.truncated, fallbackUsed: sum.fallbackUsed };
-    } catch (e) {
-      // 요약 실패 시 원문 유지
+    // finalize=true일 때 최종 요약 실행, 그 외에는 원문 저장
+    let finalContent = dto.content;
+    const isFinalize =
+      (dto as any).finalize === 'true' || (dto as any).finalize === true;
+    let summaryMeta: {
+      modelUsed: string;
+      truncated: boolean;
+      fallbackUsed: boolean;
+    } | null = null;
+    if (isFinalize) {
+      try {
+        const sum = await this.diarySummaryService.summarize(finalContent, {
+          title: extractTitle(finalContent),
+          modelId: dto.questionModel,
+          userId,
+        });
+        finalContent = sum.text;
+        summaryMeta = {
+          modelUsed: sum.modelUsed,
+          truncated: sum.truncated,
+          fallbackUsed: sum.fallbackUsed,
+        };
+      } catch (e) {
+        // 요약 실패 시 원문 유지
+      }
     }
-  }
-  // 제목 저장: 프론트가 별도 title을 보낼 수 없으므로 [제목] 패턴/첫 줄에서 추출
-  const { title: resolvedTitle, body: cleanedContent } = splitTitleAndBody(finalContent);
-    const selectedQuestionDomains = normalizeStringArray((dto as any).selectedQuestionDomains);
-    const selectedQuestionTexts = normalizeStringArray((dto as any).selectedQuestionTexts);
+    // 제목 저장: 프론트가 별도 title을 보낼 수 없으므로 [제목] 패턴/첫 줄에서 추출
+    const { title: resolvedTitle, body: cleanedContent } =
+      splitTitleAndBody(finalContent);
+    const selectedQuestionDomains = normalizeStringArray(
+      (dto as any).selectedQuestionDomains,
+    );
+    const selectedQuestionTexts = normalizeStringArray(
+      (dto as any).selectedQuestionTexts,
+    );
 
     // 동일 날짜 일기 존재 시 업데이트로 전환
-    let diary = await this.prisma.journal.findFirst({ where: { userId, diaryDate: dayStart } });
+    let diary = await this.prisma.journal.findFirst({
+      where: { userId, diaryDate: dayStart },
+    });
     if (diary) {
       diary = await this.prisma.journal.update({
         where: { id: diary.id },
@@ -654,11 +786,16 @@ export class DiaryService {
 
     // 일기 저장/업데이트 후 임베딩 생성 및 Pinecone upsert (VectorDbService 래퍼 사용)
     try {
-      const embedding = await this.vectorDbService.getCombinedEmbedding([diary.content]);
+      const embedding = await this.vectorDbService.getCombinedEmbedding([
+        diary.content,
+      ]);
       if (embedding) {
         // DB 저장 (prisma generate 후 embedding 필드 인식, 현재는 any 캐스팅 가능)
-        (this.prisma as any).journal.update({ where: { id: diary.id }, data: { embedding } })
-          .catch((err: any) => console.warn('임베딩 DB 저장 실패:', err.message));
+        (this.prisma as any).journal
+          .update({ where: { id: diary.id }, data: { embedding } })
+          .catch((err: any) =>
+            console.warn('임베딩 DB 저장 실패:', err.message),
+          );
         await this.vectorDbService.upsert([
           {
             id: diary.id,
@@ -680,7 +817,7 @@ export class DiaryService {
     const result = {
       id: diary.id,
       title: (diary as any).title ?? resolvedTitle ?? undefined,
-  content: diary.content,
+      content: diary.content,
       createdAt: diary.createdAt.toISOString(),
       isPublic: diary.isPublic,
       question: '', // deprecated
@@ -694,27 +831,27 @@ export class DiaryService {
     this.streakBadgeService.onDiaryOrCheckin(userId, diaryDate).catch(() => {});
 
     // 일기 작성 후 최신 일기 수 카운트 및 실시간 전송 (비동기, 실패해도 throw 아님)
-    this.prisma.journal.count({ where: { userId } })
-      .then(count => {
+    this.prisma.journal
+      .count({ where: { userId } })
+      .then((count) => {
         this.realtimeGateway.emitProfileCountersUpdate({
           userId,
           diaryCount: count,
         });
       })
-      .catch(err => {
-        // eslint-disable-next-line no-console
+      .catch((err) => {
         console.error('실시간 diaryCount 전송 실패', err.message);
       });
 
     // 활동지수 반영 (질문 사용 여부: dto.questionId 존재 시 질문 기반 작성으로 간주)
-    this.activityService.addDiaryScore(userId, !!dto.questionId).catch(err => {
-      // eslint-disable-next-line no-console
-      console.warn('활동지수 일기 가점 실패:', err.message);
-    });
+    this.activityService
+      .addDiaryScore(userId, !!dto.questionId)
+      .catch((err) => {
+        console.warn('활동지수 일기 가점 실패:', err.message);
+      });
 
     // 일기 저장 직후 오늘의 한마디 갱신 시도 (비동기, 오류는 무시)
-    this.adviceService.generateWithCache(userId, true).catch(err => {
-      // eslint-disable-next-line no-console
+    this.adviceService.generateWithCache(userId, true).catch((err) => {
       console.warn('조언 갱신 실패 (무시):', err.message);
     });
 
@@ -725,20 +862,39 @@ export class DiaryService {
    * 질문 답변 저장: Q&A를 커밋하고 즉시 요약을 생성/저장한다.
    * - 기존 일기가 있으면 업데이트, 없으면 생성(최초 저장 시 선택 질문 텍스트/도메인도 저장)
    */
-  async saveQuestionAnswers(req: any, dto: { qa: Array<{ domain: string; question: string; answer: string }>; modelId?: string; diaryDate?: string }) {
+  async saveQuestionAnswers(
+    req: any,
+    dto: {
+      qa: Array<{ domain: string; question: string; answer: string }>;
+      modelId?: string;
+      diaryDate?: string;
+    },
+  ) {
     const userId = req.user.userId;
     const date = dto.diaryDate ? new Date(dto.diaryDate) : new Date();
-    const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const dayStart = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    );
 
     // 기존 일기 조회(해당 날짜)
-    let journal = await this.prisma.journal.findFirst({ where: { userId, diaryDate: dayStart } });
+    let journal = await this.prisma.journal.findFirst({
+      where: { userId, diaryDate: dayStart },
+    });
 
     // Q&A를 단일 텍스트로 병합 (요약 입력)
-    const qaText = dto.qa.map((q, i) => `[${q.domain}] Q${i+1}: ${q.question}\nA: ${q.answer}`).join('\n\n');
+    const qaText = dto.qa
+      .map((q, i) => `[${q.domain}] Q${i + 1}: ${q.question}\nA: ${q.answer}`)
+      .join('\n\n');
     const title = extractTitle(qaText) || '오늘의 Q&A';
 
     // 즉시 요약 생성
-    const sum = await this.diarySummaryService.summarize(qaText, { title, modelId: dto.modelId, userId });
+    const sum = await this.diarySummaryService.summarize(qaText, {
+      title,
+      modelId: dto.modelId,
+      userId,
+    });
     const finalContent = sum.text;
 
     if (!journal) {
@@ -754,8 +910,8 @@ export class DiaryService {
           summaryModel: sum.modelUsed,
           summaryTruncated: sum.truncated,
           summaryFallbackUsed: sum.fallbackUsed,
-          selectedQuestionDomains: dto.qa.map(q => q.domain),
-          selectedQuestionTexts: dto.qa.map(q => q.question),
+          selectedQuestionDomains: dto.qa.map((q) => q.domain),
+          selectedQuestionTexts: dto.qa.map((q) => q.question),
         },
       });
     } else {
@@ -784,16 +940,29 @@ export class DiaryService {
       isPublic: journal.isPublic,
       question: '',
       diaryDate: journal.diaryDate.toISOString(),
-      summary: { modelUsed: sum.modelUsed, truncated: sum.truncated, fallbackUsed: sum.fallbackUsed },
-      selectedQuestions: journal.selectedQuestionTexts?.map((t, i) => ({ domain: journal!.selectedQuestionDomains?.[i], text: t })) || [],
+      summary: {
+        modelUsed: sum.modelUsed,
+        truncated: sum.truncated,
+        fallbackUsed: sum.fallbackUsed,
+      },
+      selectedQuestions:
+        journal.selectedQuestionTexts?.map((t, i) => ({
+          domain: journal.selectedQuestionDomains?.[i],
+          text: t,
+        })) || [],
     };
   }
 
-  async rateDiary(req: any, id: string, dto: RateDiaryDto): Promise<{ id: string; emotionScore: number; updatedAt: string }> {
+  async rateDiary(
+    req: any,
+    id: string,
+    dto: RateDiaryDto,
+  ): Promise<{ id: string; emotionScore: number; updatedAt: string }> {
     const userId = req.user.userId;
     const diary = await this.prisma.journal.findUnique({ where: { id } });
     if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
-    if (diary.userId !== userId) throw new ForbiddenException('본인 일기만 평가할 수 있습니다.');
+    if (diary.userId !== userId)
+      throw new ForbiddenException('본인 일기만 평가할 수 있습니다.');
     const updated = await this.prisma.journal.update({
       where: { id },
       data: { emotionScore: dto.emotionScore },
@@ -805,11 +974,16 @@ export class DiaryService {
     };
   }
 
-  async shareDiary(req: any, id: string, isPublic: boolean): Promise<{ id: string; isPublic: boolean; updatedAt: string }> {
+  async shareDiary(
+    req: any,
+    id: string,
+    isPublic: boolean,
+  ): Promise<{ id: string; isPublic: boolean; updatedAt: string }> {
     const userId = req.user.userId;
     const diary = await this.prisma.journal.findUnique({ where: { id } });
     if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
-    if (diary.userId !== userId) throw new ForbiddenException('본인 일기만 공유 설정할 수 있습니다.');
+    if (diary.userId !== userId)
+      throw new ForbiddenException('본인 일기만 공유 설정할 수 있습니다.');
     const updated = await this.prisma.journal.update({
       where: { id },
       data: { isPublic },
@@ -833,7 +1007,8 @@ export class DiaryService {
     const userId = req.user.userId;
     const diary = await this.prisma.journal.findUnique({ where: { id } });
     if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
-    if (diary.userId !== userId) throw new ForbiddenException('본인 일기만 수정할 수 있습니다.');
+    if (diary.userId !== userId)
+      throw new ForbiddenException('본인 일기만 수정할 수 있습니다.');
 
     // 파일 업로드 처리 (선택)
     let mediaUrl: string | undefined = diary.mediaUrl ?? undefined;
@@ -845,7 +1020,7 @@ export class DiaryService {
           file,
           config.uploadPath,
           config.allowedTypes,
-          config.maxSize
+          config.maxSize,
         );
         mediaUrl = uploadResult.fileUrl;
         mediaType = file.mimetype;
@@ -875,19 +1050,31 @@ export class DiaryService {
     }
 
     // 타입 변환
-    const isPublic = (dto.isPublic as any) === true || (dto.isPublic as any) === 'true';
+    const isPublic =
+      (dto.isPublic as any) === true || (dto.isPublic as any) === 'true';
     const writingDurationParsed = (() => {
       const n = parseInt(dto.writingDuration as any, 10);
       if (Number.isNaN(n) || n < 0) return 0;
       return n;
     })();
-    const lat = dto.lat !== undefined && dto.lat !== null && dto.lat !== '' ? parseFloat(dto.lat) : (diary as any).lat;
-    const lng = dto.lng !== undefined && dto.lng !== null && dto.lng !== '' ? parseFloat(dto.lng) : (diary as any).lng;
+    const lat =
+      dto.lat !== undefined && dto.lat !== null && dto.lat !== ''
+        ? parseFloat(dto.lat)
+        : (diary as any).lat;
+    const lng =
+      dto.lng !== undefined && dto.lng !== null && dto.lng !== ''
+        ? parseFloat(dto.lng)
+        : (diary as any).lng;
 
     // finalize=true일 때만 요약 적용
     let finalContent = dto.content;
-    const isFinalize = (dto as any).finalize === 'true' || (dto as any).finalize === true;
-    let summaryMeta: { modelUsed: string; truncated: boolean; fallbackUsed: boolean } | null = null;
+    const isFinalize =
+      (dto as any).finalize === 'true' || (dto as any).finalize === true;
+    let summaryMeta: {
+      modelUsed: string;
+      truncated: boolean;
+      fallbackUsed: boolean;
+    } | null = null;
     if (isFinalize) {
       try {
         const sum = await this.diarySummaryService.summarize(finalContent, {
@@ -896,11 +1083,16 @@ export class DiaryService {
           userId,
         });
         finalContent = sum.text;
-        summaryMeta = { modelUsed: sum.modelUsed, truncated: sum.truncated, fallbackUsed: sum.fallbackUsed };
+        summaryMeta = {
+          modelUsed: sum.modelUsed,
+          truncated: sum.truncated,
+          fallbackUsed: sum.fallbackUsed,
+        };
       } catch {}
     }
 
-    const { title: resolvedTitle, body: cleanedContent } = splitTitleAndBody(finalContent);
+    const { title: resolvedTitle, body: cleanedContent } =
+      splitTitleAndBody(finalContent);
 
     const updated = await this.prisma.journal.update({
       where: { id },
@@ -936,10 +1128,15 @@ export class DiaryService {
 
     // 임베딩 갱신(베스트 에포치: 내용 변경 시)
     try {
-      const embedding = await this.vectorDbService.getCombinedEmbedding([updated.content]);
+      const embedding = await this.vectorDbService.getCombinedEmbedding([
+        updated.content,
+      ]);
       if (embedding) {
-        (this.prisma as any).journal.update({ where: { id: updated.id }, data: { embedding } })
-          .catch((err: any) => console.warn('임베딩 DB 저장 실패:', err.message));
+        (this.prisma as any).journal
+          .update({ where: { id: updated.id }, data: { embedding } })
+          .catch((err: any) =>
+            console.warn('임베딩 DB 저장 실패:', err.message),
+          );
         await this.vectorDbService.upsert([
           {
             id: updated.id,
@@ -985,7 +1182,7 @@ export class DiaryService {
         orderBy: { createdAt: 'desc' },
         take: 3,
       });
-      const texts = recent.map(d => d.content);
+      const texts = recent.map((d) => d.content);
       embedding = await this.vectorDbService.getCombinedEmbedding(texts);
     }
     if (!embedding) return [];
@@ -1004,8 +1201,7 @@ export class DiaryService {
       orderBy: { createdAt: 'desc' },
     });
     // 결과 정렬: Pinecone 순서대로
-    const idToDiary = Object.fromEntries(diaries.map(d => [d.id, d]));
+    const idToDiary = Object.fromEntries(diaries.map((d) => [d.id, d]));
     return ids.map((id: string) => idToDiary[id]).filter(Boolean);
   }
-
 }

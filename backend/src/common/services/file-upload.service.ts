@@ -5,7 +5,6 @@ import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
 
 @Injectable()
 export class FileUploadService {
-  
   /**
    * 안전한 파일 업로드
    * @param file 업로드할 파일
@@ -18,9 +17,8 @@ export class FileUploadService {
     file: any,
     uploadPath: string,
     allowedTypes: string[],
-    maxSize: number
+    maxSize: number,
   ): Promise<{ fileUrl: string; fileName: string; fileSize: number }> {
-    
     if (!file) {
       throw new BadRequestException('파일이 제공되지 않았습니다.');
     }
@@ -28,7 +26,7 @@ export class FileUploadService {
     // MIME 타입 검증
     if (!allowedTypes.includes(file.mimetype)) {
       throw new BadRequestException(
-        `지원되지 않는 파일 형식입니다. 허용된 형식: ${allowedTypes.join(', ')}`
+        `지원되지 않는 파일 형식입니다. 허용된 형식: ${allowedTypes.join(', ')}`,
       );
     }
 
@@ -36,7 +34,7 @@ export class FileUploadService {
     if (file.size > maxSize) {
       const maxSizeMB = Math.round(maxSize / (1024 * 1024));
       throw new BadRequestException(
-        `파일 크기가 너무 큽니다. 최대 ${maxSizeMB}MB까지 업로드 가능합니다.`
+        `파일 크기가 너무 큽니다. 최대 ${maxSizeMB}MB까지 업로드 가능합니다.`,
       );
     }
 
@@ -109,8 +107,14 @@ export class FileUploadService {
       case 'diary':
         return {
           allowedTypes: [
-            'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif',
-            'video/mp4', 'video/webm', 'video/quicktime'
+            'image/jpeg',
+            'image/jpg',
+            'image/png',
+            'image/webp',
+            'image/gif',
+            'video/mp4',
+            'video/webm',
+            'video/quicktime',
           ],
           maxSize: 10 * 1024 * 1024, // 10MB
           uploadPath: 'diary',

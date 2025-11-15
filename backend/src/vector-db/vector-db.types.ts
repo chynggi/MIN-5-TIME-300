@@ -11,7 +11,9 @@ export interface BaseVectorMetadata {
   [key: string]: any; // 확장 허용
 }
 
-export interface UpsertVectorItem<M extends Record<string, any> = BaseVectorMetadata> {
+export interface UpsertVectorItem<
+  M extends Record<string, any> = BaseVectorMetadata,
+> {
   id: string;
   values: number[];
   metadata?: M;

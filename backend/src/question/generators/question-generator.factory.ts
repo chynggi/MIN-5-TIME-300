@@ -1,10 +1,14 @@
-import { AIModel, QuestionGeneratorInterface } from '../interfaces/question-generator.interface';
+import {
+  AIModel,
+  QuestionGeneratorInterface,
+} from '../interfaces/question-generator.interface';
 import { GeminiQuestionGenerator } from './gemini-question.generator';
 import { ClaudeQuestionGenerator } from './claude-question.generator';
 import { GPTQuestionGenerator } from './gpt-question.generator';
 
 export class QuestionGeneratorFactory {
-  private static generators: Map<AIModel, QuestionGeneratorInterface> = new Map();
+  private static generators: Map<AIModel, QuestionGeneratorInterface> =
+    new Map();
 
   static getGenerator(model: AIModel): QuestionGeneratorInterface {
     if (!this.generators.has(model)) {
@@ -50,7 +54,9 @@ export class QuestionGeneratorFactory {
 
     // 최소 하나는 활성화되어야 함 (Gemini를 기본으로)
     if (enabledModels.length === 0) {
-      console.log('경고: 활성화된 AI 모델이 없습니다. Gemini를 기본으로 설정합니다.');
+      console.log(
+        '경고: 활성화된 AI 모델이 없습니다. Gemini를 기본으로 설정합니다.',
+      );
       enabledModels.push(AIModel.GEMINI_2_5_FLASH);
     }
 
@@ -66,16 +72,16 @@ export class QuestionGeneratorFactory {
   // 기본 모델 선택 (우선순위: Gemini > GPT-5 > Claude - 안정성 기준)
   static getDefaultModel(): AIModel {
     const enabledModels = this.getEnabledModels();
-    
+
     // Gemini를 1순위로 (가장 안정적)
     if (enabledModels.includes(AIModel.GEMINI_2_5_FLASH)) {
       return AIModel.GEMINI_2_5_FLASH;
     }
-    
+
     if (enabledModels.includes(AIModel.GPT_5)) {
       return AIModel.GPT_5;
     }
-    
+
     if (enabledModels.includes(AIModel.CLAUDE_SONNET_4)) {
       return AIModel.CLAUDE_SONNET_4;
     }
@@ -101,6 +107,8 @@ export class QuestionGeneratorFactory {
   // 안정성 기준으로 정렬된 모델 목록
   static getModelsByStability(): AIModel[] {
     const models = this.getEnabledModels();
-    return models.sort((a, b) => this.getModelStability(b) - this.getModelStability(a));
+    return models.sort(
+      (a, b) => this.getModelStability(b) - this.getModelStability(a),
+    );
   }
 }

@@ -1,13 +1,18 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationService } from '../notification/notification.service';
 import { FollowStatus } from '@prisma/client';
-import { 
-  FollowResponseDto, 
-  FollowListQueryDto, 
+import {
+  FollowResponseDto,
+  FollowListQueryDto,
   FollowListResponseDto,
-  FollowCountersDto
+  FollowCountersDto,
 } from './dto';
 
 @Injectable()
@@ -21,7 +26,10 @@ export class FollowService {
   /**
    * 사용자를 팔로우하거나 팔로우 요청을 보냅니다.
    */
-  async followUser(followerId: string, followeeId: string): Promise<FollowResponseDto> {
+  async followUser(
+    followerId: string,
+    followeeId: string,
+  ): Promise<FollowResponseDto> {
     // 자기 자신을 팔로우할 수 없음
     if (followerId === followeeId) {
       throw new BadRequestException('자기 자신을 팔로우할 수 없습니다.');
@@ -30,7 +38,12 @@ export class FollowService {
     // 팔로우 대상 사용자 존재 확인
     const followee = await this.prisma.user.findUnique({
       where: { id: followeeId },
-      select: { id: true, isPrivate: true, username: true, profileImageUrl: true }
+      select: {
+        id: true,
+        isPrivate: true,
+        username: true,
+        profileImageUrl: true,
+      },
     });
 
     if (!followee) {
@@ -48,12 +61,14 @@ export class FollowService {
       where: {
         followerId_followeeId: {
           followerId,
-          followeeId
-        }
-      }
+          followeeId,
+        },
+      },
     });
 
-    const status = followee.isPrivate ? FollowStatus.REQUESTED : FollowStatus.ACTIVE;
+    const status = followee.isPrivate
+      ? FollowStatus.REQUESTED
+      : FollowStatus.ACTIVE;
 
     const result = await this.prisma.$transaction(async (tx) => {
       let follow;
@@ -66,16 +81,16 @@ export class FollowService {
             where: { id: existingFollow.id },
             data: {
               status,
-              deletedAt: null
+              deletedAt: null,
             },
             include: {
               follower: {
-                select: { id: true, username: true, profileImageUrl: true }
+                select: { id: true, username: true, profileImageUrl: true },
               },
               followee: {
-                select: { id: true, username: true, profileImageUrl: true }
-              }
-            }
+                select: { id: true, username: true, profileImageUrl: true },
+              },
+            },
           });
         } else {
           // 이미 활성 상태인 관계
@@ -91,31 +106,44 @@ export class FollowService {
           data: {
             followerId,
             followeeId,
-            status
+            status,
           },
           include: {
             follower: {
-              select: { id: true, username: true, profileImageUrl: true }
+              select: { id: true, username: true, profileImageUrl: true },
             },
             followee: {
-              select: { id: true, username: true, profileImageUrl: true }
-            }
-          }
+              select: { id: true, username: true, profileImageUrl: true },
+            },
+          },
         });
       }
 
       // 공개 계정인 경우 즉시 카운터 업데이트 및 실시간 브로드캐스트
       if (status === FollowStatus.ACTIVE) {
-        await this.updateFollowCounters(tx, followerId, followeeId, 'increment');
+        await this.updateFollowCounters(
+          tx,
+          followerId,
+          followeeId,
+          'increment',
+        );
       }
 
       // 알림 생성
       if (followee.isPrivate) {
         // 비공개 계정인 경우 팔로우 요청 알림
-        await this.notificationService.handleFollowEvent(followerId, followeeId, 'request');
+        await this.notificationService.handleFollowEvent(
+          followerId,
+          followeeId,
+          'request',
+        );
       } else {
         // 공개 계정인 경우 즉시 팔로우 알림
-        await this.notificationService.handleFollowEvent(followerId, followeeId, 'direct');
+        await this.notificationService.handleFollowEvent(
+          followerId,
+          followeeId,
+          'direct',
+        );
       }
 
       return {
@@ -125,7 +153,7 @@ export class FollowService {
         status: follow.status,
         createdAt: follow.createdAt,
         follower: follow.follower,
-        followee: follow.followee
+        followee: follow.followee,
       };
     });
     // 트랜잭션 커밋 후 실시간 이벤트 emit (최신 counters 기반)
@@ -143,9 +171,9 @@ export class FollowService {
       where: {
         followerId_followeeId: {
           followerId,
-          followeeId
-        }
-      }
+          followeeId,
+        },
+      },
     });
 
     if (!existingFollow || existingFollow.deletedAt) {
@@ -157,12 +185,17 @@ export class FollowService {
       // 소프트 삭제
       await tx.follow.update({
         where: { id: existingFollow.id },
-        data: { deletedAt: new Date() }
+        data: { deletedAt: new Date() },
       });
 
       // 활성 상태였던 경우에만 카운터 감소
       if (wasActive) {
-        await this.updateFollowCounters(tx, followerId, followeeId, 'decrement');
+        await this.updateFollowCounters(
+          tx,
+          followerId,
+          followeeId,
+          'decrement',
+        );
       }
     });
     if (wasActive) {
@@ -173,25 +206,32 @@ export class FollowService {
   /**
    * 팔로우 요청을 승인합니다.
    */
-  async approveFollowRequest(followeeId: string, followerId: string): Promise<FollowResponseDto> {
+  async approveFollowRequest(
+    followeeId: string,
+    followerId: string,
+  ): Promise<FollowResponseDto> {
     const followRequest = await this.prisma.follow.findUnique({
       where: {
         followerId_followeeId: {
           followerId,
-          followeeId
-        }
+          followeeId,
+        },
       },
       include: {
         follower: {
-          select: { id: true, username: true, profileImageUrl: true }
+          select: { id: true, username: true, profileImageUrl: true },
         },
         followee: {
-          select: { id: true, username: true, profileImageUrl: true }
-        }
-      }
+          select: { id: true, username: true, profileImageUrl: true },
+        },
+      },
     });
 
-    if (!followRequest || followRequest.deletedAt || followRequest.status !== FollowStatus.REQUESTED) {
+    if (
+      !followRequest ||
+      followRequest.deletedAt ||
+      followRequest.status !== FollowStatus.REQUESTED
+    ) {
       throw new BadRequestException('승인할 팔로우 요청이 존재하지 않습니다.');
     }
 
@@ -201,19 +241,23 @@ export class FollowService {
         data: { status: FollowStatus.ACTIVE },
         include: {
           follower: {
-            select: { id: true, username: true, profileImageUrl: true }
+            select: { id: true, username: true, profileImageUrl: true },
           },
           followee: {
-            select: { id: true, username: true, profileImageUrl: true }
-          }
-        }
+            select: { id: true, username: true, profileImageUrl: true },
+          },
+        },
       });
 
-  // 카운터 업데이트 및 브로드캐스트
-  await this.updateFollowCounters(tx, followerId, followeeId, 'increment');
+      // 카운터 업데이트 및 브로드캐스트
+      await this.updateFollowCounters(tx, followerId, followeeId, 'increment');
 
       // 팔로우 승인 알림 생성
-      await this.notificationService.handleFollowEvent(followeeId, followerId, 'accept');
+      await this.notificationService.handleFollowEvent(
+        followeeId,
+        followerId,
+        'accept',
+      );
 
       return {
         id: follow.id,
@@ -222,7 +266,7 @@ export class FollowService {
         status: follow.status,
         createdAt: follow.createdAt,
         follower: follow.follower,
-        followee: follow.followee
+        followee: follow.followee,
       };
     });
     await this.broadcastCounters([followerId, followeeId]);
@@ -232,24 +276,31 @@ export class FollowService {
   /**
    * 팔로우 요청을 거절합니다.
    */
-  async rejectFollowRequest(followeeId: string, followerId: string): Promise<void> {
+  async rejectFollowRequest(
+    followeeId: string,
+    followerId: string,
+  ): Promise<void> {
     const followRequest = await this.prisma.follow.findUnique({
       where: {
         followerId_followeeId: {
           followerId,
-          followeeId
-        }
-      }
+          followeeId,
+        },
+      },
     });
 
-    if (!followRequest || followRequest.deletedAt || followRequest.status !== FollowStatus.REQUESTED) {
+    if (
+      !followRequest ||
+      followRequest.deletedAt ||
+      followRequest.status !== FollowStatus.REQUESTED
+    ) {
       throw new BadRequestException('거절할 팔로우 요청이 존재하지 않습니다.');
     }
 
     // 소프트 삭제
     await this.prisma.follow.update({
       where: { id: followRequest.id },
-      data: { deletedAt: new Date() }
+      data: { deletedAt: new Date() },
     });
   }
 
@@ -262,9 +313,9 @@ export class FollowService {
     // followCounters 테이블 한 번에 조회하여 DB count 부하 감소
     const counters = await this.prisma.followCounters.findMany({
       where: { userId: { in: unique } },
-      select: { userId: true, followersCount: true, followingCount: true }
+      select: { userId: true, followersCount: true, followingCount: true },
     });
-    const map = new Map(counters.map(c => [c.userId, c]));
+    const map = new Map(counters.map((c) => [c.userId, c]));
     for (const uid of unique) {
       const c = map.get(uid);
       if (!c) continue; // 아직 생성되지 않은 경우 skip
@@ -279,12 +330,22 @@ export class FollowService {
   /**
    * 팔로워 목록을 조회합니다.
    */
-  async getFollowers(userId: string, query: FollowListQueryDto, requesterId?: string): Promise<FollowListResponseDto> {
+  async getFollowers(
+    userId: string,
+    query: FollowListQueryDto,
+    requesterId?: string,
+  ): Promise<FollowListResponseDto> {
     // 권한 검사
     if (requesterId) {
-      const canView = await this.checkFollowListVisibility(userId, requesterId, 'followers');
+      const canView = await this.checkFollowListVisibility(
+        userId,
+        requesterId,
+        'followers',
+      );
       if (!canView) {
-        throw new ForbiddenException('팔로워 목록을 볼 수 있는 권한이 없습니다.');
+        throw new ForbiddenException(
+          '팔로워 목록을 볼 수 있는 권한이 없습니다.',
+        );
       }
     }
     const limit = Number(query.limit) || 20;
@@ -294,7 +355,9 @@ export class FollowService {
     // 커서 디코딩
     if (query.cursor) {
       try {
-        const cursorData = JSON.parse(Buffer.from(query.cursor, 'base64').toString());
+        const cursorData = JSON.parse(
+          Buffer.from(query.cursor, 'base64').toString(),
+        );
         cursorCreatedAt = new Date(cursorData.createdAt);
         cursorUserId = cursorData.userId;
       } catch (error) {
@@ -302,37 +365,34 @@ export class FollowService {
       }
     }
 
-    let whereClause: any = {
+    const whereClause: any = {
       followeeId: userId,
       status: FollowStatus.ACTIVE,
-      deletedAt: null
+      deletedAt: null,
     };
 
     // 커서 기반 페이지네이션
     if (cursorCreatedAt && cursorUserId) {
       whereClause.OR = [
         {
-          createdAt: { lt: cursorCreatedAt }
+          createdAt: { lt: cursorCreatedAt },
         },
         {
           createdAt: cursorCreatedAt,
-          followerId: { lt: cursorUserId }
-        }
+          followerId: { lt: cursorUserId },
+        },
       ];
     }
 
     const followers = await this.prisma.follow.findMany({
       where: whereClause,
-      orderBy: [
-        { createdAt: 'desc' },
-        { followerId: 'desc' }
-      ],
+      orderBy: [{ createdAt: 'desc' }, { followerId: 'desc' }],
       take: limit + 1, // 다음 페이지 존재 여부 확인용
       include: {
         follower: {
-          select: { id: true, username: true, profileImageUrl: true }
-        }
-      }
+          select: { id: true, username: true, profileImageUrl: true },
+        },
+      },
     });
 
     const hasMore = followers.length > limit;
@@ -344,34 +404,44 @@ export class FollowService {
       nextCursor = Buffer.from(
         JSON.stringify({
           createdAt: lastItem.createdAt.toISOString(),
-          userId: lastItem.followerId
-        })
+          userId: lastItem.followerId,
+        }),
       ).toString('base64');
     }
 
     return {
-      data: data.map(follow => ({
+      data: data.map((follow) => ({
         id: follow.id,
         followerId: follow.followerId,
         followeeId: follow.followeeId,
         status: follow.status,
         createdAt: follow.createdAt,
-        follower: follow.follower
+        follower: follow.follower,
       })),
       hasMore,
-      nextCursor
+      nextCursor,
     };
   }
 
   /**
    * 팔로잉 목록을 조회합니다.
    */
-  async getFollowing(userId: string, query: FollowListQueryDto, requesterId?: string): Promise<FollowListResponseDto> {
+  async getFollowing(
+    userId: string,
+    query: FollowListQueryDto,
+    requesterId?: string,
+  ): Promise<FollowListResponseDto> {
     // 권한 검사
     if (requesterId) {
-      const canView = await this.checkFollowListVisibility(userId, requesterId, 'following');
+      const canView = await this.checkFollowListVisibility(
+        userId,
+        requesterId,
+        'following',
+      );
       if (!canView) {
-        throw new ForbiddenException('팔로잉 목록을 볼 수 있는 권한이 없습니다.');
+        throw new ForbiddenException(
+          '팔로잉 목록을 볼 수 있는 권한이 없습니다.',
+        );
       }
     }
     const limit = Number(query.limit) || 20;
@@ -381,7 +451,9 @@ export class FollowService {
     // 커서 디코딩
     if (query.cursor) {
       try {
-        const cursorData = JSON.parse(Buffer.from(query.cursor, 'base64').toString());
+        const cursorData = JSON.parse(
+          Buffer.from(query.cursor, 'base64').toString(),
+        );
         cursorCreatedAt = new Date(cursorData.createdAt);
         cursorUserId = cursorData.userId;
       } catch (error) {
@@ -389,37 +461,34 @@ export class FollowService {
       }
     }
 
-    let whereClause: any = {
+    const whereClause: any = {
       followerId: userId,
       status: FollowStatus.ACTIVE,
-      deletedAt: null
+      deletedAt: null,
     };
 
     // 커서 기반 페이지네이션
     if (cursorCreatedAt && cursorUserId) {
       whereClause.OR = [
         {
-          createdAt: { lt: cursorCreatedAt }
+          createdAt: { lt: cursorCreatedAt },
         },
         {
           createdAt: cursorCreatedAt,
-          followeeId: { lt: cursorUserId }
-        }
+          followeeId: { lt: cursorUserId },
+        },
       ];
     }
 
     const following = await this.prisma.follow.findMany({
       where: whereClause,
-      orderBy: [
-        { createdAt: 'desc' },
-        { followeeId: 'desc' }
-      ],
+      orderBy: [{ createdAt: 'desc' }, { followeeId: 'desc' }],
       take: limit + 1, // 다음 페이지 존재 여부 확인용
       include: {
         followee: {
-          select: { id: true, username: true, profileImageUrl: true }
-        }
-      }
+          select: { id: true, username: true, profileImageUrl: true },
+        },
+      },
     });
 
     const hasMore = following.length > limit;
@@ -431,29 +500,32 @@ export class FollowService {
       nextCursor = Buffer.from(
         JSON.stringify({
           createdAt: lastItem.createdAt.toISOString(),
-          userId: lastItem.followeeId
-        })
+          userId: lastItem.followeeId,
+        }),
       ).toString('base64');
     }
 
     return {
-      data: data.map(follow => ({
+      data: data.map((follow) => ({
         id: follow.id,
         followerId: follow.followerId,
         followeeId: follow.followeeId,
         status: follow.status,
         createdAt: follow.createdAt,
-        followee: follow.followee
+        followee: follow.followee,
       })),
       hasMore,
-      nextCursor
+      nextCursor,
     };
   }
 
   /**
    * 팔로우 요청 목록을 조회합니다.
    */
-  async getFollowRequests(userId: string, query: FollowListQueryDto): Promise<FollowListResponseDto> {
+  async getFollowRequests(
+    userId: string,
+    query: FollowListQueryDto,
+  ): Promise<FollowListResponseDto> {
     const limit = Number(query.limit) || 20;
     let cursorCreatedAt: Date | undefined;
     let cursorUserId: string | undefined;
@@ -461,7 +533,9 @@ export class FollowService {
     // 커서 디코딩
     if (query.cursor) {
       try {
-        const cursorData = JSON.parse(Buffer.from(query.cursor, 'base64').toString());
+        const cursorData = JSON.parse(
+          Buffer.from(query.cursor, 'base64').toString(),
+        );
         cursorCreatedAt = new Date(cursorData.createdAt);
         cursorUserId = cursorData.userId;
       } catch (error) {
@@ -469,37 +543,34 @@ export class FollowService {
       }
     }
 
-    let whereClause: any = {
+    const whereClause: any = {
       followeeId: userId,
       status: FollowStatus.REQUESTED,
-      deletedAt: null
+      deletedAt: null,
     };
 
     // 커서 기반 페이지네이션
     if (cursorCreatedAt && cursorUserId) {
       whereClause.OR = [
         {
-          createdAt: { lt: cursorCreatedAt }
+          createdAt: { lt: cursorCreatedAt },
         },
         {
           createdAt: cursorCreatedAt,
-          followerId: { lt: cursorUserId }
-        }
+          followerId: { lt: cursorUserId },
+        },
       ];
     }
 
     const requests = await this.prisma.follow.findMany({
       where: whereClause,
-      orderBy: [
-        { createdAt: 'desc' },
-        { followerId: 'desc' }
-      ],
+      orderBy: [{ createdAt: 'desc' }, { followerId: 'desc' }],
       take: limit + 1,
       include: {
         follower: {
-          select: { id: true, username: true, profileImageUrl: true }
-        }
-      }
+          select: { id: true, username: true, profileImageUrl: true },
+        },
+      },
     });
 
     const hasMore = requests.length > limit;
@@ -511,22 +582,22 @@ export class FollowService {
       nextCursor = Buffer.from(
         JSON.stringify({
           createdAt: lastItem.createdAt.toISOString(),
-          userId: lastItem.followerId
-        })
+          userId: lastItem.followerId,
+        }),
       ).toString('base64');
     }
 
     return {
-      data: data.map(follow => ({
+      data: data.map((follow) => ({
         id: follow.id,
         followerId: follow.followerId,
         followeeId: follow.followeeId,
         status: follow.status,
         createdAt: follow.createdAt,
-        follower: follow.follower
+        follower: follow.follower,
       })),
       hasMore,
-      nextCursor
+      nextCursor,
     };
   }
 
@@ -535,7 +606,7 @@ export class FollowService {
    */
   async getFollowCounters(userId: string): Promise<FollowCountersDto> {
     let counters = await this.prisma.followCounters.findUnique({
-      where: { userId }
+      where: { userId },
     });
 
     if (!counters) {
@@ -545,31 +616,31 @@ export class FollowService {
           where: {
             followeeId: userId,
             status: FollowStatus.ACTIVE,
-            deletedAt: null
-          }
+            deletedAt: null,
+          },
         }),
         this.prisma.follow.count({
           where: {
             followerId: userId,
             status: FollowStatus.ACTIVE,
-            deletedAt: null
-          }
-        })
+            deletedAt: null,
+          },
+        }),
       ]);
 
       counters = await this.prisma.followCounters.create({
         data: {
           userId,
           followersCount,
-          followingCount
-        }
+          followingCount,
+        },
       });
     }
 
     return {
       followersCount: counters.followersCount,
       followingCount: counters.followingCount,
-      updatedAt: counters.updatedAt
+      updatedAt: counters.updatedAt,
     };
   }
 
@@ -581,9 +652,9 @@ export class FollowService {
       where: {
         followerId_followeeId: {
           followerId,
-          followeeId
-        }
-      }
+          followeeId,
+        },
+      },
     });
 
     if (!follow || follow.deletedAt) {
@@ -592,21 +663,24 @@ export class FollowService {
 
     return {
       status: follow.status.toLowerCase(),
-      createdAt: follow.createdAt
+      createdAt: follow.createdAt,
     };
   }
 
   /**
    * 차단 관계를 확인합니다.
    */
-  private async checkBlockRelationship(userId1: string, userId2: string): Promise<boolean> {
+  private async checkBlockRelationship(
+    userId1: string,
+    userId2: string,
+  ): Promise<boolean> {
     const block = await this.prisma.userBlock.findFirst({
       where: {
         OR: [
           { blockerId: userId1, blockedId: userId2 },
-          { blockerId: userId2, blockedId: userId1 }
-        ]
-      }
+          { blockerId: userId2, blockedId: userId1 },
+        ],
+      },
     });
 
     return !!block;
@@ -619,7 +693,7 @@ export class FollowService {
     tx: any,
     followerId: string,
     followeeId: string,
-    operation: 'increment' | 'decrement'
+    operation: 'increment' | 'decrement',
   ) {
     const increment = operation === 'increment' ? 1 : -1;
 
@@ -628,36 +702,36 @@ export class FollowService {
     const followeeCounter = await tx.followCounters.upsert({
       where: { userId: followeeId },
       update: {
-        followersCount: { increment }
+        followersCount: { increment },
       },
       create: {
         userId: followeeId,
         followersCount: increment > 0 ? increment : 0,
-        followingCount: 0
-      }
+        followingCount: 0,
+      },
     });
     if (followeeCounter.followersCount < 0) {
       await tx.followCounters.update({
         where: { userId: followeeId },
-        data: { followersCount: 0 }
+        data: { followersCount: 0 },
       });
     }
 
     const followerCounter = await tx.followCounters.upsert({
       where: { userId: followerId },
       update: {
-        followingCount: { increment }
+        followingCount: { increment },
       },
       create: {
         userId: followerId,
         followersCount: 0,
-        followingCount: increment > 0 ? increment : 0
-      }
+        followingCount: increment > 0 ? increment : 0,
+      },
     });
     if (followerCounter.followingCount < 0) {
       await tx.followCounters.update({
         where: { userId: followerId },
-        data: { followingCount: 0 }
+        data: { followingCount: 0 },
       });
     }
   }
@@ -665,7 +739,15 @@ export class FollowService {
   /**
    * 사용자를 차단합니다.
    */
-  async blockUser(blockerId: string, blockedId: string): Promise<{ success: boolean; blockerId: string; blockedId: string; createdAt: Date }> {
+  async blockUser(
+    blockerId: string,
+    blockedId: string,
+  ): Promise<{
+    success: boolean;
+    blockerId: string;
+    blockedId: string;
+    createdAt: Date;
+  }> {
     if (blockerId === blockedId) {
       throw new Error('자신을 차단할 수 없습니다.');
     }
@@ -675,9 +757,9 @@ export class FollowService {
       where: {
         blockerId_blockedId: {
           blockerId,
-          blockedId
-        }
-      }
+          blockedId,
+        },
+      },
     });
 
     if (existingBlock) {
@@ -688,8 +770,8 @@ export class FollowService {
     const block = await this.prisma.userBlock.create({
       data: {
         blockerId,
-        blockedId
-      }
+        blockedId,
+      },
     });
 
     // 기존 팔로우 관계 삭제 (양방향)
@@ -697,9 +779,9 @@ export class FollowService {
       where: {
         OR: [
           { followerId: blockerId, followeeId: blockedId },
-          { followerId: blockedId, followeeId: blockerId }
-        ]
-      }
+          { followerId: blockedId, followeeId: blockerId },
+        ],
+      },
     });
 
     // 팔로우 카운터 업데이트는 트랜잭션 밖에서 실행
@@ -712,21 +794,24 @@ export class FollowService {
       success: true,
       blockerId: block.blockerId,
       blockedId: block.blockedId,
-      createdAt: block.createdAt
+      createdAt: block.createdAt,
     };
   }
 
   /**
    * 사용자 차단을 해제합니다.
    */
-  async unblockUser(blockerId: string, blockedId: string): Promise<{ success: boolean }> {
+  async unblockUser(
+    blockerId: string,
+    blockedId: string,
+  ): Promise<{ success: boolean }> {
     const deletedBlock = await this.prisma.userBlock.delete({
       where: {
         blockerId_blockedId: {
           blockerId,
-          blockedId
-        }
-      }
+          blockedId,
+        },
+      },
     });
 
     if (!deletedBlock) {
@@ -739,26 +824,30 @@ export class FollowService {
   /**
    * 차단한 사용자 목록을 조회합니다.
    */
-  async getBlockedUsers(userId: string): Promise<{ id: string; username: string; profileImageUrl?: string | null; }[]> {
+  async getBlockedUsers(
+    userId: string,
+  ): Promise<
+    { id: string; username: string; profileImageUrl?: string | null }[]
+  > {
     const blocks = await this.prisma.userBlock.findMany({
       where: {
-        blockerId: userId
+        blockerId: userId,
       },
       include: {
         blocked: {
           select: {
             id: true,
             username: true,
-            profileImageUrl: true
-          }
-        }
-      }
+            profileImageUrl: true,
+          },
+        },
+      },
     });
 
-    return blocks.map(block => ({
+    return blocks.map((block) => ({
       id: block.blocked.id,
       username: block.blocked.username,
-      profileImageUrl: block.blocked.profileImageUrl
+      profileImageUrl: block.blocked.profileImageUrl,
     }));
   }
 
@@ -766,9 +855,9 @@ export class FollowService {
    * 팔로우 목록 조회 권한을 확인합니다.
    */
   private async checkFollowListVisibility(
-    targetUserId: string, 
-    requesterId: string, 
-    listType: 'followers' | 'following'
+    targetUserId: string,
+    requesterId: string,
+    listType: 'followers' | 'following',
   ): Promise<boolean> {
     // 본인인 경우 항상 허용
     if (targetUserId === requesterId) {
@@ -776,20 +865,24 @@ export class FollowService {
     }
 
     // 차단 관계 확인
-    const isBlocked = await this.checkBlockRelationship(requesterId, targetUserId);
+    const isBlocked = await this.checkBlockRelationship(
+      requesterId,
+      targetUserId,
+    );
     if (isBlocked) {
       return false;
     }
 
     // 프라이버시 설정 조회
     const privacySettings = await this.prisma.privacySettings.findUnique({
-      where: { userId: targetUserId }
+      where: { userId: targetUserId },
     });
 
     // 프라이버시 설정이 없으면 기본값 사용 (PUBLIC)
-    const visibility = listType === 'followers' 
-      ? (privacySettings?.followersVisibility || 'PUBLIC')
-      : (privacySettings?.followingVisibility || 'PUBLIC');
+    const visibility =
+      listType === 'followers'
+        ? privacySettings?.followersVisibility || 'PUBLIC'
+        : privacySettings?.followingVisibility || 'PUBLIC';
 
     switch (visibility) {
       case 'PUBLIC':
@@ -801,8 +894,8 @@ export class FollowService {
             followerId: requesterId,
             followeeId: targetUserId,
             status: FollowStatus.ACTIVE,
-            deletedAt: null
-          }
+            deletedAt: null,
+          },
         });
         return !!isFollowing;
       case 'PRIVATE':

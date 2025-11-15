@@ -1,15 +1,52 @@
-import { Body, Controller, Get, Put, Post, Delete, Req, UseGuards, Param, UploadedFile, UseInterceptors, UseFilters } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Put,
+  Post,
+  Delete,
+  Req,
+  UseGuards,
+  Param,
+  UploadedFile,
+  UseInterceptors,
+  UseFilters,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Multer } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { UpdateBasicInfoDto, UpdateProfileImageDto, UpdatePrivacyDto, UpdateLifestyleDto, ProfileCompleteDto } from './dto/update-profile-extended.dto';
-import { DetailedPrivacyDto, BlockUserDto, UnblockUserDto, PrivacySettingsResponseDto, ActivitySettingsResponseDto, UpdateActivitySettingsDto } from './dto/privacy-settings.dto';
-import { ProfileResponseDto, OtherProfileResponseDto } from './dto/profile-response.dto';
-import { UpdateInterestsDto, InterestResponseDto } from './dto/update-interests.dto';
+import {
+  UpdateBasicInfoDto,
+  UpdateProfileImageDto,
+  UpdatePrivacyDto,
+  UpdateLifestyleDto,
+  ProfileCompleteDto,
+} from './dto/update-profile-extended.dto';
+import {
+  DetailedPrivacyDto,
+  BlockUserDto,
+  UnblockUserDto,
+  PrivacySettingsResponseDto,
+  ActivitySettingsResponseDto,
+  UpdateActivitySettingsDto,
+} from './dto/privacy-settings.dto';
+import {
+  ProfileResponseDto,
+  OtherProfileResponseDto,
+} from './dto/profile-response.dto';
+import {
+  UpdateInterestsDto,
+  InterestResponseDto,
+} from './dto/update-interests.dto';
 import { LifestyleAnswerDto } from './dto/lifestyle-answer.dto';
-import { ProfileEditDataDto, ProfileBasicInfoDto, InterestOptionsDto, LifestyleOptionsDto } from './dto/profile-edit-data.dto';
+import {
+  ProfileEditDataDto,
+  ProfileBasicInfoDto,
+  InterestOptionsDto,
+  LifestyleOptionsDto,
+} from './dto/profile-edit-data.dto';
 import { PersonaService } from './persona.service';
 import { profileImageUploadOptions } from '../common/config/multer.config';
 import { FileUploadExceptionFilter } from '../common/filters/file-upload-exception.filter';
@@ -28,17 +65,26 @@ export class ProfileController {
   }
 
   @Put()
-  async updateProfile(@Req() req, @Body() dto: UpdateProfileDto): Promise<ProfileResponseDto> {
+  async updateProfile(
+    @Req() req,
+    @Body() dto: UpdateProfileDto,
+  ): Promise<ProfileResponseDto> {
     return this.profileService.updateProfile(req, dto);
   }
 
   @Post('interests')
-  async updateInterests(@Req() req, @Body() dto: UpdateInterestsDto): Promise<{ success: boolean; interests: InterestResponseDto[] }> {
+  async updateInterests(
+    @Req() req,
+    @Body() dto: UpdateInterestsDto,
+  ): Promise<{ success: boolean; interests: InterestResponseDto[] }> {
     return this.profileService.updateInterests(req, dto);
   }
 
   @Post('lifestyle')
-  async answerLifestyle(@Req() req, @Body() dto: LifestyleAnswerDto): Promise<{ success: boolean; message: string }> {
+  async answerLifestyle(
+    @Req() req,
+    @Body() dto: LifestyleAnswerDto,
+  ): Promise<{ success: boolean; message: string }> {
     return this.profileService.answerLifestyle(req, dto);
   }
 
@@ -59,12 +105,15 @@ export class ProfileController {
     const userId = req.user.userId;
     return this.profileService.getPersonaAndGoals(userId);
   }
-  
+
   /**
    * 타인 프로필 조회 (username으로 조회)
    */
   @Get(':username')
-  async getOtherProfile(@Req() req, @Param('username') username: string): Promise<OtherProfileResponseDto> {
+  async getOtherProfile(
+    @Req() req,
+    @Param('username') username: string,
+  ): Promise<OtherProfileResponseDto> {
     return this.profileService.getOtherProfile(req, username);
   }
 
@@ -73,66 +122,93 @@ export class ProfileController {
    */
   @Get(':username/calendar/:year/:month')
   async getOtherUserCalendarData(
-    @Req() req, 
+    @Req() req,
     @Param('username') username: string,
     @Param('year') year: string,
-    @Param('month') month: string
+    @Param('month') month: string,
   ) {
     const yearNum = parseInt(year, 10);
     const monthNum = parseInt(month, 10);
-    
+
     if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
       throw new Error('올바른 년도와 월을 입력해주세요.');
     }
-    
-    return this.profileService.getOtherUserCalendarData(req, username, yearNum, monthNum);
+
+    return this.profileService.getOtherUserCalendarData(
+      req,
+      username,
+      yearNum,
+      monthNum,
+    );
   }
 
   // 프로필 편집 관련 엔드포인트 추가
   @Put('basic')
-  async updateBasicInfo(@Req() req, @Body() dto: UpdateBasicInfoDto): Promise<{ success: boolean; message: string }> {
+  async updateBasicInfo(
+    @Req() req,
+    @Body() dto: UpdateBasicInfoDto,
+  ): Promise<{ success: boolean; message: string }> {
     return this.profileService.updateBasicInfo(req, dto);
   }
 
   @Put('image')
-  async updateProfileImage(@Req() req, @Body() dto: UpdateProfileImageDto): Promise<{ success: boolean; message: string }> {
+  async updateProfileImage(
+    @Req() req,
+    @Body() dto: UpdateProfileImageDto,
+  ): Promise<{ success: boolean; message: string }> {
     return this.profileService.updateProfileImage(req, dto);
   }
 
   @Post('upload-image')
   @UseInterceptors(FileInterceptor('file', profileImageUploadOptions))
   @UseFilters(FileUploadExceptionFilter)
-  async uploadProfileImage(@Req() req, @UploadedFile() file: Multer.File): Promise<{ success: boolean; profileImageUrl: string; message: string }> {
+  async uploadProfileImage(
+    @Req() req,
+    @UploadedFile() file: Multer.File,
+  ): Promise<{ success: boolean; profileImageUrl: string; message: string }> {
     return this.profileService.uploadProfileImage(req, file);
   }
 
   @Delete('image')
-  async deleteProfileImage(@Req() req): Promise<{ success: boolean; message: string }> {
+  async deleteProfileImage(
+    @Req() req,
+  ): Promise<{ success: boolean; message: string }> {
     return this.profileService.deleteProfileImage(req);
   }
 
   @Get('upload-progress/:uploadId')
-  async getUploadProgress(@Param('uploadId') uploadId: string): Promise<{ progress: number; status: string }> {
+  async getUploadProgress(
+    @Param('uploadId') uploadId: string,
+  ): Promise<{ progress: number; status: string }> {
     // 실제 구현에서는 Redis나 메모리 캐시를 사용하여 업로드 진행 상황 추적
     // 여기서는 간단한 예시만 제공
     return {
       progress: 100,
-      status: 'completed'
+      status: 'completed',
     };
   }
 
   @Put('privacy')
-  async updatePrivacy(@Req() req, @Body() dto: UpdatePrivacyDto): Promise<{ success: boolean; message: string }> {
+  async updatePrivacy(
+    @Req() req,
+    @Body() dto: UpdatePrivacyDto,
+  ): Promise<{ success: boolean; message: string }> {
     return this.profileService.updatePrivacy(req, dto);
   }
 
   @Put('lifestyle')
-  async updateLifestyle(@Req() req, @Body() dto: UpdateLifestyleDto): Promise<{ success: boolean; message: string }> {
+  async updateLifestyle(
+    @Req() req,
+    @Body() dto: UpdateLifestyleDto,
+  ): Promise<{ success: boolean; message: string }> {
     return this.profileService.updateLifestyle(req, dto);
   }
 
   @Post('complete')
-  async updateCompleteProfile(@Req() req, @Body() dto: ProfileCompleteDto): Promise<{ success: boolean; message: string }> {
+  async updateCompleteProfile(
+    @Req() req,
+    @Body() dto: ProfileCompleteDto,
+  ): Promise<{ success: boolean; message: string }> {
     return this.profileService.updateCompleteProfile(req, dto);
   }
 
@@ -143,28 +219,45 @@ export class ProfileController {
 
   // 고급 프라이버시 설정 API들
   @Get('privacy/detailed')
-  async getDetailedPrivacySettings(@Req() req): Promise<PrivacySettingsResponseDto> {
+  async getDetailedPrivacySettings(
+    @Req() req,
+  ): Promise<PrivacySettingsResponseDto> {
     return this.profileService.getDetailedPrivacySettings(req);
   }
 
   @Put('privacy/detailed')
-  async updateDetailedPrivacy(@Req() req, @Body() dto: DetailedPrivacyDto): Promise<{ success: boolean; message: string }> {
+  async updateDetailedPrivacy(
+    @Req() req,
+    @Body() dto: DetailedPrivacyDto,
+  ): Promise<{ success: boolean; message: string }> {
     return this.profileService.updateDetailedPrivacy(req, dto);
   }
 
   // 사용자 차단/해제 API들
   @Post('block')
-  async blockUser(@Req() req, @Body() dto: BlockUserDto): Promise<{ success: boolean; message: string }> {
+  async blockUser(
+    @Req() req,
+    @Body() dto: BlockUserDto,
+  ): Promise<{ success: boolean; message: string }> {
     return this.profileService.blockUser(req, dto);
   }
 
   @Delete('block/:targetUserId')
-  async unblockUser(@Req() req, @Param('targetUserId') targetUserId: string): Promise<{ success: boolean; message: string }> {
+  async unblockUser(
+    @Req() req,
+    @Param('targetUserId') targetUserId: string,
+  ): Promise<{ success: boolean; message: string }> {
     return this.profileService.unblockUser(req, targetUserId);
   }
 
   @Get('blocked-users')
-  async getBlockedUsers(@Req() req): Promise<{ blockedUsers: Array<{ id: string; username: string; profileImageUrl?: string }> }> {
+  async getBlockedUsers(@Req() req): Promise<{
+    blockedUsers: Array<{
+      id: string;
+      username: string;
+      profileImageUrl?: string;
+    }>;
+  }> {
     return this.profileService.getBlockedUsers(req);
   }
 
@@ -175,18 +268,26 @@ export class ProfileController {
   }
 
   @Put('activity/settings')
-  async updateActivitySettings(@Req() req, @Body() dto: UpdateActivitySettingsDto): Promise<{ success: boolean; activityPublic: boolean }> {
+  async updateActivitySettings(
+    @Req() req,
+    @Body() dto: UpdateActivitySettingsDto,
+  ): Promise<{ success: boolean; activityPublic: boolean }> {
     return this.profileService.updateActivitySettings(req, dto);
   }
 
   @Post('activity/reset')
-  async resetActivity(@Req() req): Promise<{ success: boolean; message: string; resetAt: string }> {
+  async resetActivity(
+    @Req() req,
+  ): Promise<{ success: boolean; message: string; resetAt: string }> {
     return this.profileService.resetActivity(req);
   }
 
   // 프로필 공개 범위 체크 API
   @Get(':username/visibility')
-  async checkProfileVisibility(@Req() req, @Param('username') username: string): Promise<{ canView: boolean; visibleFields: string[] }> {
+  async checkProfileVisibility(
+    @Req() req,
+    @Param('username') username: string,
+  ): Promise<{ canView: boolean; visibleFields: string[] }> {
     return this.profileService.checkProfileVisibility(req, username);
   }
 

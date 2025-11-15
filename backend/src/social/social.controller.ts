@@ -8,14 +8,14 @@ import {
   UseGuards,
   Request,
   HttpCode,
-  HttpStatus
+  HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { SocialService } from './social.service';
 import {
   SocialFriendsQueryDto,
   SocialFriendsResponseDto,
-  UpdateFavoriteDto
+  UpdateFavoriteDto,
 } from './dto';
 
 @Controller('api/v1/social')
@@ -30,7 +30,7 @@ export class SocialController {
   @Get('friends')
   async getFriends(
     @Query() query: SocialFriendsQueryDto,
-    @Request() req: any
+    @Request() req: any,
   ): Promise<SocialFriendsResponseDto> {
     return this.socialService.getFriends(req.user.userId, query);
   }
@@ -44,12 +44,12 @@ export class SocialController {
   async toggleFavorite(
     @Param('id') followId: string,
     @Body() updateFavoriteDto: UpdateFavoriteDto,
-    @Request() req: any
+    @Request() req: any,
   ): Promise<{ success: boolean }> {
     await this.socialService.toggleFavorite(
-      req.user.userId, 
-      followId, 
-      updateFavoriteDto.isFavorite
+      req.user.userId,
+      followId,
+      updateFavoriteDto.isFavorite,
     );
     return { success: true };
   }

@@ -1,4 +1,11 @@
-import { IsOptional, IsInt, Min, Max, IsString, IsDateString } from 'class-validator';
+import {
+  IsOptional,
+  IsInt,
+  Min,
+  Max,
+  IsString,
+  IsDateString,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class FollowListQueryDto {

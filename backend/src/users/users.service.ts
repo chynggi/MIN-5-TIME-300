@@ -7,7 +7,10 @@ import { SearchUserResponseDto } from './dto/search-user-response.dto';
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async searchUsers(currentUserId: string, dto: SearchUsersDto): Promise<{ users: SearchUserResponseDto[] }> {
+  async searchUsers(
+    currentUserId: string,
+    dto: SearchUsersDto,
+  ): Promise<{ users: SearchUserResponseDto[] }> {
     const { q, limit } = dto;
     const limitNum = parseInt(limit || '10') || 10;
 
@@ -64,7 +67,7 @@ export class UsersService {
           isFollowing: friendRelation?.status === 'accepted',
           isFriend: friendRelation?.status === 'accepted',
         };
-      })
+      }),
     );
 
     return {

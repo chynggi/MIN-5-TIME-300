@@ -1,8 +1,22 @@
-
 import { AuthGuard } from '@nestjs/passport';
-import { Controller, UseGuards, Get, Post, Req, Param, Query, Body } from '@nestjs/common';
+import {
+  Controller,
+  UseGuards,
+  Get,
+  Post,
+  Req,
+  Param,
+  Query,
+  Body,
+} from '@nestjs/common';
 import { ChatService } from './chat.service';
-import { CreateConversationDto, SendMessageDto, ReadMessagesDto, MessageDto, ConversationDto } from './dto';
+import {
+  CreateConversationDto,
+  SendMessageDto,
+  ReadMessagesDto,
+  MessageDto,
+  ConversationDto,
+} from './dto';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/chat')
@@ -22,8 +36,8 @@ export class ChatController {
    */
   @Post('conversations')
   async createOrGetConversation(
-    @Req() req, 
-    @Body() dto: CreateConversationDto
+    @Req() req,
+    @Body() dto: CreateConversationDto,
   ): Promise<ConversationDto> {
     return this.chatService.createOrGetConversation(req.user.userId, dto);
   }
@@ -33,13 +47,18 @@ export class ChatController {
    */
   @Get('conversations/:id/messages')
   async getMessages(
-    @Req() req, 
+    @Req() req,
     @Param('id') conversationId: string,
     @Query('limit') limit?: string,
-    @Query('cursor') cursor?: string
+    @Query('cursor') cursor?: string,
   ): Promise<{ messages: MessageDto[]; nextCursor?: string }> {
     const limitNum = limit ? parseInt(limit, 10) : 30;
-    return this.chatService.getMessages(req.user.userId, conversationId, limitNum, cursor);
+    return this.chatService.getMessages(
+      req.user.userId,
+      conversationId,
+      limitNum,
+      cursor,
+    );
   }
 
   /**
@@ -47,9 +66,9 @@ export class ChatController {
    */
   @Post('conversations/:id/messages')
   async sendMessage(
-    @Req() req, 
-    @Param('id') conversationId: string, 
-    @Body() dto: SendMessageDto
+    @Req() req,
+    @Param('id') conversationId: string,
+    @Body() dto: SendMessageDto,
   ): Promise<MessageDto> {
     return this.chatService.sendMessage(req.user.userId, conversationId, dto);
   }
@@ -59,11 +78,15 @@ export class ChatController {
    */
   @Post('conversations/:id/read')
   async markMessagesAsRead(
-    @Req() req, 
-    @Param('id') conversationId: string, 
-    @Body() dto: ReadMessagesDto
+    @Req() req,
+    @Param('id') conversationId: string,
+    @Body() dto: ReadMessagesDto,
   ): Promise<{ success: boolean }> {
-    await this.chatService.markMessagesAsRead(req.user.userId, conversationId, dto);
+    await this.chatService.markMessagesAsRead(
+      req.user.userId,
+      conversationId,
+      dto,
+    );
     return { success: true };
   }
 }

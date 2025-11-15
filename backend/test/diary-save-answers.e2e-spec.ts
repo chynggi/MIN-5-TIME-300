@@ -3,20 +3,29 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 
-const user = { email: 'qauser@example.com', password: 'test1234', username: 'qauser' };
+const user = {
+  email: 'qauser@example.com',
+  password: 'test1234',
+  username: 'qauser',
+};
 
 describe('POST /api/v1/diaries/save-answers (e2e)', () => {
   let app: INestApplication;
   let token: string;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
     await app.init();
 
     // sign up and login
-    await request(app.getHttpServer()).post('/api/v1/signup').send(user).expect(201);
+    await request(app.getHttpServer())
+      .post('/api/v1/signup')
+      .send(user)
+      .expect(201);
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/login')
       .send({ email: user.email, password: user.password })

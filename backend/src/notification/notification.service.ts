@@ -1,14 +1,14 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { 
-  CreateNotificationDto, 
-  NotificationQueryDto, 
-  NotificationResponseDto, 
-  NotificationStatus, 
+import {
+  CreateNotificationDto,
+  NotificationQueryDto,
+  NotificationResponseDto,
+  NotificationStatus,
   NotificationType,
   UpdateNotificationDto,
   NotificationPrefsDto,
-  DeviceTokenDto
+  DeviceTokenDto,
 } from './dto';
 
 @Injectable()
@@ -18,8 +18,18 @@ export class NotificationService {
   constructor(private prisma: PrismaService) {}
 
   // 알림 생성 (집계 로직 포함)
-  async createNotification(dto: CreateNotificationDto): Promise<NotificationResponseDto> {
-    const { recipientId, type, actorIds, objectType, objectId, groupKey, payload } = dto;
+  async createNotification(
+    dto: CreateNotificationDto,
+  ): Promise<NotificationResponseDto> {
+    const {
+      recipientId,
+      type,
+      actorIds,
+      objectType,
+      objectId,
+      groupKey,
+      payload,
+    } = dto;
 
     // 집계 키가 있는 경우 기존 알림 찾기 (15분 윈도우)
     let existingNotification: any = null;
@@ -29,25 +39,28 @@ export class NotificationService {
         where: {
           recipientId,
           groupKey,
-          createdAt: { gte: fifteenMinutesAgo }
-        }
+          createdAt: { gte: fifteenMinutesAgo },
+        },
       });
     }
 
     let notification;
     if (existingNotification) {
       // 기존 알림 업데이트 (집계)
-      const newActorIds = [actorIds[0], ...((existingNotification.actorIds as string[]) || [])];
+      const newActorIds = [
+        actorIds[0],
+        ...((existingNotification.actorIds as string[]) || []),
+      ];
       const uniqueActorIds = [...new Set(newActorIds)]; // 중복 제거
-      
+
       notification = await this.prisma.notification.update({
         where: { id: existingNotification.id },
         data: {
           actorIds: uniqueActorIds,
           groupCount: uniqueActorIds.length,
           payload,
-          updatedAt: new Date()
-        }
+          updatedAt: new Date(),
+        },
       });
     } else {
       // 새 알림 생성
@@ -61,8 +74,8 @@ export class NotificationService {
           groupKey,
           groupCount: actorIds.length,
           payload,
-          status: NotificationStatus.UNREAD
-        }
+          status: NotificationStatus.UNREAD,
+        },
       });
 
       // 읽지 않은 알림 카운터 증가
@@ -73,11 +86,14 @@ export class NotificationService {
   }
 
   // 알림 목록 조회 (커서 기반 페이지네이션)
-  async getNotifications(userId: string, query: NotificationQueryDto): Promise<NotificationResponseDto[]> {
+  async getNotifications(
+    userId: string,
+    query: NotificationQueryDto,
+  ): Promise<NotificationResponseDto[]> {
     const { limit = 20, cursor, status, onlyUnread } = query;
 
     const where: any = {
-      recipientId: userId
+      recipientId: userId,
     };
 
     if (cursor) {
@@ -95,20 +111,23 @@ export class NotificationService {
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
-        recipient: true
-      }
+        recipient: true,
+      },
     });
 
-    return Promise.all(notifications.map(n => this.mapToResponseDto(n)));
+    return Promise.all(notifications.map((n) => this.mapToResponseDto(n)));
   }
 
   // 알림 읽음 처리
-  async markAsRead(userId: string, notificationId: string): Promise<NotificationResponseDto> {
+  async markAsRead(
+    userId: string,
+    notificationId: string,
+  ): Promise<NotificationResponseDto> {
     const notification = await this.prisma.notification.findFirst({
       where: {
         id: notificationId,
-        recipientId: userId
-      }
+        recipientId: userId,
+      },
     });
 
     if (!notification) {
@@ -118,7 +137,7 @@ export class NotificationService {
     if (notification.status === NotificationStatus.UNREAD) {
       const updated = await this.prisma.notification.update({
         where: { id: notificationId },
-        data: { status: NotificationStatus.READ }
+        data: { status: NotificationStatus.READ },
       });
 
       // 읽지 않은 알림 카운터 감소
@@ -135,18 +154,18 @@ export class NotificationService {
     const unreadNotifications = await this.prisma.notification.findMany({
       where: {
         recipientId: userId,
-        status: NotificationStatus.UNREAD
+        status: NotificationStatus.UNREAD,
       },
-      select: { id: true }
+      select: { id: true },
     });
 
     if (unreadNotifications.length > 0) {
       await this.prisma.notification.updateMany({
         where: {
           recipientId: userId,
-          status: NotificationStatus.UNREAD
+          status: NotificationStatus.UNREAD,
         },
-        data: { status: NotificationStatus.READ }
+        data: { status: NotificationStatus.READ },
       });
 
       // 읽지 않은 알림 카운터 리셋
@@ -159,7 +178,7 @@ export class NotificationService {
   // 읽지 않은 알림 개수 조회
   async getUnreadCount(userId: string): Promise<number> {
     let counter = await this.prisma.notificationCounter.findUnique({
-      where: { userId }
+      where: { userId },
     });
 
     if (!counter) {
@@ -167,15 +186,15 @@ export class NotificationService {
       const actualCount = await this.prisma.notification.count({
         where: {
           recipientId: userId,
-          status: NotificationStatus.UNREAD
-        }
+          status: NotificationStatus.UNREAD,
+        },
       });
 
       counter = await this.prisma.notificationCounter.create({
         data: {
           userId,
-          unreadCount: actualCount
-        }
+          unreadCount: actualCount,
+        },
       });
     }
 
@@ -185,13 +204,13 @@ export class NotificationService {
   // 알림 설정 조회
   async getNotificationPrefs(userId: string) {
     let prefs = await this.prisma.notificationPrefs.findUnique({
-      where: { userId }
+      where: { userId },
     });
 
     if (!prefs) {
       // 기본 설정으로 생성
       prefs = await this.prisma.notificationPrefs.create({
-        data: { userId }
+        data: { userId },
       });
     }
 
@@ -205,8 +224,8 @@ export class NotificationService {
       update: dto,
       create: {
         userId,
-        ...dto
-      }
+        ...dto,
+      },
     });
   }
 
@@ -216,29 +235,32 @@ export class NotificationService {
       where: {
         userId_token: {
           userId,
-          token: dto.token
-        }
+          token: dto.token,
+        },
       },
       update: {
         platform: dto.platform,
         locale: dto.locale,
         isActive: true,
-        lastSeen: new Date()
+        lastSeen: new Date(),
       },
       create: {
         userId,
-        ...dto
-      }
+        ...dto,
+      },
     });
   }
 
   // 알림 삭제 (숨김 처리)
-  async hideNotification(userId: string, notificationId: string): Promise<void> {
+  async hideNotification(
+    userId: string,
+    notificationId: string,
+  ): Promise<void> {
     const notification = await this.prisma.notification.findFirst({
       where: {
         id: notificationId,
-        recipientId: userId
-      }
+        recipientId: userId,
+      },
     });
 
     if (!notification) {
@@ -247,7 +269,7 @@ export class NotificationService {
 
     await this.prisma.notification.update({
       where: { id: notificationId },
-      data: { status: NotificationStatus.HIDDEN }
+      data: { status: NotificationStatus.HIDDEN },
     });
 
     // 읽지 않은 상태였다면 카운터 감소
@@ -262,12 +284,12 @@ export class NotificationService {
       where: { userId },
       update: {
         unreadCount: { increment: 1 },
-        lastCalculatedAt: new Date()
+        lastCalculatedAt: new Date(),
       },
       create: {
         userId,
-        unreadCount: 1
-      }
+        unreadCount: 1,
+      },
     });
   }
 
@@ -276,21 +298,21 @@ export class NotificationService {
       where: { userId },
       update: {
         unreadCount: { decrement: 1 },
-        lastCalculatedAt: new Date()
+        lastCalculatedAt: new Date(),
       },
       create: {
         userId,
-        unreadCount: 0
-      }
+        unreadCount: 0,
+      },
     });
 
     // 음수 방지
     await this.prisma.notificationCounter.updateMany({
       where: {
         userId,
-        unreadCount: { lt: 0 }
+        unreadCount: { lt: 0 },
       },
-      data: { unreadCount: 0 }
+      data: { unreadCount: 0 },
     });
   }
 
@@ -299,26 +321,28 @@ export class NotificationService {
       where: { userId },
       update: {
         unreadCount: 0,
-        lastCalculatedAt: new Date()
+        lastCalculatedAt: new Date(),
       },
       create: {
         userId,
-        unreadCount: 0
-      }
+        unreadCount: 0,
+      },
     });
   }
 
-  private async mapToResponseDto(notification: any): Promise<NotificationResponseDto> {
+  private async mapToResponseDto(
+    notification: any,
+  ): Promise<NotificationResponseDto> {
     // 액터 정보 조회
     const actors = await this.prisma.user.findMany({
       where: {
-        id: { in: notification.actorIds as string[] }
+        id: { in: notification.actorIds as string[] },
       },
       select: {
         id: true,
         username: true,
-        profileImageUrl: true
-      }
+        profileImageUrl: true,
+      },
     });
 
     return {
@@ -335,11 +359,14 @@ export class NotificationService {
       updatedAt: notification.updatedAt,
       expiresAt: notification.expiresAt,
       actors,
-      ...this.generateNotificationText(notification, actors)
+      ...this.generateNotificationText(notification, actors),
     };
   }
 
-  private generateNotificationText(notification: any, actors: any[]): { title: string; body?: string; deepLink?: string } {
+  private generateNotificationText(
+    notification: any,
+    actors: any[],
+  ): { title: string; body?: string; deepLink?: string } {
     const primaryActor = actors[0];
     const actorName = primaryActor?.username || '알 수 없는 사용자';
     const extraCount = notification.groupCount - 1;
@@ -348,57 +375,64 @@ export class NotificationService {
       case NotificationType.FOLLOW_REQUESTED:
         return {
           title: `${actorName}님이 회원님을 팔로우하기 요청했어요`,
-          deepLink: `/profile/${primaryActor?.username}`
+          deepLink: `/profile/${primaryActor?.username}`,
         };
 
       case NotificationType.FOLLOWED_YOU:
         return {
-          title: extraCount > 0 
-            ? `${actorName}님 외 ${extraCount}명이 회원님을 팔로우했어요`
-            : `${actorName}님이 회원님을 팔로우했어요`,
-          deepLink: `/profile/${primaryActor?.username}`
+          title:
+            extraCount > 0
+              ? `${actorName}님 외 ${extraCount}명이 회원님을 팔로우했어요`
+              : `${actorName}님이 회원님을 팔로우했어요`,
+          deepLink: `/profile/${primaryActor?.username}`,
         };
 
       case NotificationType.JOURNAL_LIKED:
         return {
-          title: extraCount > 0
-            ? `${actorName}님 외 ${extraCount}명이 회원님의 일기를 좋아합니다`
-            : `${actorName}님이 회원님의 일기를 좋아합니다`,
-          deepLink: `/diary/${notification.objectId}`
+          title:
+            extraCount > 0
+              ? `${actorName}님 외 ${extraCount}명이 회원님의 일기를 좋아합니다`
+              : `${actorName}님이 회원님의 일기를 좋아합니다`,
+          deepLink: `/diary/${notification.objectId}`,
         };
 
       case NotificationType.JOURNAL_COMMENTED:
         return {
-          title: extraCount > 0
-            ? `${actorName}님 외 ${extraCount}명이 회원님의 일기에 댓글을 남겼습니다`
-            : `${actorName}님이 회원님의 일기에 댓글을 남겼습니다`,
-          deepLink: `/diary/${notification.objectId}`
+          title:
+            extraCount > 0
+              ? `${actorName}님 외 ${extraCount}명이 회원님의 일기에 댓글을 남겼습니다`
+              : `${actorName}님이 회원님의 일기에 댓글을 남겼습니다`,
+          deepLink: `/diary/${notification.objectId}`,
         };
 
       case NotificationType.DIARY_PUBLISHED:
         return {
           title: `${actorName}님이 새로운 일기를 작성했어요`,
-          deepLink: `/diary/${notification.objectId}`
+          deepLink: `/diary/${notification.objectId}`,
         };
 
       case NotificationType.WELLBEING_SEVERE:
         return {
           title: '도움이 필요할 수 있어요',
           body: '최근 지표들이 많이 힘들어 보여요. 가까운 사람과 이야기하거나, 전문 도움을 고려해보세요.',
-          deepLink: '/help' // 도움말/리소스 페이지로 연결
+          deepLink: '/help', // 도움말/리소스 페이지로 연결
         };
 
       default:
         return {
-          title: '새로운 알림이 있습니다'
+          title: '새로운 알림이 있습니다',
         };
     }
   }
 
   // 도메인 이벤트 처리 메서드들
-  async handleFollowEvent(actorId: string, targetId: string, type: 'request' | 'accept' | 'direct'): Promise<void> {
+  async handleFollowEvent(
+    actorId: string,
+    targetId: string,
+    type: 'request' | 'accept' | 'direct',
+  ): Promise<void> {
     let notificationType: NotificationType;
-    
+
     switch (type) {
       case 'request':
         notificationType = NotificationType.FOLLOW_REQUESTED;
@@ -417,17 +451,23 @@ export class NotificationService {
       actorIds: [actorId],
       objectType: 'user',
       objectId: actorId,
-      groupKey: type === 'direct' ? `followed_you:${targetId}` : undefined
+      groupKey: type === 'direct' ? `followed_you:${targetId}` : undefined,
     });
   }
 
-  async handleJournalEvent(actorId: string, journalId: string, authorId: string, type: 'like' | 'comment'): Promise<void> {
+  async handleJournalEvent(
+    actorId: string,
+    journalId: string,
+    authorId: string,
+    type: 'like' | 'comment',
+  ): Promise<void> {
     // 자신의 일기에 대한 알림은 제외
     if (actorId === authorId) return;
 
-    const notificationType = type === 'like' 
-      ? NotificationType.JOURNAL_LIKED 
-      : NotificationType.JOURNAL_COMMENTED;
+    const notificationType =
+      type === 'like'
+        ? NotificationType.JOURNAL_LIKED
+        : NotificationType.JOURNAL_COMMENTED;
 
     await this.createNotification({
       recipientId: authorId,
@@ -435,7 +475,7 @@ export class NotificationService {
       actorIds: [actorId],
       objectType: 'journal',
       objectId: journalId,
-      groupKey: `${type === 'like' ? 'journal_liked' : 'journal_commented'}:${journalId}`
+      groupKey: `${type === 'like' ? 'journal_liked' : 'journal_commented'}:${journalId}`,
     });
   }
 }

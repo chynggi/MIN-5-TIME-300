@@ -20,9 +20,7 @@ describe('채팅 API (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
     await app.init();
-    await request(app.getHttpServer())
-      .post('/api/v1/signup')
-      .send(testUser);
+    await request(app.getHttpServer()).post('/api/v1/signup').send(testUser);
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/login')
       .send({ email: testUser.email, password: testUser.password });

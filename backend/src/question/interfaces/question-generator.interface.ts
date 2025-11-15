@@ -79,9 +79,14 @@ export abstract class QuestionGeneratorInterface {
     this.modelName = modelName;
   }
 
-  abstract generateQuestion(request: QuestionGenerationRequest): Promise<QuestionGenerationResponse>;
+  abstract generateQuestion(
+    request: QuestionGenerationRequest,
+  ): Promise<QuestionGenerationResponse>;
 
-  protected abstract callAPI(prompt: string, systemPrompt?: string): Promise<string>;
+  protected abstract callAPI(
+    prompt: string,
+    systemPrompt?: string,
+  ): Promise<string>;
 
   protected createSystemPrompt(): string {
     return `📌 With me — 통합형 질문 생성 프롬프트 (최종본: 요약 연동 + 과거반영 + 멘탈 체크인 + 감정태그 · 친구 톤 고정)
@@ -454,55 +459,109 @@ Step 5) 감정 → 관계/맥락 → 회복 → 행동 → 목표 흐름의 5문
   }
 
   protected createUserPrompt(request: QuestionGenerationRequest): string {
-    const { userProfile, recentJournals, metaInfo, personaAndGoals, trendTopics = [] } = request;
+    const {
+      userProfile,
+      recentJournals,
+      metaInfo,
+      personaAndGoals,
+      trendTopics = [],
+    } = request;
     const structured = request.structuredDiaries ?? recentJournals ?? [];
     const freeform = request.freeformDiaries ?? [];
-    const hasPast = (structured.length + freeform.length) > 0;
+    const hasPast = structured.length + freeform.length > 0;
 
     const mbtiInfo = `MBTI: ${userProfile.mbti}`;
-    const genderInfo = userProfile.gender ? `성별(중립표현): ${userProfile.gender}` : '';
-    const ageInfo = typeof userProfile.age === 'number' ? `연령대 추론: ${Math.floor(userProfile.age / 10) * 10}대 (정확 나이 미표기)` : '';
-    const eduInfo = userProfile.education ? `역할/학습 맥락: ${userProfile.education}` : '';
-    const wellbeingHint = (userProfile.heightCm && userProfile.weightKg) ? '신체지표 존재(직접 언급 금지, 자기돌봄 필요성 판단 활용)' : '';
-    const interestsInfo = userProfile.interests.length ? `관심사(상위): ${userProfile.interests.slice(0, 5).join(', ')}` : '관심사: 없음';
-    const lifestyleInfo = userProfile.lifestyleAnswers.map(item => `- ${item.question}: ${item.answer}`).join('\n');
+    const genderInfo = userProfile.gender
+      ? `성별(중립표현): ${userProfile.gender}`
+      : '';
+    const ageInfo =
+      typeof userProfile.age === 'number'
+        ? `연령대 추론: ${Math.floor(userProfile.age / 10) * 10}대 (정확 나이 미표기)`
+        : '';
+    const eduInfo = userProfile.education
+      ? `역할/학습 맥락: ${userProfile.education}`
+      : '';
+    const wellbeingHint =
+      userProfile.heightCm && userProfile.weightKg
+        ? '신체지표 존재(직접 언급 금지, 자기돌봄 필요성 판단 활용)'
+        : '';
+    const interestsInfo = userProfile.interests.length
+      ? `관심사(상위): ${userProfile.interests.slice(0, 5).join(', ')}`
+      : '관심사: 없음';
+    const lifestyleInfo = userProfile.lifestyleAnswers
+      .map((item) => `- ${item.question}: ${item.answer}`)
+      .join('\n');
 
-    const mask = (t: string) => (t||'')
-      .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[이메일]')
-      .replace(/\b\d{2,3}-\d{3,4}-\d{4}\b/g, '[연락처]')
-      .replace(/\b\d{10,11}\b/g, '[연락처]');
+    const mask = (t: string) =>
+      (t || '')
+        .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[이메일]')
+        .replace(/\b\d{2,3}-\d{3,4}-\d{4}\b/g, '[연락처]')
+        .replace(/\b\d{10,11}\b/g, '[연락처]');
 
-    const structuredInfo = structured.map(j => `날짜:${j.date}\n질문:${j.question}\n감정점수:${j.emotionScore}/5\n본문:${mask(j.content)}`).join('\n\n');
-    const freeformInfo = freeform.map(j => `날짜:${j.date}\n감정점수:${j.emotionScore ?? ''}\n본문:${mask(j.content)}`).join('\n\n');
+    const structuredInfo = structured
+      .map(
+        (j) =>
+          `날짜:${j.date}\n질문:${j.question}\n감정점수:${j.emotionScore}/5\n본문:${mask(j.content)}`,
+      )
+      .join('\n\n');
+    const freeformInfo = freeform
+      .map(
+        (j) =>
+          `날짜:${j.date}\n감정점수:${j.emotionScore ?? ''}\n본문:${mask(j.content)}`,
+      )
+      .join('\n\n');
 
     const metaDay = `요일:${metaInfo.dayOfWeek} / 시간대:${metaInfo.timeOfDay}`;
     const metaWeather = metaInfo.weather ? `날씨:${metaInfo.weather}` : '';
     const metaReactions = `많이 반응:${metaInfo.reactionStats.mostReactedQuestionTypes.join(', ')} | 적게 반응:${metaInfo.reactionStats.leastReactedQuestionTypes.join(', ')}`;
-    const personaInfo = personaAndGoals?.persona ? `페르소나:${personaAndGoals.persona}` : '';
-    const goalsInfo = personaAndGoals?.goals?.length ? `목표:${personaAndGoals.goals.join(', ')}` : '';
-    const trendInfo = trendTopics.length ? `트렌드:${trendTopics.join(', ')}` : '';
+    const personaInfo = personaAndGoals?.persona
+      ? `페르소나:${personaAndGoals.persona}`
+      : '';
+    const goalsInfo = personaAndGoals?.goals?.length
+      ? `목표:${personaAndGoals.goals.join(', ')}`
+      : '';
+    const trendInfo = trendTopics.length
+      ? `트렌드:${trendTopics.join(', ')}`
+      : '';
 
-    const regenInfo = typeof request.regenerationCount === 'number' ? `재생성횟수:${request.regenerationCount}` : '';
-    const avgTimeInfo = typeof request.averageWritingTimeSec === 'number' ? `평균작성시간(s):${request.averageWritingTimeSec}` : '';
-    const avgLenInfo = typeof request.averageAnswerLength === 'number' ? `평균답변길이:${request.averageAnswerLength}` : '';
-    const noRespInfo = typeof request.noResponseRate === 'number' ? `무응답비율:${(request.noResponseRate * 100).toFixed(1)}%` : '';
+    const regenInfo =
+      typeof request.regenerationCount === 'number'
+        ? `재생성횟수:${request.regenerationCount}`
+        : '';
+    const avgTimeInfo =
+      typeof request.averageWritingTimeSec === 'number'
+        ? `평균작성시간(s):${request.averageWritingTimeSec}`
+        : '';
+    const avgLenInfo =
+      typeof request.averageAnswerLength === 'number'
+        ? `평균답변길이:${request.averageAnswerLength}`
+        : '';
+    const noRespInfo =
+      typeof request.noResponseRate === 'number'
+        ? `무응답비율:${(request.noResponseRate * 100).toFixed(1)}%`
+        : '';
 
-    const checkinsInfo = (request.checkins ?? []).map(c => (
-      `날짜:${c.date} | 🙂${c.mood_1to10} 🔋${c.energy_1to10} 😡${c.stress_1to10} ` +
-      `😴H:${c.sleep_hours_1to9p} 🛌Q:${c.sleep_quality_1to10} ` +
-      `🏃:${(c.activity_types||[]).join(',')||'-'}/${c.workout_intensity_1to10} ` +
-      `🧐${c.focus_1to10} 🫩${c.fatigue_1to10} 👫${c.social_count_1to10} 👩‍❤️‍👨${c.social_satisfaction_1to10}`
-    )).join('\n');
+    const checkinsInfo = (request.checkins ?? [])
+      .map(
+        (c) =>
+          `날짜:${c.date} | 🙂${c.mood_1to10} 🔋${c.energy_1to10} 😡${c.stress_1to10} ` +
+          `😴H:${c.sleep_hours_1to9p} 🛌Q:${c.sleep_quality_1to10} ` +
+          `🏃:${(c.activity_types || []).join(',') || '-'}/${c.workout_intensity_1to10} ` +
+          `🧐${c.focus_1to10} 🫩${c.fatigue_1to10} 👫${c.social_count_1to10} 👩‍❤️‍👨${c.social_satisfaction_1to10}`,
+      )
+      .join('\n');
 
-    const baselineInfo = request.baseline ? (
-      `🙂${request.baseline.mood_1to10} 🔋${request.baseline.energy_1to10} 😡${request.baseline.stress_1to10} `+
-      `😴H:${request.baseline.sleep_hours_1to9p} 🛌Q:${request.baseline.sleep_quality_1to10} `+
-      `🏃:${(request.baseline.activity_types||[]).join(',')||'-'}/${request.baseline.workout_intensity_1to10} `+
-      `🧐${request.baseline.focus_1to10} 🫩${request.baseline.fatigue_1to10} `+
-      `👫${request.baseline.social_count_1to10} 👩‍❤️‍👨${request.baseline.social_satisfaction_1to10}`
-    ) : '';
+    const baselineInfo = request.baseline
+      ? `🙂${request.baseline.mood_1to10} 🔋${request.baseline.energy_1to10} 😡${request.baseline.stress_1to10} ` +
+        `😴H:${request.baseline.sleep_hours_1to9p} 🛌Q:${request.baseline.sleep_quality_1to10} ` +
+        `🏃:${(request.baseline.activity_types || []).join(',') || '-'}/${request.baseline.workout_intensity_1to10} ` +
+        `🧐${request.baseline.focus_1to10} 🫩${request.baseline.fatigue_1to10} ` +
+        `👫${request.baseline.social_count_1to10} 👩‍❤️‍👨${request.baseline.social_satisfaction_1to10}`
+      : '';
 
-    const emotionTagsInfo = (request.emotionTags ?? []).map(t => `${t.tag}:${t.intensity}`).join(', ');
+    const emotionTagsInfo = (request.emotionTags ?? [])
+      .map((t) => `${t.tag}:${t.intensity}`)
+      .join(', ');
 
     const modeLine = hasPast ? '모드: Past-Aware Mode' : '모드: Baseline Mode';
     console.log(modeLine);
@@ -576,7 +635,9 @@ ${noRespInfo}
     return true;
   }
 
-  protected getDefaultQuestionSet(dayOfWeek: string): QuestionGenerationResponse {
+  protected getDefaultQuestionSet(
+    dayOfWeek: string,
+  ): QuestionGenerationResponse {
     const seed: { [key: string]: string } = {
       monday: '새로운 한 주를 여는 감정은 무엇인가요?',
       tuesday: '오늘 마음을 가장 움직인 순간은?',
@@ -584,16 +645,30 @@ ${noRespInfo}
       thursday: '오늘 작은 성취나 배움이 있었다면?',
       friday: '이번 주 나를 지탱해준 관계는?',
       saturday: '주말에 나를 회복시킨 순간은?',
-      sunday: '다음 주를 위한 작은 다짐은?'
+      sunday: '다음 주를 위한 작은 다짐은?',
     };
-    const base = seed[dayOfWeek.toLowerCase()] || '오늘 하루 가장 선명한 감정은 무엇인가요?';
+    const base =
+      seed[dayOfWeek.toLowerCase()] ||
+      '오늘 하루 가장 선명한 감정은 무엇인가요?';
     // 간단한 도메인 분포 기본 세트
     const questions: GeneratedQuestionItem[] = [
       { domain: 'emotion', text: base },
-      { domain: 'relationship', text: '오늘 기억에 남는 대화나 상호작용이 있었나요?' },
-      { domain: 'recovery', text: '오늘 나를 잠깐이라도 회복시킨 휴식은 무엇이었나요?' },
-      { domain: 'action', text: '오늘 의미 있었던 작지만 구체적인 행동은 무엇이었나요?' },
-      { domain: 'goal', text: '내일 스스로에게 약속하고 싶은 아주 작은 한 가지는?' }
+      {
+        domain: 'relationship',
+        text: '오늘 기억에 남는 대화나 상호작용이 있었나요?',
+      },
+      {
+        domain: 'recovery',
+        text: '오늘 나를 잠깐이라도 회복시킨 휴식은 무엇이었나요?',
+      },
+      {
+        domain: 'action',
+        text: '오늘 의미 있었던 작지만 구체적인 행동은 무엇이었나요?',
+      },
+      {
+        domain: 'goal',
+        text: '내일 스스로에게 약속하고 싶은 아주 작은 한 가지는?',
+      },
     ];
     return {
       questions,
@@ -605,9 +680,16 @@ ${noRespInfo}
 }
 
 // 확장 타입 정의
-export interface FreeformJournal { date: string; content: string; emotionScore?: number; }
+export interface FreeformJournal {
+  date: string;
+  content: string;
+  emotionScore?: number;
+}
 
-export interface EmotionTag { tag: string; intensity: number; }
+export interface EmotionTag {
+  tag: string;
+  intensity: number;
+}
 
 export interface DailyCheckinInput {
   date: string;

@@ -65,13 +65,19 @@ export async function generateDailyQuestion(
   metaInfo: MetaInfo,
   userId?: string,
   vectorDbService?: VectorDbService,
-  personaAndGoals?: PersonaAndGoals // 추가: 페르소나/목표 정보
+  personaAndGoals?: PersonaAndGoals, // 추가: 페르소나/목표 정보
 ): Promise<string> {
   let trendTopics: string[] = [];
   if (userId && vectorDbService) {
     trendTopics = await vectorDbService.getWeeklyTrendTopics(userId, 2);
   }
-  const userPrompt = createPromptTemplate(userProfile, recentJournals, metaInfo, trendTopics, personaAndGoals);
+  const userPrompt = createPromptTemplate(
+    userProfile,
+    recentJournals,
+    metaInfo,
+    trendTopics,
+    personaAndGoals,
+  );
   const fullPrompt = `${SYSTEM_INSTRUCTIONS}\n\n${userPrompt}`;
 
   const apiKey = process.env.GEMINI_API_KEY || '';
@@ -118,27 +124,35 @@ function createPromptTemplate(
   recentJournals: RecentJournal[],
   metaInfo: MetaInfo,
   trendTopics: string[] = [],
-  personaAndGoals?: PersonaAndGoals
+  personaAndGoals?: PersonaAndGoals,
 ): string {
   const mbtiInfo = `사용자의 MBTI는 ${userProfile.mbti}입니다.`;
   const interestsInfo = `사용자의 주요 관심사: ${userProfile.interests.join(', ')}`;
   const lifestyleInfo = userProfile.lifestyleAnswers
-    .map(item => `Q: ${item.question}\nA: ${item.answer}`)
+    .map((item) => `Q: ${item.question}\nA: ${item.answer}`)
     .join('\n\n');
   const recentJournalsInfo = recentJournals
     .map(
-      journal =>
-        `날짜: ${journal.date}\n질문: ${journal.question}\n내용: ${journal.content}\n감정점수: ${journal.emotionScore}/5`
+      (journal) =>
+        `날짜: ${journal.date}\n질문: ${journal.question}\n내용: ${journal.content}\n감정점수: ${journal.emotionScore}/5`,
     )
     .join('\n\n');
   const dayInfo = `오늘은 ${metaInfo.dayOfWeek}이고, 현재 시간대는 ${metaInfo.timeOfDay}입니다.`;
-  const weatherInfo = metaInfo.weather ? `오늘의 날씨는 ${metaInfo.weather}입니다.` : '';
+  const weatherInfo = metaInfo.weather
+    ? `오늘의 날씨는 ${metaInfo.weather}입니다.`
+    : '';
   const reactionInfo =
     `사용자가 가장 많이 반응한 질문 유형: ${metaInfo.reactionStats.mostReactedQuestionTypes.join(', ')}\n` +
     `사용자가 가장 적게 반응한 질문 유형: ${metaInfo.reactionStats.leastReactedQuestionTypes.join(', ')}`;
-  const trendInfo = trendTopics.length > 0 ? `\n# 주간 트렌드\n${trendTopics.join(', ')}` : '';
-  const personaInfo = personaAndGoals?.persona ? `\n# 페르소나\n${personaAndGoals.persona}` : '';
-  const goalsInfo = personaAndGoals?.goals && personaAndGoals.goals.length > 0 ? `\n# 올해 목표\n${personaAndGoals.goals.join(', ')}` : '';
+  const trendInfo =
+    trendTopics.length > 0 ? `\n# 주간 트렌드\n${trendTopics.join(', ')}` : '';
+  const personaInfo = personaAndGoals?.persona
+    ? `\n# 페르소나\n${personaAndGoals.persona}`
+    : '';
+  const goalsInfo =
+    personaAndGoals?.goals && personaAndGoals.goals.length > 0
+      ? `\n# 올해 목표\n${personaAndGoals.goals.join(', ')}`
+      : '';
 
   return `
 # 사용자 정보

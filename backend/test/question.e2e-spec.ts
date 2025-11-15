@@ -22,9 +22,7 @@ describe('Gemini 질문 생성 API (e2e)', () => {
     await app.init();
 
     // 회원가입 및 로그인 후 토큰 획득
-    await request(app.getHttpServer())
-      .post('/api/v1/signup')
-      .send(testUser);
+    await request(app.getHttpServer()).post('/api/v1/signup').send(testUser);
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/login')
       .send({ email: testUser.email, password: testUser.password });
@@ -45,7 +43,7 @@ describe('Gemini 질문 생성 API (e2e)', () => {
       expect(typeof res.body.question).toBe('string');
       expect(res.body.question.length).toBeGreaterThan(0);
       // 반환된 질문을 터미널에 출력
-      // eslint-disable-next-line no-console
+
       console.log(`Gemini 생성 질문 #${i + 1}:`, res.body.question);
     });
   }

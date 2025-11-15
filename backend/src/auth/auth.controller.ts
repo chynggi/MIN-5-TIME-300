@@ -26,7 +26,9 @@ export class AuthController {
   }
 
   @Get('username/check')
-  async checkUsername(@Query('username') username: string): Promise<{ available: boolean }> {
+  async checkUsername(
+    @Query('username') username: string,
+  ): Promise<{ available: boolean }> {
     return this.authService.checkUsername(username);
   }
 }

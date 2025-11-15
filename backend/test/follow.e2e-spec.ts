@@ -14,7 +14,7 @@ describe('Follow System (e2e)', () => {
   let user1Token: string;
   let user2Token: string;
   let user3Token: string; // 비공개 계정
-  
+
   // 테스트용 사용자 ID
   let user1Id: string;
   let user2Id: string;
@@ -28,7 +28,7 @@ describe('Follow System (e2e)', () => {
     app = moduleFixture.createNestApplication();
     prisma = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
-    
+
     await app.init();
 
     // 테스트용 사용자 생성
