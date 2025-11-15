@@ -6,7 +6,8 @@ import {
   Query,
   Req,
   UseGuards,
-  TooManyRequestsException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { AdviceService } from './advice.service';
 import { RateCacheService } from '../common/services/rate-cache.service';
@@ -49,8 +50,9 @@ export class AdviceController {
   async generate(@Req() req: any, @Query('force') force?: string) {
     const userId = req.user.userId;
     if (!this.rate.isAllowed(`advice_gen:${userId}`, 3)) {
-      throw new TooManyRequestsException(
+      throw new HttpException(
         '요청이 너무 잦아요. 잠시 후 다시 시도해 주세요.',
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
     const f = String(force || '').toLowerCase() === 'true';
@@ -82,8 +84,9 @@ export class AdviceController {
   async invalidate(@Req() req: any) {
     const userId = req.user.userId;
     if (!this.rate.isAllowed(`advice_inv:${userId}`, 3)) {
-      throw new TooManyRequestsException(
+      throw new HttpException(
         '요청이 너무 잦아요. 잠시 후 다시 시도해 주세요.',
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
     const result = await this.service.generateWithCache(userId, true);

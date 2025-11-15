@@ -3,6 +3,19 @@ import { Injectable } from '@nestjs/common';
 import { DashboardStatisticsDto } from './dto/dashboard.dto';
 import { PrismaService } from '../prisma.service';
 
+type MentalScoreSource = {
+  mood_1to10?: number | null;
+  stress_1to10?: number | null;
+  energy_1to10?: number | null;
+  sleep_hours_1to9p?: number | null;
+  sleep_quality_1to10?: number | null;
+  focus_1to10?: number | null;
+  fatigue_1to10?: number | null;
+  social_satisfaction_1to10?: number | null;
+};
+
+type CheckinEntry = MentalScoreSource & { diaryDate: Date };
+
 @Injectable()
 export class StatisticsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -144,9 +157,9 @@ export class StatisticsService {
   private buildMentalTrendSeries(params: {
     startDate: Date;
     endDate: Date;
-    rangeCheckins: Array<{ diaryDate: Date }>;
-    previousCheckin?: { diaryDate: Date } | null;
-    baseline?: Record<string, any> | null;
+    rangeCheckins: CheckinEntry[];
+    previousCheckin?: CheckinEntry | null;
+    baseline?: MentalScoreSource | null;
   }): { date: string; score: number }[] {
     const { startDate, endDate, rangeCheckins, previousCheckin, baseline } = params;
     const dayStart = new Date(startDate);
@@ -229,16 +242,7 @@ export class StatisticsService {
     return 0.6 * bucket + 0.4 * qualityNorm;
   }
 
-  private computeMentalScore(source: {
-    mood_1to10?: number | null;
-    stress_1to10?: number | null;
-    energy_1to10?: number | null;
-    sleep_hours_1to9p?: number | null;
-    sleep_quality_1to10?: number | null;
-    focus_1to10?: number | null;
-    fatigue_1to10?: number | null;
-    social_satisfaction_1to10?: number | null;
-  } | null): number | undefined {
+  private computeMentalScore(source: MentalScoreSource | null): number | undefined {
     if (!source) return undefined;
 
     const mood = this.norm1to10(source.mood_1to10);
