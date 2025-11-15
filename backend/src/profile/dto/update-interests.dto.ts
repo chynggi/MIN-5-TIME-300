@@ -1,4 +1,11 @@
-import { IsArray, ValidateNested, IsString, IsInt, Min, Max } from 'class-validator';
+import {
+  IsArray,
+  ValidateNested,
+  IsString,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class InterestInputDto {

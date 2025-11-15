@@ -1,4 +1,8 @@
-import { SummaryGeneratorInterface, DiarySummaryRequest, DiarySummaryResponse } from '../interfaces/summary-generator.interface';
+import {
+  SummaryGeneratorInterface,
+  DiarySummaryRequest,
+  DiarySummaryResponse,
+} from '../interfaces/summary-generator.interface';
 import OpenAI from 'openai';
 
 export class GPTSummaryGenerator extends SummaryGeneratorInterface {
@@ -12,7 +16,12 @@ export class GPTSummaryGenerator extends SummaryGeneratorInterface {
 
   async summarize(req: DiarySummaryRequest): Promise<DiarySummaryResponse> {
     if (!this.openai) {
-      return { text: this.enforceRange(this.maskPII(req.rawContent)), modelUsed: this.modelName, truncated: false, fallbackUsed: true };
+      return {
+        text: this.enforceRange(this.maskPII(req.rawContent)),
+        modelUsed: this.modelName,
+        truncated: false,
+        fallbackUsed: true,
+      };
     }
     const systemPrompt = this.buildSystemPrompt();
     const userPrompt = this.buildUserPrompt(req);
@@ -24,13 +33,26 @@ export class GPTSummaryGenerator extends SummaryGeneratorInterface {
         const resp: any = await (this.openai as any).responses.create({
           model: 'gpt-5',
           input: [
-            { role: 'developer', content: [{ type: 'input_text', text: systemPrompt }] },
-            { role: 'user', content: [{ type: 'input_text', text: userPrompt }] },
+            {
+              role: 'developer',
+              content: [{ type: 'input_text', text: systemPrompt }],
+            },
+            {
+              role: 'user',
+              content: [{ type: 'input_text', text: userPrompt }],
+            },
           ],
           text: { format: { type: 'text' }, verbosity: 'low' },
           store: false,
         });
-        raw = (resp as any)?.output_text || (Array.isArray(resp.output) ? resp.output.map((o: any) => o.content?.[0]?.text).filter(Boolean).join('\n') : undefined);
+        raw =
+          resp?.output_text ||
+          (Array.isArray(resp.output)
+            ? resp.output
+                .map((o: any) => o.content?.[0]?.text)
+                .filter(Boolean)
+                .join('\n')
+            : undefined);
       } catch (responsesErr) {
         const chat = await (this.openai as any).chat.completions.create({
           model: 'gpt-4o',
@@ -44,10 +66,24 @@ export class GPTSummaryGenerator extends SummaryGeneratorInterface {
         raw = chat?.choices?.[0]?.message?.content;
       }
       const diary = this.extractDiary(raw || '');
-      const finalText = diary ? this.enforceRange(this.maskPII(diary)) : this.enforceRange(this.maskPII(req.rawContent));
-      return { text: finalText, modelUsed: this.modelName, truncated: false, fallbackUsed: !diary, rawOutput: process.env.NODE_ENV==='development'?raw:undefined };
+      const finalText = diary
+        ? this.enforceRange(this.maskPII(diary))
+        : this.enforceRange(this.maskPII(req.rawContent));
+      return {
+        text: finalText,
+        modelUsed: this.modelName,
+        truncated: false,
+        fallbackUsed: !diary,
+        rawOutput: process.env.NODE_ENV === 'development' ? raw : undefined,
+      };
     } catch (e: any) {
-      return { text: this.enforceRange(this.maskPII(req.rawContent)), modelUsed: this.modelName, truncated: false, fallbackUsed: true, rawOutput: e?.message };
+      return {
+        text: this.enforceRange(this.maskPII(req.rawContent)),
+        modelUsed: this.modelName,
+        truncated: false,
+        fallbackUsed: true,
+        rawOutput: e?.message,
+      };
     }
   }
 
@@ -91,10 +127,12 @@ ${req.rawContent}
       const json = match ? JSON.parse(match[0]) : JSON.parse(cleaned);
       const d = json?.diary;
       return typeof d === 'string' && d.trim() ? d.trim() : null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
   private maskPII(text: string) {
-    return (text||'')
+    return (text || '')
       .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[이메일]')
       .replace(/\b\d{2,3}-\d{3,4}-\d{4}\b/g, '[연락처]')
       .replace(/\b\d{10,11}\b/g, '[연락처]');

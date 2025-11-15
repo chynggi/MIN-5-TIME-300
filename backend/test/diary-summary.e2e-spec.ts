@@ -51,7 +51,7 @@ describe('Diary Summary (AI Question Flow)', () => {
       .field('writingDuration', '120');
 
     // 저장 성공
-    expect([200,201]).toContain(res.status);
+    expect([200, 201]).toContain(res.status);
     const saved = res.body;
 
     // 요약/변환된 content가 원문과 다를 가능성 (단, API Key 없으면 동일)

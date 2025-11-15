@@ -10,7 +10,12 @@ import { NotificationModule } from '../notification/notification.module';
 @Module({
   imports: [RealtimeModule, NotificationModule],
   controllers: [ActivityController],
-  providers: [ActivityService, PrismaService, ActivityScheduler, StreakBadgeService],
+  providers: [
+    ActivityService,
+    PrismaService,
+    ActivityScheduler,
+    StreakBadgeService,
+  ],
   exports: [ActivityService, StreakBadgeService],
 })
 export class ActivityModule {}

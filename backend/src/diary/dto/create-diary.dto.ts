@@ -1,4 +1,9 @@
-import { IsString, IsOptional, IsBooleanString, IsNumberString } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBooleanString,
+  IsNumberString,
+} from 'class-validator';
 
 export class CreateDiaryDto {
   @IsString()
@@ -48,7 +53,7 @@ export class CreateDiaryDto {
 
   @IsNumberString()
   writingDuration: string; // FormData에서 문자열로 전달
-  
+
   @IsOptional()
   @IsNumberString()
   lat?: string;

@@ -1,10 +1,10 @@
 import { GoogleGenAI } from '@google/genai';
-import { 
-  QuestionGeneratorInterface, 
-  QuestionGenerationRequest, 
-  QuestionGenerationResponse, 
+import {
+  QuestionGeneratorInterface,
+  QuestionGenerationRequest,
+  QuestionGenerationResponse,
   AIModel,
-  GeneratedQuestionItem
+  GeneratedQuestionItem,
 } from '../interfaces/question-generator.interface';
 import { tryParseQuestionJson } from '../validators/question-schema';
 
@@ -18,12 +18,14 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
     });
   }
 
-  async generateQuestion(request: QuestionGenerationRequest): Promise<QuestionGenerationResponse> {
+  async generateQuestion(
+    request: QuestionGenerationRequest,
+  ): Promise<QuestionGenerationResponse> {
     try {
-  const systemPrompt = this.createSystemPrompt();
-  const userPrompt = this.createUserPrompt(request);
+      const systemPrompt = this.createSystemPrompt();
+      const userPrompt = this.createUserPrompt(request);
 
-  const raw = await this.callAPI(userPrompt, systemPrompt);
+      const raw = await this.callAPI(userPrompt, systemPrompt);
       const parsed = this.parseQuestions(raw);
 
       if (!parsed.questions.length) throw new Error('파싱된 질문이 없습니다');
@@ -44,8 +46,9 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
   private parseQuestions(raw: string): { questions: GeneratedQuestionItem[] } {
     const questions: GeneratedQuestionItem[] = [];
 
-    const sanitize = (text: string) => text.replace(/```+json?/gi, '```').trim();
-    let work = sanitize(raw);
+    const sanitize = (text: string) =>
+      text.replace(/```+json?/gi, '```').trim();
+    const work = sanitize(raw);
 
     // 1) 코드펜스 내부 JSON 블록 우선 추출
     let jsonCandidate: string | undefined = undefined;
@@ -70,7 +73,8 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
         if (valid) {
           for (const q of valid.questions) {
             const trimmed = q.text.trim().replace(/^['"`]+|['"`]+$/g, '');
-            if (this.autoQualityFilter(trimmed)) questions.push({ domain: q.domain, text: trimmed });
+            if (this.autoQualityFilter(trimmed))
+              questions.push({ domain: q.domain, text: trimmed });
           }
           return questions.length > 0;
         }
@@ -86,18 +90,25 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
       // 3) 라인 기반 폴백: 코드펜스, 중괄호, 빈/언어지시 라인 제거
       const lines = work
         .split(/\n+/)
-        .map(l => l.trim())
-        .filter(l =>
-          l.length >= 4 &&
-          l.length <= 120 &&
-          !/^```/.test(l) &&
-          !/^[{}\[\]]+$/.test(l) &&
-          !/^"?questions"?\s*:/.test(l) &&
-          !/^domain\s*:/.test(l)
+        .map((l) => l.trim())
+        .filter(
+          (l) =>
+            l.length >= 4 &&
+            l.length <= 120 &&
+            !/^```/.test(l) &&
+            !/^[{}\[\]]+$/.test(l) &&
+            !/^"?questions"?\s*:/.test(l) &&
+            !/^domain\s*:/.test(l),
         )
-        .slice(0,5);
-      const domains: GeneratedQuestionItem['domain'][] = ['emotion','action','relationship','recovery','goal'];
-      for (let i=0; i<lines.length; i++) {
+        .slice(0, 5);
+      const domains: GeneratedQuestionItem['domain'][] = [
+        'emotion',
+        'action',
+        'relationship',
+        'recovery',
+        'goal',
+      ];
+      for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         if (this.autoQualityFilter(line)) {
           questions.push({ domain: domains[i] || 'emotion', text: line });
@@ -105,10 +116,13 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
       }
     }
 
-    return { questions: questions.slice(0,5) };
+    return { questions: questions.slice(0, 5) };
   }
 
-  protected async callAPI(prompt: string, systemPrompt?: string): Promise<string> {
+  protected async callAPI(
+    prompt: string,
+    systemPrompt?: string,
+  ): Promise<string> {
     try {
       const fullPrompt = systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
 
@@ -126,7 +140,7 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
       if (response.text) {
         return response.text;
       }
-      
+
       throw new Error('Gemini API에서 유효한 텍스트 응답을 받지 못했습니다.');
     } catch (error) {
       console.error('Gemini API 호출 오류:', error);

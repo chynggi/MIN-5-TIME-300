@@ -1,4 +1,13 @@
-import { IsOptional, IsString, IsUrl, IsArray, ValidateNested, IsInt, Min, Max } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsArray,
+  ValidateNested,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateBasicInfoDto {

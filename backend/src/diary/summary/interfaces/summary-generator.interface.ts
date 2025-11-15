@@ -9,11 +9,11 @@ export interface DiarySummaryRequest {
 }
 
 export interface DiarySummaryResponse {
-  text: string;            // 요약 결과 (트리밍 후)
-  modelUsed: string;       // 실제 사용된 모델명
-  truncated: boolean;      // 길이 제한으로 잘렸는지 여부
-  fallbackUsed: boolean;   // 폴백 로직 사용 여부
-  rawOutput?: string;      // 필요 시 디버깅
+  text: string; // 요약 결과 (트리밍 후)
+  modelUsed: string; // 실제 사용된 모델명
+  truncated: boolean; // 길이 제한으로 잘렸는지 여부
+  fallbackUsed: boolean; // 폴백 로직 사용 여부
+  rawOutput?: string; // 필요 시 디버깅
 }
 
 export abstract class SummaryGeneratorInterface {
@@ -26,8 +26,14 @@ export abstract class SummaryGeneratorInterface {
   abstract summarize(req: DiarySummaryRequest): Promise<DiarySummaryResponse>;
 
   /** 공통 길이 컷 적용 */
-  protected applyLengthLimit(text: string, maxChars: number): { text: string; truncated: boolean } {
+  protected applyLengthLimit(
+    text: string,
+    maxChars: number,
+  ): { text: string; truncated: boolean } {
     if (text.length <= maxChars) return { text, truncated: false };
-    return { text: text.slice(0, maxChars - 3).trim() + '...', truncated: true };
+    return {
+      text: text.slice(0, maxChars - 3).trim() + '...',
+      truncated: true,
+    };
   }
 }

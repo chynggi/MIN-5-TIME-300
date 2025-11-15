@@ -1,11 +1,42 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { UpdateBasicInfoDto, UpdateProfileImageDto, UpdatePrivacyDto, UpdateLifestyleDto, ProfileCompleteDto } from './dto/update-profile-extended.dto';
-import { DetailedPrivacyDto, BlockUserDto, UnblockUserDto, PrivacySettingsResponseDto, VisibilityLevel, ActivitySettingsResponseDto, UpdateActivitySettingsDto } from './dto/privacy-settings.dto';
-import { ProfileResponseDto, OtherProfileResponseDto } from './dto/profile-response.dto';
-import { UpdateInterestsDto, InterestResponseDto } from './dto/update-interests.dto';
+import {
+  UpdateBasicInfoDto,
+  UpdateProfileImageDto,
+  UpdatePrivacyDto,
+  UpdateLifestyleDto,
+  ProfileCompleteDto,
+} from './dto/update-profile-extended.dto';
+import {
+  DetailedPrivacyDto,
+  BlockUserDto,
+  UnblockUserDto,
+  PrivacySettingsResponseDto,
+  VisibilityLevel,
+  ActivitySettingsResponseDto,
+  UpdateActivitySettingsDto,
+} from './dto/privacy-settings.dto';
+import {
+  ProfileResponseDto,
+  OtherProfileResponseDto,
+} from './dto/profile-response.dto';
+import {
+  UpdateInterestsDto,
+  InterestResponseDto,
+} from './dto/update-interests.dto';
 import { LifestyleAnswerDto } from './dto/lifestyle-answer.dto';
-import { ProfileEditDataDto, ProfileBasicInfoDto, InterestInfoDto, LifestyleInfoDto, InterestOptionsDto, LifestyleOptionsDto } from './dto/profile-edit-data.dto';
+import {
+  ProfileEditDataDto,
+  ProfileBasicInfoDto,
+  InterestInfoDto,
+  LifestyleInfoDto,
+  InterestOptionsDto,
+  LifestyleOptionsDto,
+} from './dto/profile-edit-data.dto';
 import { PrismaService } from '../prisma.service';
 import { PersonaService } from './persona.service';
 import { StatisticsService } from '../statistics/statistics.service';
@@ -23,7 +54,7 @@ export class ProfileService {
   async getProfile(req: any): Promise<ProfileResponseDto> {
     const userId = req.user.userId;
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },      
+      where: { id: userId },
       select: {
         id: true,
         email: true,
@@ -55,29 +86,39 @@ export class ProfileService {
       birthDate: user.birthDate ?? '',
       location: user.location ?? '',
       profileImageUrl: user.profileImageUrl || '',
-      interests: user.interests.map(i => ({ id: i.id, interest: i.interest, priority: i.priority })),
+      interests: user.interests.map((i) => ({
+        id: i.id,
+        interest: i.interest,
+        priority: i.priority,
+      })),
       createdAt: user.createdAt.toISOString(),
-  activityScore,
+      activityScore,
       // 확장 지표 추가
       // @ts-ignore - DTO 확장에 맞춰 프론트 타입도 업데이트 필요
       mentalIndex,
       // @ts-ignore
       activityKpis,
-  activityPublic: user.activityPublic,
-  // streak/badges 노출
-  // @ts-ignore
-  streakDays: user.streakDays,
-  // @ts-ignore
-  badges: (user.badges || []).map(b => ({ type: b.type, awardedAt: b.awardedAt.toISOString() })),
+      activityPublic: user.activityPublic,
+      // streak/badges 노출
+      // @ts-ignore
+      streakDays: user.streakDays,
+      // @ts-ignore
+      badges: (user.badges || []).map((b) => ({
+        type: b.type,
+        awardedAt: b.awardedAt.toISOString(),
+      })),
     };
   }
   /**
    * 타인 프로필 조회
    */
-  async getOtherProfile(req: any, otherUsername: string): Promise<OtherProfileResponseDto> {
+  async getOtherProfile(
+    req: any,
+    otherUsername: string,
+  ): Promise<OtherProfileResponseDto> {
     const currentUserId = req.user.userId;
     // username 기반 조회
-    const otherUser = await this.prisma.user.findFirst({ 
+    const otherUser = await this.prisma.user.findFirst({
       where: { username: otherUsername },
       select: {
         id: true,
@@ -95,26 +136,42 @@ export class ProfileService {
     });
     if (!otherUser) throw new NotFoundException('유저를 찾을 수 없습니다.');
     const otherUserId = otherUser.id;
-    
+
     // 공개 일기 수 (공개 일기만 카운트)
-    const diaryCount = await this.prisma.journal.count({ where: { userId: otherUserId, isPublic: true } });
+    const diaryCount = await this.prisma.journal.count({
+      where: { userId: otherUserId, isPublic: true },
+    });
 
     // FollowCounters 활용 (없으면 즉시 생성 X, 0 처리)
-    const followCounters = await this.prisma.followCounters.findUnique({ where: { userId: otherUserId } });
-    let followerCount = followCounters?.followersCount ?? 0;
-    let followingCount = followCounters?.followingCount ?? 0;
+    const followCounters = await this.prisma.followCounters.findUnique({
+      where: { userId: otherUserId },
+    });
+    const followerCount = followCounters?.followersCount ?? 0;
+    const followingCount = followCounters?.followingCount ?? 0;
 
     // 현재 사용자 팔로우 상태(Follow 테이블 기준)
     const followRelation = await this.prisma.follow.findUnique({
-      where: { followerId_followeeId: { followerId: currentUserId, followeeId: otherUserId } }
+      where: {
+        followerId_followeeId: {
+          followerId: currentUserId,
+          followeeId: otherUserId,
+        },
+      },
     });
-    const isFollowing = !!(followRelation && followRelation.deletedAt === null && followRelation.status === 'ACTIVE');
+    const isFollowing = !!(
+      followRelation &&
+      followRelation.deletedAt === null &&
+      followRelation.status === 'ACTIVE'
+    );
 
     // LPG 점수 조회 (StatisticsService 이용)
-    const lpgData = await this.statisticsService.getLPGScore({ user: { userId: otherUserId } });
+    const lpgData = await this.statisticsService.getLPGScore({
+      user: { userId: otherUserId },
+    });
 
     // 프로필 visibility 우선 Quick Fix: profileVisibility=PRIVATE && 친구 아님 => 최소 응답
-    let profileVisibility: string | undefined = otherUser.privacySettings?.profileVisibility;
+    let profileVisibility: string | undefined =
+      otherUser.privacySettings?.profileVisibility;
     // 기본: isProfilePublic true이면 PUBLIC 취급, false이면 FRIENDS 취급 (간단 맵핑)
     if (!profileVisibility) {
       profileVisibility = otherUser.isProfilePublic ? 'PUBLIC' : 'FRIENDS';
@@ -122,12 +179,25 @@ export class ProfileService {
 
     // 친구 관계(Follow ACTIVE 상호 여부)를 아직 계산하지 않았으므로 간단히 isFollowing 역방향도 검사
     const reverseRelation = await this.prisma.follow.findUnique({
-      where: { followerId_followeeId: { followerId: otherUserId, followeeId: currentUserId } }
+      where: {
+        followerId_followeeId: {
+          followerId: otherUserId,
+          followeeId: currentUserId,
+        },
+      },
     });
-    const otherFollowsMe = !!(reverseRelation && reverseRelation.deletedAt === null && reverseRelation.status === 'ACTIVE');
+    const otherFollowsMe = !!(
+      reverseRelation &&
+      reverseRelation.deletedAt === null &&
+      reverseRelation.status === 'ACTIVE'
+    );
     const isFriendLike = isFollowing && otherFollowsMe; // 상호 팔로우를 친구로 간주 (Quick Fix)
 
-    if (profileVisibility === 'PRIVATE' && currentUserId !== otherUserId && !isFriendLike) {
+    if (
+      profileVisibility === 'PRIVATE' &&
+      currentUserId !== otherUserId &&
+      !isFriendLike
+    ) {
       return {
         id: otherUser.id,
         username: otherUser.username,
@@ -146,7 +216,7 @@ export class ProfileService {
 
     // 달력 조회 권한 계산
     let canViewCalendar = false;
-    
+
     // 본인인 경우 모든 권한
     if (currentUserId === otherUserId) {
       canViewCalendar = true;
@@ -166,8 +236,16 @@ export class ProfileService {
         const friendship = await this.prisma.friend.findFirst({
           where: {
             OR: [
-              { requesterId: currentUserId, addresseeId: otherUserId, status: 'accepted' },
-              { requesterId: otherUserId, addresseeId: currentUserId, status: 'accepted' },
+              {
+                requesterId: currentUserId,
+                addresseeId: otherUserId,
+                status: 'accepted',
+              },
+              {
+                requesterId: otherUserId,
+                addresseeId: currentUserId,
+                status: 'accepted',
+              },
             ],
           },
         });
@@ -176,13 +254,14 @@ export class ProfileService {
 
         // 일기 공개 설정 확인
         // 먼저 공개된 개별 일기가 있는지 확인
-        const hasPublicJournals = await this.prisma.journal.count({
-          where: { 
-            userId: otherUserId, 
-            isPublic: true 
-          }
-        }) > 0;
-        
+        const hasPublicJournals =
+          (await this.prisma.journal.count({
+            where: {
+              userId: otherUserId,
+              isPublic: true,
+            },
+          })) > 0;
+
         // 개별 일기가 공개되어 있으면 누구나 볼 수 있음
         if (hasPublicJournals) {
           canViewCalendar = true;
@@ -199,7 +278,7 @@ export class ProfileService {
         // PrivacySettings 테이블의 설정도 확인 (더 세부적인 설정이 있는 경우)
         if (otherUser.privacySettings) {
           const { diaryDefaultVisibility } = otherUser.privacySettings;
-          
+
           switch (diaryDefaultVisibility) {
             case 'PUBLIC':
               canViewCalendar = true;
@@ -241,31 +320,39 @@ export class ProfileService {
       isPublic: profileVisibility === 'PUBLIC',
       mbti: otherUser.mbti || '',
       canViewCalendar,
-  activityScore: otherActivityScore,
+      activityScore: otherActivityScore,
       // @ts-ignore
       mentalIndex: otherMentalIndex,
       activityPublic: otherUser.activityPublic,
-  // @ts-ignore
-  streakDays: (otherUser as any).streakDays,
-  // @ts-ignore
-  badges: ((otherUser as any).badges || []).map((b: any) => ({ type: b.type, awardedAt: b.awardedAt.toISOString() })),
+      // @ts-ignore
+      streakDays: (otherUser as any).streakDays,
+      // @ts-ignore
+      badges: ((otherUser as any).badges || []).map((b: any) => ({
+        type: b.type,
+        awardedAt: b.awardedAt.toISOString(),
+      })),
     };
   }
 
   /**
    * 다른 사용자의 일기 달력 데이터 조회 (공개 설정에 따라 필터링)
    */
-  async getOtherUserCalendarData(req: any, otherUsername: string, year: number, month: number) {
+  async getOtherUserCalendarData(
+    req: any,
+    otherUsername: string,
+    year: number,
+    month: number,
+  ) {
     const currentUserId = req.user.userId;
-    
+
     // 대상 사용자 조회
-    const otherUser = await this.prisma.user.findFirst({ 
+    const otherUser = await this.prisma.user.findFirst({
       where: { username: otherUsername },
       include: {
         privacySettings: true,
       },
     });
-    
+
     if (!otherUser) {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
@@ -276,7 +363,7 @@ export class ProfileService {
     if (currentUserId === otherUserId) {
       const startDate = new Date(year, month - 1, 1);
       const endDate = new Date(year, month, 0, 23, 59, 59);
-      
+
       const journals = await this.prisma.journal.findMany({
         where: {
           userId: otherUserId,
@@ -297,7 +384,7 @@ export class ProfileService {
 
       return {
         canViewCalendar: true,
-        journals: journals.map(journal => ({
+        journals: journals.map((journal) => ({
           id: journal.id,
           date: journal.diaryDate.toISOString().split('T')[0],
           emotion: journal.emotion,
@@ -328,8 +415,16 @@ export class ProfileService {
     const friendship = await this.prisma.friend.findFirst({
       where: {
         OR: [
-          { requesterId: currentUserId, addresseeId: otherUserId, status: 'accepted' },
-          { requesterId: otherUserId, addresseeId: currentUserId, status: 'accepted' },
+          {
+            requesterId: currentUserId,
+            addresseeId: otherUserId,
+            status: 'accepted',
+          },
+          {
+            requesterId: otherUserId,
+            addresseeId: currentUserId,
+            status: 'accepted',
+          },
         ],
       },
     });
@@ -338,15 +433,16 @@ export class ProfileService {
 
     // 일기 공개 설정 확인
     let canViewDiaries = false;
-    
+
     // 먼저 공개된 개별 일기가 있는지 확인
-    const hasPublicJournals = await this.prisma.journal.count({
-      where: { 
-        userId: otherUserId, 
-        isPublic: true 
-      }
-    }) > 0;
-    
+    const hasPublicJournals =
+      (await this.prisma.journal.count({
+        where: {
+          userId: otherUserId,
+          isPublic: true,
+        },
+      })) > 0;
+
     // 개별 일기가 공개되어 있으면 누구나 볼 수 있음
     if (hasPublicJournals) {
       canViewDiaries = true;
@@ -364,7 +460,7 @@ export class ProfileService {
     // PrivacySettings 테이블의 설정도 확인 (더 세부적인 설정이 있는 경우)
     if (otherUser.privacySettings) {
       const { diaryDefaultVisibility } = otherUser.privacySettings;
-      
+
       switch (diaryDefaultVisibility) {
         case 'PUBLIC':
           canViewDiaries = true;
@@ -391,9 +487,9 @@ export class ProfileService {
     // 달력 데이터 조회
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
-    
+
     // 일기 조회 조건 설정
-    let journalWhereCondition: any = {
+    const journalWhereCondition: any = {
       userId: otherUserId,
       diaryDate: {
         gte: startDate,
@@ -430,7 +526,7 @@ export class ProfileService {
 
     return {
       canViewCalendar: true,
-      journals: journals.map(journal => ({
+      journals: journals.map((journal) => ({
         id: journal.id,
         date: journal.diaryDate.toISOString().split('T')[0],
         emotion: journal.emotion,
@@ -440,7 +536,10 @@ export class ProfileService {
     };
   }
 
-  async updateProfile(req: any, dto: UpdateProfileDto): Promise<ProfileResponseDto> {
+  async updateProfile(
+    req: any,
+    dto: UpdateProfileDto,
+  ): Promise<ProfileResponseDto> {
     const userId = req.user.userId;
     const user = await this.prisma.user.update({
       where: { id: userId },
@@ -462,7 +561,8 @@ export class ProfileService {
     });
     // 프로필 변경 시 페르소나/목표 자동 추출 및 DB 저장
     try {
-      const personaAndGoals = await this.personaService.generatePersonaAndGoals(userId);
+      const personaAndGoals =
+        await this.personaService.generatePersonaAndGoals(userId);
       await this.prisma.userPersona.upsert({
         where: { userId },
         update: {
@@ -482,25 +582,35 @@ export class ProfileService {
       username: user.username,
       mbti: user.mbti ?? '',
       profileImageUrl: user.profileImageUrl || '',
-      interests: user.interests.map(i => ({ id: i.id, interest: i.interest, priority: i.priority })),
+      interests: user.interests.map((i) => ({
+        id: i.id,
+        interest: i.interest,
+        priority: i.priority,
+      })),
       createdAt: user.createdAt.toISOString(),
       activityScore: await this.calculateActivityScore(userId),
       activityPublic: user.activityPublic,
     };
   }
 
-  async updateInterests(req: any, dto: UpdateInterestsDto): Promise<{ success: boolean; interests: InterestResponseDto[] }> {
+  async updateInterests(
+    req: any,
+    dto: UpdateInterestsDto,
+  ): Promise<{ success: boolean; interests: InterestResponseDto[] }> {
     const userId = req.user.userId;
     // 기존 관심사 삭제 후 새로 추가 (간단 구현)
     await this.prisma.userInterest.deleteMany({ where: { userId } });
     const created = await this.prisma.userInterest.createMany({
-      data: dto.interests.map(i => ({ ...i, userId })),
+      data: dto.interests.map((i) => ({ ...i, userId })),
       skipDuplicates: true,
     });
-    const interests = await this.prisma.userInterest.findMany({ where: { userId } });
+    const interests = await this.prisma.userInterest.findMany({
+      where: { userId },
+    });
     // 관심사 변경 시 페르소나/목표 자동 추출 및 DB 저장
     try {
-      const personaAndGoals = await this.personaService.generatePersonaAndGoals(userId);
+      const personaAndGoals =
+        await this.personaService.generatePersonaAndGoals(userId);
       await this.prisma.userPersona.upsert({
         where: { userId },
         update: {
@@ -516,16 +626,23 @@ export class ProfileService {
     } catch (e) {}
     return {
       success: true,
-      interests: interests.map(i => ({ id: i.id, interest: i.interest, priority: i.priority })),
+      interests: interests.map((i) => ({
+        id: i.id,
+        interest: i.interest,
+        priority: i.priority,
+      })),
     };
   }
 
-  async answerLifestyle(req: any, dto: LifestyleAnswerDto): Promise<{ success: boolean; message: string }> {
+  async answerLifestyle(
+    req: any,
+    dto: LifestyleAnswerDto,
+  ): Promise<{ success: boolean; message: string }> {
     const userId = req.user.userId;
     // 기존 답변 삭제 후 새로 추가 (간단 구현)
     await this.prisma.lifestyleAnswer.deleteMany({ where: { userId } });
     await this.prisma.lifestyleAnswer.createMany({
-      data: dto.answers.map(a => ({ ...a, userId })),
+      data: dto.answers.map((a) => ({ ...a, userId })),
       skipDuplicates: true,
     });
     return {
@@ -537,8 +654,12 @@ export class ProfileService {
   /**
    * DB에서 페르소나/목표 조회, 없으면 AI로 생성 후 저장(캐싱)
    */
-  async getPersonaAndGoals(userId: string): Promise<{ persona: string; goals: string[] }> {
-    const cached = await this.prisma.userPersona.findUnique({ where: { userId } });
+  async getPersonaAndGoals(
+    userId: string,
+  ): Promise<{ persona: string; goals: string[] }> {
+    const cached = await this.prisma.userPersona.findUnique({
+      where: { userId },
+    });
     if (cached) {
       return {
         persona: cached.persona,
@@ -546,7 +667,8 @@ export class ProfileService {
       };
     }
     // 없으면 AI로 생성 후 저장
-    const personaAndGoals = await this.personaService.generatePersonaAndGoals(userId);
+    const personaAndGoals =
+      await this.personaService.generatePersonaAndGoals(userId);
     await this.prisma.userPersona.create({
       data: {
         userId,
@@ -558,9 +680,12 @@ export class ProfileService {
   }
 
   // 새로운 프로필 편집 메서드들
-  async updateBasicInfo(req: any, dto: UpdateBasicInfoDto): Promise<{ success: boolean; message: string }> {
+  async updateBasicInfo(
+    req: any,
+    dto: UpdateBasicInfoDto,
+  ): Promise<{ success: boolean; message: string }> {
     const userId = req.user.userId;
-    
+
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -578,9 +703,12 @@ export class ProfileService {
     };
   }
 
-  async updateProfileImage(req: any, dto: UpdateProfileImageDto): Promise<{ success: boolean; message: string }> {
+  async updateProfileImage(
+    req: any,
+    dto: UpdateProfileImageDto,
+  ): Promise<{ success: boolean; message: string }> {
     const userId = req.user.userId;
-    
+
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -594,7 +722,10 @@ export class ProfileService {
     };
   }
 
-  async uploadProfileImage(req: any, file: any): Promise<{ success: boolean; profileImageUrl: string; message: string }> {
+  async uploadProfileImage(
+    req: any,
+    file: any,
+  ): Promise<{ success: boolean; profileImageUrl: string; message: string }> {
     const userId = req.user.userId;
 
     try {
@@ -614,7 +745,7 @@ export class ProfileService {
         file,
         config.uploadPath,
         config.allowedTypes,
-        config.maxSize
+        config.maxSize,
       );
 
       // 데이터베이스 업데이트
@@ -639,7 +770,9 @@ export class ProfileService {
     }
   }
 
-  async deleteProfileImage(req: any): Promise<{ success: boolean; message: string }> {
+  async deleteProfileImage(
+    req: any,
+  ): Promise<{ success: boolean; message: string }> {
     const userId = req.user.userId;
 
     try {
@@ -668,13 +801,18 @@ export class ProfileService {
       };
     } catch (error) {
       console.error('프로필 이미지 삭제 오류:', error);
-      throw new BadRequestException('프로필 이미지 삭제 중 오류가 발생했습니다.');
+      throw new BadRequestException(
+        '프로필 이미지 삭제 중 오류가 발생했습니다.',
+      );
     }
   }
 
-  async updatePrivacy(req: any, dto: UpdatePrivacyDto): Promise<{ success: boolean; message: string }> {
+  async updatePrivacy(
+    req: any,
+    dto: UpdatePrivacyDto,
+  ): Promise<{ success: boolean; message: string }> {
     const userId = req.user.userId;
-    
+
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -694,9 +832,12 @@ export class ProfileService {
     };
   }
 
-  async updateLifestyle(req: any, dto: UpdateLifestyleDto): Promise<{ success: boolean; message: string }> {
+  async updateLifestyle(
+    req: any,
+    dto: UpdateLifestyleDto,
+  ): Promise<{ success: boolean; message: string }> {
     const userId = req.user.userId;
-    
+
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -713,9 +854,12 @@ export class ProfileService {
     };
   }
 
-  async updateCompleteProfile(req: any, dto: ProfileCompleteDto): Promise<{ success: boolean; message: string }> {
+  async updateCompleteProfile(
+    req: any,
+    dto: ProfileCompleteDto,
+  ): Promise<{ success: boolean; message: string }> {
     const userId = req.user.userId;
-    
+
     // 트랜잭션으로 모든 업데이트를 한 번에 처리
     await this.prisma.$transaction(async (prisma) => {
       // 기본 정보 업데이트
@@ -745,7 +889,7 @@ export class ProfileService {
       if (dto.interests && dto.interests.length > 0) {
         // 기존 관심사 삭제
         await prisma.userInterest.deleteMany({ where: { userId } });
-        
+
         // 새 관심사 추가
         await prisma.userInterest.createMany({
           data: dto.interests.map((interest, index) => ({
@@ -759,7 +903,8 @@ export class ProfileService {
 
     // 프로필 변경 시 페르소나/목표 자동 추출 및 DB 저장
     try {
-      const personaAndGoals = await this.personaService.generatePersonaAndGoals(userId);
+      const personaAndGoals =
+        await this.personaService.generatePersonaAndGoals(userId);
       await this.prisma.userPersona.upsert({
         where: { userId },
         update: {
@@ -796,12 +941,29 @@ export class ProfileService {
     const since = new Date();
     since.setDate(since.getDate() - 30);
 
-    const [journalCount, messageCount, followerCount, followingCount, interests, user] = await Promise.all([
-      this.prisma.journal.count({ where: { userId, diaryDate: { gte: since } } }),
+    const [
+      journalCount,
+      messageCount,
+      followerCount,
+      followingCount,
+      interests,
+      user,
+    ] = await Promise.all([
+      this.prisma.journal.count({
+        where: { userId, diaryDate: { gte: since } },
+      }),
       // 채팅 메시지: chatMessage 테이블이 있다고 가정 (없으면 0)
-      this.prisma.chatMessage ? this.prisma.chatMessage.count({ where: { senderId: userId, createdAt: { gte: since } } }) : Promise.resolve(0),
-      this.prisma.friend.count({ where: { addresseeId: userId, status: 'accepted' } }),
-      this.prisma.friend.count({ where: { requesterId: userId, status: 'accepted' } }),
+      this.prisma.chatMessage
+        ? this.prisma.chatMessage.count({
+            where: { senderId: userId, createdAt: { gte: since } },
+          })
+        : Promise.resolve(0),
+      this.prisma.friend.count({
+        where: { addresseeId: userId, status: 'accepted' },
+      }),
+      this.prisma.friend.count({
+        where: { requesterId: userId, status: 'accepted' },
+      }),
       this.prisma.userInterest.findMany({ where: { userId } }),
       this.prisma.user.findUnique({ where: { id: userId } }),
     ]);
@@ -811,17 +973,35 @@ export class ProfileService {
     // 2. 메시지 점수 (25 max, 0~100 -> 선형)
     const messageScore = Math.min(messageCount, 100) * (25 / 100);
     // 3. 팔로워 점수 (20 max, log 스케일)
-    const followerScore = Math.min(Math.log10(followerCount + 1) / Math.log10(101) * 20, 20);
+    const followerScore = Math.min(
+      (Math.log10(followerCount + 1) / Math.log10(101)) * 20,
+      20,
+    );
     // 4. 팔로잉/친구 점수 (10 max)
-    const followingScore = Math.min(Math.log10(followingCount + 1) / Math.log10(101) * 10, 10);
+    const followingScore = Math.min(
+      (Math.log10(followingCount + 1) / Math.log10(101)) * 10,
+      10,
+    );
     // 5. 관심사 점수 (5 max)
     const interestScore = Math.min(interests.length, 10) * (5 / 10);
     // 6. 프로필 완성도 (10 max)
-    const fields = [user?.mbti, user?.bio, user?.location, user?.birthDate, user?.profileImageUrl];
-    const filled = fields.filter(v => !!v).length;
+    const fields = [
+      user?.mbti,
+      user?.bio,
+      user?.location,
+      user?.birthDate,
+      user?.profileImageUrl,
+    ];
+    const filled = fields.filter((v) => !!v).length;
     const profileCompletenessScore = (filled / fields.length) * 10;
 
-    const total = diaryScore + messageScore + followerScore + followingScore + interestScore + profileCompletenessScore;
+    const total =
+      diaryScore +
+      messageScore +
+      followerScore +
+      followingScore +
+      interestScore +
+      profileCompletenessScore;
     return Math.round(Math.min(100, total));
   }
 
@@ -832,11 +1012,18 @@ export class ProfileService {
    */
   private async calculateMentalIndex(userId: string): Promise<number> {
     const today = new Date();
-    const since = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const since = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
     since.setDate(since.getDate() - 29); // 오늘 포함 30일 창
 
     const [checks, baseline] = await Promise.all([
-      this.prisma.dailyCheckin.findMany({ where: { userId, diaryDate: { gte: since, lte: today } }, orderBy: { diaryDate: 'asc' } }),
+      this.prisma.dailyCheckin.findMany({
+        where: { userId, diaryDate: { gte: since, lte: today } },
+        orderBy: { diaryDate: 'asc' },
+      }),
       this.prisma.userBaselineCheckin.findUnique({ where: { userId } }),
     ]);
 
@@ -855,13 +1042,23 @@ export class ProfileService {
     const dayScores: number[] = [];
     for (const c of checks) {
       const mood = c.mood_1to10 ? norm(c.mood_1to10) : undefined;
-      const stressInv = c.stress_1to10 ? (1 - norm(c.stress_1to10)) : undefined;
+      const stressInv = c.stress_1to10 ? 1 - norm(c.stress_1to10) : undefined;
       const energy = c.energy_1to10 ? norm(c.energy_1to10) : undefined;
-      const sleep = sleepScore(c.sleep_hours_1to9p as any, c.sleep_quality_1to10 as any);
-      const vitality = (energy !== undefined && sleep !== undefined) ? (0.5 * energy + 0.5 * sleep) : (energy ?? sleep);
+      const sleep = sleepScore(
+        c.sleep_hours_1to9p as any,
+        c.sleep_quality_1to10 as any,
+      );
+      const vitality =
+        energy !== undefined && sleep !== undefined
+          ? 0.5 * energy + 0.5 * sleep
+          : (energy ?? sleep);
       const focus = c.focus_1to10 ? norm(c.focus_1to10) : undefined;
-      const fatigueInv = c.fatigue_1to10 ? (1 - norm(c.fatigue_1to10)) : undefined;
-      const socialSat = c.social_satisfaction_1to10 ? norm(c.social_satisfaction_1to10) : undefined;
+      const fatigueInv = c.fatigue_1to10
+        ? 1 - norm(c.fatigue_1to10)
+        : undefined;
+      const socialSat = c.social_satisfaction_1to10
+        ? norm(c.social_satisfaction_1to10)
+        : undefined;
 
       const parts: Array<[number, number]> = [];
       if (mood !== undefined) parts.push([mood, 0.25]);
@@ -884,8 +1081,16 @@ export class ProfileService {
       const bMood = norm(baseline.mood_1to10);
       const bStressInv = 1 - norm(baseline.stress_1to10);
       const bEnergy = norm(baseline.energy_1to10);
-      const bSleep = sleepScore(baseline.sleep_hours_1to9p as any, baseline.sleep_quality_1to10 as any) ?? 0.5;
-      avg01 = 0.25 * bMood + 0.2 * bStressInv + 0.2 * (0.5 * bEnergy + 0.5 * bSleep) + 0.35 * 0.5; // 나머지 항목 평균치
+      const bSleep =
+        sleepScore(
+          baseline.sleep_hours_1to9p as any,
+          baseline.sleep_quality_1to10 as any,
+        ) ?? 0.5;
+      avg01 =
+        0.25 * bMood +
+        0.2 * bStressInv +
+        0.2 * (0.5 * bEnergy + 0.5 * bSleep) +
+        0.35 * 0.5; // 나머지 항목 평균치
     } else {
       // 데이터 없으면 중립 0.5
       avg01 = 0.5;
@@ -899,19 +1104,36 @@ export class ProfileService {
    * - diaryContinuationRate: 30일 중 작성한 날 비율
    * - nextDayRevisitRate: 작성일 다음날에도 작성한 비율
    */
-  private async calculateActivityKpis(userId: string): Promise<{ clickRate: number; diaryContinuationRate: number; nextDayRevisitRate: number }> {
+  private async calculateActivityKpis(userId: string): Promise<{
+    clickRate: number;
+    diaryContinuationRate: number;
+    nextDayRevisitRate: number;
+  }> {
     const today = new Date();
-    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const start = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate(),
+    );
     start.setDate(start.getDate() - 29); // 30일 창
 
     const [adviceCount, feedbackCount, diaries] = await Promise.all([
-      this.prisma.advice.count({ where: { userId, createdAt: { gte: start, lte: today } } }),
-      this.prisma.adviceFeedback.count({ where: { userId, createdAt: { gte: start, lte: today } } }),
-      this.prisma.journal.findMany({ where: { userId, diaryDate: { gte: start, lte: today } }, select: { diaryDate: true }, orderBy: { diaryDate: 'asc' } }),
+      this.prisma.advice.count({
+        where: { userId, createdAt: { gte: start, lte: today } },
+      }),
+      this.prisma.adviceFeedback.count({
+        where: { userId, createdAt: { gte: start, lte: today } },
+      }),
+      this.prisma.journal.findMany({
+        where: { userId, diaryDate: { gte: start, lte: today } },
+        select: { diaryDate: true },
+        orderBy: { diaryDate: 'asc' },
+      }),
     ]);
 
     // clickRate: 상호작용 비율(0~1)
-    const clickRate = adviceCount > 0 ? Math.min(1, feedbackCount / adviceCount) : 0;
+    const clickRate =
+      adviceCount > 0 ? Math.min(1, feedbackCount / adviceCount) : 0;
 
     // unique 작성일 세트
     const daysSet = new Set<string>();
@@ -928,12 +1150,17 @@ export class ProfileService {
     let revisitNumerator = 0;
     for (let i = 0; i < datesSorted.length; i++) {
       const cur = new Date(datesSorted[i]);
-      const next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+      const next = new Date(
+        cur.getFullYear(),
+        cur.getMonth(),
+        cur.getDate() + 1,
+      );
       const key = next.toISOString().split('T')[0];
       if (daysSet.has(key)) revisitNumerator += 1;
     }
     const denominator = datesSorted.length; // 작성일 수 기준
-    const nextDayRevisitRate = denominator > 0 ? revisitNumerator / denominator : 0;
+    const nextDayRevisitRate =
+      denominator > 0 ? revisitNumerator / denominator : 0;
 
     return { clickRate, diaryContinuationRate, nextDayRevisitRate };
   }
@@ -941,30 +1168,51 @@ export class ProfileService {
   // === 활동지수 공개/초기화 관련 메서드 ===
   async getActivitySettings(req: any): Promise<ActivitySettingsResponseDto> {
     const userId = req.user.userId;
-  const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { activityPublic: true, activityResetAt: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { activityPublic: true, activityResetAt: true },
+    });
     if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
     return {
       activityPublic: user.activityPublic,
-      lastResetAt: user.activityResetAt ? user.activityResetAt.toISOString() : undefined,
+      lastResetAt: user.activityResetAt
+        ? user.activityResetAt.toISOString()
+        : undefined,
     };
   }
 
-  async updateActivitySettings(req: any, dto: UpdateActivitySettingsDto): Promise<{ success: boolean; activityPublic: boolean }> {
+  async updateActivitySettings(
+    req: any,
+    dto: UpdateActivitySettingsDto,
+  ): Promise<{ success: boolean; activityPublic: boolean }> {
     const userId = req.user.userId;
-  const updated = await this.prisma.user.update({ where: { id: userId }, data: { activityPublic: dto.activityPublic } , select:{ activityPublic:true } });
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { activityPublic: dto.activityPublic },
+      select: { activityPublic: true },
+    });
     return { success: true, activityPublic: updated.activityPublic };
   }
 
-  async resetActivity(req: any): Promise<{ success: boolean; message: string; resetAt: string }> {
+  async resetActivity(
+    req: any,
+  ): Promise<{ success: boolean; message: string; resetAt: string }> {
     const userId = req.user.userId;
     const now = new Date();
-  await this.prisma.user.update({ where: { id: userId }, data: { activityResetAt: now } });
-    return { success: true, message: '활동지수가 초기화되었습니다.', resetAt: now.toISOString() };
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { activityResetAt: now },
+    });
+    return {
+      success: true,
+      message: '활동지수가 초기화되었습니다.',
+      resetAt: now.toISOString(),
+    };
   }
 
   async getPrivacySettings(req: any): Promise<UpdatePrivacyDto> {
     const userId = req.user.userId;
-    
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -994,9 +1242,11 @@ export class ProfileService {
   }
 
   // 고급 프라이버시 설정 메서드들
-  async getDetailedPrivacySettings(req: any): Promise<PrivacySettingsResponseDto> {
+  async getDetailedPrivacySettings(
+    req: any,
+  ): Promise<PrivacySettingsResponseDto> {
     const userId = req.user.userId;
-    
+
     // 프라이버시 설정이 없으면 기본값으로 생성
     let privacySettings = await this.prisma.privacySettings.findUnique({
       where: { userId },
@@ -1026,17 +1276,23 @@ export class ProfileService {
       profileVisibility: privacySettings.profileVisibility as VisibilityLevel,
       mbtiVisibility: privacySettings.mbtiVisibility as VisibilityLevel,
       locationVisibility: privacySettings.locationVisibility as VisibilityLevel,
-      birthDateVisibility: privacySettings.birthDateVisibility as VisibilityLevel,
-      interestsVisibility: privacySettings.interestsVisibility as VisibilityLevel,
-      lifestyleVisibility: privacySettings.lifestyleVisibility as VisibilityLevel,
-      followersVisibility: privacySettings.followersVisibility as VisibilityLevel,
-      followingVisibility: privacySettings.followingVisibility as VisibilityLevel,
-      diaryDefaultVisibility: privacySettings.diaryDefaultVisibility as VisibilityLevel,
+      birthDateVisibility:
+        privacySettings.birthDateVisibility as VisibilityLevel,
+      interestsVisibility:
+        privacySettings.interestsVisibility as VisibilityLevel,
+      lifestyleVisibility:
+        privacySettings.lifestyleVisibility as VisibilityLevel,
+      followersVisibility:
+        privacySettings.followersVisibility as VisibilityLevel,
+      followingVisibility:
+        privacySettings.followingVisibility as VisibilityLevel,
+      diaryDefaultVisibility:
+        privacySettings.diaryDefaultVisibility as VisibilityLevel,
       allowFollowRequests: privacySettings.allowFollowRequests,
       showOnlineStatus: privacySettings.showOnlineStatus,
       allowDirectMessages: privacySettings.allowDirectMessages,
       showInRecommendations: privacySettings.showInRecommendations,
-      blockedUsers: blockedUsers.map(block => ({
+      blockedUsers: blockedUsers.map((block) => ({
         id: block.blocked.id,
         username: block.blocked.username,
         profileImageUrl: block.blocked.profileImageUrl || undefined,
@@ -1044,7 +1300,10 @@ export class ProfileService {
     };
   }
 
-  async updateDetailedPrivacy(req: any, dto: DetailedPrivacyDto): Promise<{ success: boolean; message: string }> {
+  async updateDetailedPrivacy(
+    req: any,
+    dto: DetailedPrivacyDto,
+  ): Promise<{ success: boolean; message: string }> {
     const userId = req.user.userId;
 
     // 프라이버시 설정 업데이트 (upsert 사용)
@@ -1089,7 +1348,10 @@ export class ProfileService {
     };
   }
 
-  async blockUser(req: any, dto: BlockUserDto): Promise<{ success: boolean; message: string }> {
+  async blockUser(
+    req: any,
+    dto: BlockUserDto,
+  ): Promise<{ success: boolean; message: string }> {
     const userId = req.user.userId;
     const { targetUserId } = dto;
 
@@ -1135,7 +1397,10 @@ export class ProfileService {
     };
   }
 
-  async unblockUser(req: any, targetUserId: string): Promise<{ success: boolean; message: string }> {
+  async unblockUser(
+    req: any,
+    targetUserId: string,
+  ): Promise<{ success: boolean; message: string }> {
     const userId = req.user.userId;
 
     const block = await this.prisma.userBlock.findUnique({
@@ -1166,7 +1431,13 @@ export class ProfileService {
     };
   }
 
-  async getBlockedUsers(req: any): Promise<{ blockedUsers: Array<{ id: string; username: string; profileImageUrl?: string }> }> {
+  async getBlockedUsers(req: any): Promise<{
+    blockedUsers: Array<{
+      id: string;
+      username: string;
+      profileImageUrl?: string;
+    }>;
+  }> {
     const userId = req.user.userId;
 
     const blockedUsers = await this.prisma.userBlock.findMany({
@@ -1184,7 +1455,7 @@ export class ProfileService {
     });
 
     return {
-      blockedUsers: blockedUsers.map(block => ({
+      blockedUsers: blockedUsers.map((block) => ({
         id: block.blocked.id,
         username: block.blocked.username,
         profileImageUrl: block.blocked.profileImageUrl || undefined,
@@ -1192,9 +1463,12 @@ export class ProfileService {
     };
   }
 
-  async checkProfileVisibility(req: any, username: string): Promise<{ canView: boolean; visibleFields: string[] }> {
+  async checkProfileVisibility(
+    req: any,
+    username: string,
+  ): Promise<{ canView: boolean; visibleFields: string[] }> {
     const currentUserId = req.user.userId;
-    
+
     // 대상 사용자 조회
     const targetUser = await this.prisma.user.findFirst({
       where: { username },
@@ -1236,20 +1510,30 @@ export class ProfileService {
     const friendship = await this.prisma.friend.findFirst({
       where: {
         OR: [
-          { requesterId: currentUserId, addresseeId: targetUser.id, status: 'accepted' },
-          { requesterId: targetUser.id, addresseeId: currentUserId, status: 'accepted' },
+          {
+            requesterId: currentUserId,
+            addresseeId: targetUser.id,
+            status: 'accepted',
+          },
+          {
+            requesterId: targetUser.id,
+            addresseeId: currentUserId,
+            status: 'accepted',
+          },
         ],
       },
     });
 
     const isFriend = !!friendship;
     const privacySettings = targetUser.privacySettings;
-    
+
     if (!privacySettings) {
       // 기본 설정: 친구들에게만 공개
       return {
         canView: isFriend,
-        visibleFields: isFriend ? ['basic', 'mbti', 'location', 'interests'] : ['basic'],
+        visibleFields: isFriend
+          ? ['basic', 'mbti', 'location', 'interests']
+          : ['basic'],
       };
     }
 
@@ -1301,7 +1585,7 @@ export class ProfileService {
    */
   async getProfileBasicInfo(req: any): Promise<ProfileBasicInfoDto> {
     const userId = req.user.userId;
-    
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -1333,7 +1617,7 @@ export class ProfileService {
    */
   async getInterestEditData(req: any): Promise<InterestOptionsDto> {
     const userId = req.user.userId;
-    
+
     // 현재 사용자가 선택한 관심사들 조회
     const userInterests = await this.prisma.userInterest.findMany({
       where: { userId },
@@ -1342,16 +1626,49 @@ export class ProfileService {
 
     // 선택 가능한 관심사 옵션들 (프론트엔드와 동일한 목록)
     const availableInterests = [
-      '독서', '영화감상', '음악', '게임', '운동', '요리', '여행', '사진촬영',
-      '그림그리기', '글쓰기', '외국어학습', '코딩', '디자인', '패션', '뷰티',
-      '반려동물', '원예', '악기연주', '댄스', '보드게임', '카페투어', '맛집탐방',
-      '등산', '캠핑', '낚시', '자전거', '요가', '헬스', '수영', '테니스',
-      '골프', '축구', '농구', '야구', '볼링', '당구', '스키', '서핑'
+      '독서',
+      '영화감상',
+      '음악',
+      '게임',
+      '운동',
+      '요리',
+      '여행',
+      '사진촬영',
+      '그림그리기',
+      '글쓰기',
+      '외국어학습',
+      '코딩',
+      '디자인',
+      '패션',
+      '뷰티',
+      '반려동물',
+      '원예',
+      '악기연주',
+      '댄스',
+      '보드게임',
+      '카페투어',
+      '맛집탐방',
+      '등산',
+      '캠핑',
+      '낚시',
+      '자전거',
+      '요가',
+      '헬스',
+      '수영',
+      '테니스',
+      '골프',
+      '축구',
+      '농구',
+      '야구',
+      '볼링',
+      '당구',
+      '스키',
+      '서핑',
     ];
 
     return {
       availableInterests,
-      selectedInterests: userInterests.map(interest => ({
+      selectedInterests: userInterests.map((interest) => ({
         id: interest.id,
         interest: interest.interest,
         priority: interest.priority,
@@ -1364,7 +1681,7 @@ export class ProfileService {
    */
   async getLifestyleEditData(req: any): Promise<LifestyleOptionsDto> {
     const userId = req.user.userId;
-    
+
     // 현재 사용자의 라이프스타일 정보 조회
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -1382,19 +1699,34 @@ export class ProfileService {
 
     // 선택 가능한 옵션들 (프론트엔드와 동일한 목록)
     const workStyleOptions = [
-      '재택근무', '사무실 근무', '하이브리드', '프리랜서', '학생', '기타'
+      '재택근무',
+      '사무실 근무',
+      '하이브리드',
+      '프리랜서',
+      '학생',
+      '기타',
     ];
 
     const exerciseFrequencyOptions = [
-      '매일', '주 3-4회', '주 1-2회', '월 1-2회', '거의 안함'
+      '매일',
+      '주 3-4회',
+      '주 1-2회',
+      '월 1-2회',
+      '거의 안함',
     ];
 
     const sleepPatternOptions = [
-      '일찍 자고 일찍 일어남', '늦게 자고 늦게 일어남', '불규칙함', '정해진 시간에 잠'
+      '일찍 자고 일찍 일어남',
+      '늦게 자고 늦게 일어남',
+      '불규칙함',
+      '정해진 시간에 잠',
     ];
 
     const socialActivityOptions = [
-      '매우 활동적', '보통', '조용함', '집에 있는 것을 선호'
+      '매우 활동적',
+      '보통',
+      '조용함',
+      '집에 있는 것을 선호',
     ];
 
     return {
@@ -1416,7 +1748,7 @@ export class ProfileService {
    */
   async getProfileEditData(req: any): Promise<ProfileEditDataDto> {
     const userId = req.user.userId;
-    
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -1439,7 +1771,7 @@ export class ProfileService {
         birthDate: user.birthDate || undefined,
         profileImageUrl: user.profileImageUrl || undefined,
       },
-      interests: user.interests.map(interest => ({
+      interests: user.interests.map((interest) => ({
         id: interest.id,
         interest: interest.interest,
         priority: interest.priority,

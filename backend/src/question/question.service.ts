@@ -6,15 +6,15 @@ import { ProfileService } from '../profile/profile.service';
 import { DiaryService } from '../diary/diary.service';
 import { VectorDbService } from '../vector-db/vector-db.service';
 import { QuestionGeneratorFactory } from './generators/question-generator.factory';
-import { 
-  AIModel, 
-  QuestionGenerationRequest, 
+import {
+  AIModel,
+  QuestionGenerationRequest,
   QuestionGenerationResponse,
-  UserProfile, 
-  RecentJournal, 
+  UserProfile,
+  RecentJournal,
   MetaInfo,
   PersonaAndGoals,
-  GeneratedQuestionItem 
+  GeneratedQuestionItem,
 } from './interfaces/question-generator.interface';
 
 @Injectable()
@@ -35,7 +35,10 @@ export class QuestionService {
     };
   }
 
-  async vote(req: any, dto: VoteQuestionDto): Promise<{ success: boolean; message: string }> {
+  async vote(
+    req: any,
+    dto: VoteQuestionDto,
+  ): Promise<{ success: boolean; message: string }> {
     return {
       success: true,
       message: dto.isHelpful ? '도움이 되었습니다.' : '도움이 되지 않았습니다.',
@@ -44,7 +47,7 @@ export class QuestionService {
 
   async generate(req: any, preferredModel?: AIModel): Promise<any> {
     const userId = req.user.userId;
-    
+
     // 1. 사용자 프로필 정보
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -54,7 +57,7 @@ export class QuestionService {
       },
     });
     if (!user) throw new ForbiddenException('유저 정보 없음');
-    
+
     let computedAge: number | undefined;
     if (user.birthDate) {
       const birthDate = new Date(user.birthDate);
@@ -69,8 +72,11 @@ export class QuestionService {
 
     const userProfile: UserProfile = {
       mbti: user.mbti ?? '',
-      interests: user.interests.map(i => i.interest),
-      lifestyleAnswers: user.lifestyleAnswers.map(a => ({ question: a.question, answer: a.answer })),
+      interests: user.interests.map((i) => i.interest),
+      lifestyleAnswers: user.lifestyleAnswers.map((a) => ({
+        question: a.question,
+        answer: a.answer,
+      })),
       gender: user.gender ?? undefined,
       age: computedAge,
     };
@@ -91,7 +97,7 @@ export class QuestionService {
       },
     });
 
-    const recentJournals: RecentJournal[] = recentJournalsRaw.map(j => ({
+    const recentJournals: RecentJournal[] = recentJournalsRaw.map((j) => ({
       date: j.createdAt.toISOString().slice(0, 10),
       content: j.content,
       question: (j.selectedQuestionTexts ?? []).join(' / '),
@@ -99,8 +105,8 @@ export class QuestionService {
     }));
 
     const structuredDiaries = recentJournalsRaw
-      .filter(j => (j.selectedQuestionTexts?.length ?? 0) > 0)
-      .map(j => ({
+      .filter((j) => (j.selectedQuestionTexts?.length ?? 0) > 0)
+      .map((j) => ({
         date: j.createdAt.toISOString().slice(0, 10),
         content: j.content,
         question: (j.selectedQuestionTexts ?? []).join(' / '),
@@ -108,8 +114,8 @@ export class QuestionService {
       }));
 
     const freeformDiaries = recentJournalsRaw
-      .filter(j => !(j.selectedQuestionTexts?.length))
-      .map(j => ({
+      .filter((j) => !j.selectedQuestionTexts?.length)
+      .map((j) => ({
         date: j.createdAt.toISOString().slice(0, 10),
         content: j.content,
         emotionScore: j.emotionScore,
@@ -125,7 +131,7 @@ export class QuestionService {
       this.prisma.userBaselineCheckin.findUnique({ where: { userId } }),
     ]);
 
-    const checkins = checkinsRaw.map(c => ({
+    const checkins = checkinsRaw.map((c) => ({
       date: c.diaryDate.toISOString().slice(0, 10),
       mood_1to10: c.mood_1to10,
       energy_1to10: c.energy_1to10,
@@ -158,14 +164,22 @@ export class QuestionService {
 
     // 3. 메타 정보(요일/시간대/반응)
     const now = new Date();
-    const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const days = [
+      'sunday',
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+    ];
     const hours = now.getHours();
     let timeOfDay = 'morning';
     if (hours >= 6 && hours < 12) timeOfDay = 'morning';
     else if (hours >= 12 && hours < 18) timeOfDay = 'afternoon';
     else if (hours >= 18 && hours < 22) timeOfDay = 'evening';
     else timeOfDay = 'night';
-    
+
     const metaInfo: MetaInfo = {
       dayOfWeek: days[now.getDay()],
       timeOfDay,
@@ -196,19 +210,30 @@ export class QuestionService {
     }
 
     // 6. AI 모델 선택 및 폴백 시스템
-    const selectedModel = preferredModel || QuestionGeneratorFactory.getDefaultModel();
-    
+    const selectedModel =
+      preferredModel || QuestionGeneratorFactory.getDefaultModel();
+
     // 7. 질문 생성 요청 준비
     // 7-a. 메트릭 계산 (최근 일기 기반)
-    const validJournals = recentJournalsRaw.filter(j => !!j.content);
+    const validJournals = recentJournalsRaw.filter((j) => !!j.content);
     const averageWritingTimeSec = validJournals.length
-      ? Math.round(validJournals.reduce((acc, j) => acc + (j.writingDuration || 0), 0) / validJournals.length)
+      ? Math.round(
+          validJournals.reduce((acc, j) => acc + (j.writingDuration || 0), 0) /
+            validJournals.length,
+        )
       : undefined;
     const averageAnswerLength = validJournals.length
-      ? Math.round(validJournals.reduce((acc, j) => acc + j.content.length, 0) / validJournals.length)
+      ? Math.round(
+          validJournals.reduce((acc, j) => acc + j.content.length, 0) /
+            validJournals.length,
+        )
       : undefined;
-    const noResponseCount = validJournals.filter(j => !j.content || j.content.trim().length < 5).length;
-    const noResponseRate = validJournals.length ? noResponseCount / validJournals.length : undefined;
+    const noResponseCount = validJournals.filter(
+      (j) => !j.content || j.content.trim().length < 5,
+    ).length;
+    const noResponseRate = validJournals.length
+      ? noResponseCount / validJournals.length
+      : undefined;
 
     const regenerationCount = 0; // TODO: 재생성 로그 테이블 도입 후 실제 값 반영
 
@@ -228,11 +253,16 @@ export class QuestionService {
       checkins,
       baseline,
     };
-    
+
     // 8. 다중 모델 폴백으로 질문 생성 시도
-    const response = await this.generateWithFallback(questionRequest, selectedModel);
+    const response = await this.generateWithFallback(
+      questionRequest,
+      selectedModel,
+    );
     try {
-      console.log(`[QGen] requested=${selectedModel} used=${response.modelUsed} fallback=${response.fallbackUsed ?? false}`);
+      console.log(
+        `[QGen] requested=${selectedModel} used=${response.modelUsed} fallback=${response.fallbackUsed ?? false}`,
+      );
     } catch {}
 
     // 새 다중 질문 응답 구조
@@ -250,16 +280,16 @@ export class QuestionService {
    * 다중 모델 폴백으로 질문 생성
    */
   private async generateWithFallback(
-    request: QuestionGenerationRequest, 
-    preferredModel: AIModel
+    request: QuestionGenerationRequest,
+    preferredModel: AIModel,
   ): Promise<QuestionGenerationResponse> {
     // 안정성 순으로 모델 목록 가져오기
     const modelsByStability = QuestionGeneratorFactory.getModelsByStability();
-    
+
     // 사용자가 선택한 모델을 최우선으로, 나머지는 안정성 순
     const modelsToTry = [
       preferredModel,
-      ...modelsByStability.filter(model => model !== preferredModel)
+      ...modelsByStability.filter((model) => model !== preferredModel),
     ];
 
     let lastError: Error | null = null;
@@ -269,7 +299,7 @@ export class QuestionService {
         console.log(`${modelId} 모델로 질문 생성 시도...`);
         const generator = QuestionGeneratorFactory.getGenerator(modelId);
         const response = await generator.generateQuestion(request);
-        
+
         if (response.questions && response.questions.length > 0) {
           console.log(`${modelId} 모델로 질문 생성 성공`);
           return response;
@@ -277,9 +307,12 @@ export class QuestionService {
       } catch (error) {
         console.log(`${modelId} 모델 실패:`, error.message);
         lastError = error;
-        
+
         // 특정 오류는 다른 모델로 재시도하지 않음
-        if (error.message.includes('API key') || error.message.includes('unauthorized')) {
+        if (
+          error.message.includes('API key') ||
+          error.message.includes('unauthorized')
+        ) {
           console.log(`${modelId}: API 키 문제로 건너뜀`);
           continue;
         }
@@ -318,15 +351,29 @@ export class QuestionService {
       thursday: '오늘 작은 성취나 배움이 있었다면?',
       friday: '이번 주 나를 지탱해준 관계는?',
       saturday: '주말에 나를 회복시킨 순간은?',
-      sunday: '다음 주를 위한 작은 다짐은?'
+      sunday: '다음 주를 위한 작은 다짐은?',
     };
-    const base = seed[dayOfWeek?.toLowerCase()] || '오늘 하루 가장 선명한 감정은 무엇인가요?';
+    const base =
+      seed[dayOfWeek?.toLowerCase()] ||
+      '오늘 하루 가장 선명한 감정은 무엇인가요?';
     const questions: GeneratedQuestionItem[] = [
       { domain: 'emotion', text: base },
-      { domain: 'action', text: '오늘 의미 있었던 작지만 구체적인 행동은 무엇이었나요?' },
-      { domain: 'relationship', text: '오늘 기억에 남는 대화나 상호작용이 있었나요?' },
-      { domain: 'recovery', text: '오늘 나를 잠깐이라도 회복시킨 휴식은 무엇이었나요?' },
-      { domain: 'goal', text: '내일 스스로에게 약속하고 싶은 아주 작은 한 가지는?' }
+      {
+        domain: 'action',
+        text: '오늘 의미 있었던 작지만 구체적인 행동은 무엇이었나요?',
+      },
+      {
+        domain: 'relationship',
+        text: '오늘 기억에 남는 대화나 상호작용이 있었나요?',
+      },
+      {
+        domain: 'recovery',
+        text: '오늘 나를 잠깐이라도 회복시킨 휴식은 무엇이었나요?',
+      },
+      {
+        domain: 'goal',
+        text: '내일 스스로에게 약속하고 싶은 아주 작은 한 가지는?',
+      },
     ];
     return {
       questions,

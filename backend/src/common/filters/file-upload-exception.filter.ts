@@ -1,4 +1,10 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { Response } from 'express';
 
 @Catch()
@@ -23,7 +29,8 @@ export class FileUploadExceptionFilter implements ExceptionFilter {
         message = '올바르지 않은 파일 필드입니다.';
       } else if (exception.message.includes('지원되지 않는 파일 형식')) {
         status = HttpStatus.BAD_REQUEST;
-        message = '지원되지 않는 파일 형식입니다. 이미지 파일만 업로드 가능합니다.';
+        message =
+          '지원되지 않는 파일 형식입니다. 이미지 파일만 업로드 가능합니다.';
       } else {
         message = exception.message;
       }

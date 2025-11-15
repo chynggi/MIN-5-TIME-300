@@ -6,7 +6,11 @@ import { AppModule } from '../src/app.module';
 describe('일기 위치 저장 (e2e)', () => {
   let app: INestApplication;
   let token: string;
-  const user = { email: 'locuser@example.com', password: 'test1234', username: 'locuser' };
+  const user = {
+    email: 'locuser@example.com',
+    password: 'test1234',
+    username: 'locuser',
+  };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -16,7 +20,10 @@ describe('일기 위치 저장 (e2e)', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true }));
     await app.init();
 
-    await request(app.getHttpServer()).post('/api/v1/signup').send(user).expect(201);
+    await request(app.getHttpServer())
+      .post('/api/v1/signup')
+      .send(user)
+      .expect(201);
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/login')
       .send({ email: user.email, password: user.password })

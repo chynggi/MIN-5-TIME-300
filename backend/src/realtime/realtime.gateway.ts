@@ -23,14 +23,16 @@ interface AuthenticatedSocket extends Socket {
     origin: [
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'https://chynggi.cafe24.com',
-      'http://chynggi.cafe24.com'
+      'http://chynggi.cafe24.com',
     ],
     credentials: true,
   },
   transports: ['polling', 'websocket'],
   allowEIO3: true,
 })
-export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class RealtimeGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   private readonly logger = new Logger(RealtimeGateway.name);
   private server: Server;
   private userSockets = new Map<string, Set<string>>();
@@ -106,7 +108,9 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   ) {
     if (!data?.userId) return;
     client.leave(`user:${data.userId}`);
-    this.logger.debug(`클라이언트 ${client.id} -> user:${data.userId} 구독 해제`);
+    this.logger.debug(
+      `클라이언트 ${client.id} -> user:${data.userId} 구독 해제`,
+    );
   }
 
   /**
@@ -119,12 +123,17 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     diaryCount?: number;
   }) {
     if (!this.server) return;
-    this.server.to(`user:${payload.userId}`).emit('profile.counters.update', payload);
+    this.server
+      .to(`user:${payload.userId}`)
+      .emit('profile.counters.update', payload);
   }
 
   // 프라이버시 검증 Skeleton (미구현)
   // 향후 ProfileService 주입 후 visibility 정책 검사 추가 예정
-  private async canSubscribeToProfile(requesterId: string | undefined, targetUserId: string): Promise<boolean> {
+  private async canSubscribeToProfile(
+    requesterId: string | undefined,
+    targetUserId: string,
+  ): Promise<boolean> {
     if (!targetUserId) return false;
     // 자신의 프로필은 항상 허용
     if (requesterId && requesterId === targetUserId) return true;
@@ -135,7 +144,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   /**
    * 활동지수/레벨 업데이트 브로드캐스트
    */
-  emitActivityUpdate(payload: { userId: string; activityScore: number; activityLevel: number }) {
+  emitActivityUpdate(payload: {
+    userId: string;
+    activityScore: number;
+    activityLevel: number;
+  }) {
     if (!this.server) return;
     this.server.to(`user:${payload.userId}`).emit('activity.update', payload);
   }

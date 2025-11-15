@@ -1,7 +1,11 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 
-interface SpotifyArtist { name: string }
-interface SpotifyImage { url: string }
+interface SpotifyArtist {
+  name: string;
+}
+interface SpotifyImage {
+  url: string;
+}
 export interface SpotifyTrackFormatted {
   id: string;
   name: string;
@@ -20,7 +24,10 @@ export class SpotifyService {
     const clientId = process.env.SPOTIFY_CLIENT_ID;
     const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
     if (!clientId || !clientSecret) {
-      throw new HttpException('Spotify credentials not configured', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Spotify credentials not configured',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
     // 캐시 유효
     if (this.token && Date.now() < this.tokenExpiresAt) return this.token;
@@ -29,17 +36,23 @@ export class SpotifyService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: 'Basic ' + Buffer.from(clientId + ':' + clientSecret).toString('base64'),
+        Authorization:
+          'Basic ' +
+          Buffer.from(clientId + ':' + clientSecret).toString('base64'),
       },
       body: 'grant_type=client_credentials',
     });
     if (!res.ok) {
-      throw new HttpException('Failed to get Spotify token', HttpStatus.BAD_GATEWAY);
+      throw new HttpException(
+        'Failed to get Spotify token',
+        HttpStatus.BAD_GATEWAY,
+      );
     }
     const data = await res.json();
     this.token = data.access_token;
     // 토큰 만료 1시간 - 1분 여유
-    this.tokenExpiresAt = Date.now() + (data.expires_in ? (data.expires_in - 60) * 1000 : 3000);
+    this.tokenExpiresAt =
+      Date.now() + (data.expires_in ? (data.expires_in - 60) * 1000 : 3000);
     return this.token!;
   }
 
@@ -54,14 +67,22 @@ export class SpotifyService {
     };
   }
 
-  async searchTracks(q: string): Promise<{ tracks: { items: SpotifyTrackFormatted[] } }> {
+  async searchTracks(
+    q: string,
+  ): Promise<{ tracks: { items: SpotifyTrackFormatted[] } }> {
     if (!q) {
-      throw new HttpException('Query parameter is required', HttpStatus.BAD_REQUEST);
+      throw new HttpException(
+        'Query parameter is required',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     const token = await this.fetchToken();
-    const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10&market=KR`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(
+      `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10&market=KR`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     if (!res.ok) {
       throw new HttpException('Spotify search failed', HttpStatus.BAD_GATEWAY);
     }
@@ -70,7 +91,10 @@ export class SpotifyService {
     return { tracks: { items } };
   }
 
-  async getPopular(category = 'toplists', limitStr = '10'): Promise<{ tracks: SpotifyTrackFormatted[] }> {
+  async getPopular(
+    category = 'toplists',
+    limitStr = '10',
+  ): Promise<{ tracks: SpotifyTrackFormatted[] }> {
     const limit = parseInt(limitStr, 10) || 10;
     let token: string | null = null;
     try {
@@ -106,7 +130,9 @@ export class SpotifyService {
     if (category === 'toplists') {
       for (const pid of playlistCandidates) {
         if (collected.length >= limit) break;
-        const data = await tryFetchJson(`https://api.spotify.com/v1/playlists/${pid}/tracks?market=KR&limit=${limit}`);
+        const data = await tryFetchJson(
+          `https://api.spotify.com/v1/playlists/${pid}/tracks?market=KR&limit=${limit}`,
+        );
         if (data?.items?.length) {
           for (const item of data.items) {
             if (item.track) collected.push(item.track);
@@ -117,25 +143,34 @@ export class SpotifyService {
     }
 
     // 2. new-releases (필요 시 첫 트랙) - category === 'new-releases' 이거나 toplists 실패시
-    if ((category === 'new-releases' || !collected.length) && collected.length < limit) {
-      const newData = await tryFetchJson(`https://api.spotify.com/v1/browse/new-releases?country=KR&limit=${Math.min(limit, 20)}`);
+    if (
+      (category === 'new-releases' || !collected.length) &&
+      collected.length < limit
+    ) {
+      const newData = await tryFetchJson(
+        `https://api.spotify.com/v1/browse/new-releases?country=KR&limit=${Math.min(limit, 20)}`,
+      );
       if (newData?.albums?.items?.length) {
         for (const album of newData.albums.items) {
           if (collected.length >= limit) break;
           // 각 앨범 대표 트랙 (첫 번째 트랙)
-          const albumTracks = await tryFetchJson(`https://api.spotify.com/v1/albums/${album.id}/tracks?market=KR&limit=1`);
-            const first = albumTracks?.items?.[0];
-            if (first) {
-              first.album = album; // 이미지 정보 보강
-              collected.push(first);
-            }
+          const albumTracks = await tryFetchJson(
+            `https://api.spotify.com/v1/albums/${album.id}/tracks?market=KR&limit=1`,
+          );
+          const first = albumTracks?.items?.[0];
+          if (first) {
+            first.album = album; // 이미지 정보 보강
+            collected.push(first);
+          }
         }
       }
     }
 
     // 3. 장르 검색 (k-pop) - 아직 부족하면 보충
     if (collected.length < limit) {
-      const genreData = await tryFetchJson(`https://api.spotify.com/v1/search?q=genre:k-pop&type=track&market=KR&limit=${limit}`);
+      const genreData = await tryFetchJson(
+        `https://api.spotify.com/v1/search?q=genre:k-pop&type=track&market=KR&limit=${limit}`,
+      );
       if (genreData?.tracks?.items?.length) {
         for (const t of genreData.tracks.items) {
           collected.push(t);
@@ -156,7 +191,10 @@ export class SpotifyService {
     return { tracks };
   }
 
-  async getRecommendations(seedGenres = 'k-pop,pop', limitStr = '10'): Promise<{ tracks: SpotifyTrackFormatted[] }> {
+  async getRecommendations(
+    seedGenres = 'k-pop,pop',
+    limitStr = '10',
+  ): Promise<{ tracks: SpotifyTrackFormatted[] }> {
     const limit = parseInt(limitStr, 10) || 10;
     let token: string | null = null;
     try {
@@ -164,9 +202,12 @@ export class SpotifyService {
     } catch (e) {
       return { tracks: [] };
     }
-    const res = await fetch(`https://api.spotify.com/v1/recommendations?limit=${limit}&seed_genres=${encodeURIComponent(seedGenres)}&market=KR`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(
+      `https://api.spotify.com/v1/recommendations?limit=${limit}&seed_genres=${encodeURIComponent(seedGenres)}&market=KR`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     if (!res.ok) return { tracks: [] };
     const data = await res.json();
     const items = (data.tracks || []).map((t: any) => this.mapTrack(t));

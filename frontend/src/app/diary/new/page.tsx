@@ -238,7 +238,8 @@ function NewDiaryContent() {
 
           {/* 설문 폼 모달 대체: 간단히 조건부 렌더링 */}
           {showCheckinForm && (
-            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            // Allow vertical scrolling so bottom actions remain reachable on small screens
+            <div className="fixed inset-0 bg-black/40 flex items-start justify-center overflow-y-auto py-6 z-50">
               <div className="w-full max-w-md p-4">
                 <CheckinForm
                   defaultDate={selectedDate}

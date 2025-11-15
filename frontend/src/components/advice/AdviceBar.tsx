@@ -15,18 +15,35 @@ export default function AdviceBar({ variant = 'fixed', title, fullWidth = false 
   const [loading, setLoading] = useState(false);
   const [adviceId, setAdviceId] = useState<string | undefined>(undefined);
   const [toast, setToast] = useState<string | null>(null);
+  const fallbackAdvice = '작게 시작해도 좋아요—오늘은 5분만 쉬어가요.';
+
+  const applyAdvice = (payload?: { advice?: string; risk_flag?: 'none'|'mild'|'moderate'|'severe'; id?: string }) => {
+    if (payload?.advice && payload.advice.trim().length > 0) {
+      setText(payload.advice);
+      setRisk(payload.risk_flag || 'none');
+      setAdviceId(payload.id);
+    } else {
+      setText(fallbackAdvice);
+      setRisk('none');
+      setAdviceId(undefined);
+    }
+  };
 
   const load = async (force = false) => {
     setLoading(true);
     try {
       // 우선 캐시 최신 조회
       const data = force ? await adviceApi.generate(true) : await adviceApi.latest();
-      setText(data.advice);
-      setRisk(data.risk_flag || 'none');
-      setAdviceId(data.id);
-    } catch (e) {
-      setText('작게 시작해도 좋아요—오늘은 5분만 쉬어가요.');
-      setRisk('none');
+      applyAdvice(data);
+    } catch (e: any) {
+      applyAdvice();
+      if (force) {
+        const message = typeof e?.message === 'string' && e.message.includes('요청이 너무 잦아요')
+          ? '너무 빨리 새로고침 했어요. 잠시 후 다시 시도해 주세요.'
+          : '새로운 조언을 가져오지 못했어요.';
+        setToast(message);
+        setTimeout(() => setToast(null), 1800);
+      }
     } finally { setLoading(false); }
   };
 

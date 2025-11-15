@@ -86,7 +86,7 @@ export class StatisticsService {
     });
     const mostActiveTime = Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '21';
 
-    const [recordScores, rangeCheckins, baseline] = await Promise.all([
+    const [recordScores, rangeCheckins, baseline, previousCheckin] = await Promise.all([
       this.prisma.recordScore.findMany({ where: { userId } }),
       this.prisma.dailyCheckin.findMany({
         where: {
@@ -96,28 +96,19 @@ export class StatisticsService {
         orderBy: { diaryDate: 'asc' },
       }),
       this.prisma.userBaselineCheckin.findUnique({ where: { userId } }),
+      this.prisma.dailyCheckin.findFirst({
+        where: { userId, diaryDate: { lt: from } },
+        orderBy: { diaryDate: 'desc' },
+      }),
     ]);
 
-    const mentalTrend = rangeCheckins
-      .map(checkin => {
-        const score01 = this.computeMentalScore(checkin);
-        if (score01 === undefined) return null;
-        return {
-          date: checkin.diaryDate.toISOString().slice(0, 10),
-          score: Math.round(Math.max(0, Math.min(1, score01)) * 100),
-        };
-      })
-      .filter((entry): entry is { date: string; score: number } => !!entry);
-
-    if (!mentalTrend.length && baseline) {
-      const baselineScore = this.computeMentalScore(baseline);
-      if (baselineScore !== undefined) {
-        mentalTrend.push({
-          date: now.toISOString().slice(0, 10),
-          score: Math.round(Math.max(0, Math.min(1, baselineScore)) * 100),
-        });
-      }
-    }
+    const mentalTrend = this.buildMentalTrendSeries({
+      startDate: from,
+      endDate: now,
+      rangeCheckins,
+      previousCheckin,
+      baseline,
+    });
 
     const dashboard = {
       writingStreak,
@@ -148,6 +139,66 @@ export class StatisticsService {
         inappropriateCount,
       },
     };
+  }
+
+  private buildMentalTrendSeries(params: {
+    startDate: Date;
+    endDate: Date;
+    rangeCheckins: Array<{ diaryDate: Date }>;
+    previousCheckin?: { diaryDate: Date } | null;
+    baseline?: Record<string, any> | null;
+  }): { date: string; score: number }[] {
+    const { startDate, endDate, rangeCheckins, previousCheckin, baseline } = params;
+    const dayStart = new Date(startDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(endDate);
+    dayEnd.setHours(0, 0, 0, 0);
+
+    const trendMap = new Map<string, number>();
+    rangeCheckins.forEach(checkin => {
+      const score01 = this.computeMentalScore(checkin);
+      if (score01 === undefined) return;
+      trendMap.set(this.formatDateKey(checkin.diaryDate), score01);
+    });
+
+    const baselineScore = baseline ? this.computeMentalScore(baseline) : undefined;
+    let carryScore = previousCheckin ? this.computeMentalScore(previousCheckin) : undefined;
+    if (carryScore === undefined) carryScore = baselineScore;
+    if (carryScore === undefined) {
+      const firstValue = trendMap.values().next();
+      if (!firstValue.done) carryScore = firstValue.value;
+    }
+
+    const series: { date: string; score: number }[] = [];
+    const cursor = new Date(dayStart);
+    while (cursor <= dayEnd) {
+      const key = this.formatDateKey(cursor);
+      let score01 = trendMap.get(key);
+      if (score01 === undefined) score01 = carryScore;
+      if (score01 !== undefined) {
+        carryScore = score01;
+        series.push({
+          date: key,
+          score: Math.round(Math.max(0, Math.min(1, score01)) * 100),
+        });
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    if (!series.length && baselineScore !== undefined) {
+      series.push({
+        date: this.formatDateKey(dayEnd),
+        score: Math.round(Math.max(0, Math.min(1, baselineScore)) * 100),
+      });
+    }
+
+    return series;
+  }
+
+  private formatDateKey(date: Date): string {
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    return normalized.toISOString().slice(0, 10);
   }
 
   private calcStreak(diaries: any[]): number {

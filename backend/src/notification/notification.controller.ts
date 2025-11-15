@@ -1,23 +1,23 @@
-import { 
-  Body, 
-  Controller, 
-  Get, 
-  Put, 
+import {
+  Body,
+  Controller,
+  Get,
+  Put,
   Post,
   Patch,
   Delete,
   Param,
   Query,
-  Req, 
-  UseGuards 
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { NotificationService } from './notification.service';
-import { 
-  NotificationQueryDto, 
-  NotificationResponseDto, 
+import {
+  NotificationQueryDto,
+  NotificationResponseDto,
   NotificationPrefsDto,
-  DeviceTokenDto 
+  DeviceTokenDto,
 } from './dto';
 
 @UseGuards(AuthGuard('jwt'))
@@ -29,7 +29,7 @@ export class NotificationController {
   @Get()
   async getNotifications(
     @Req() req,
-    @Query() query: NotificationQueryDto
+    @Query() query: NotificationQueryDto,
   ): Promise<NotificationResponseDto[]> {
     return this.notificationService.getNotifications(req.user.userId, query);
   }
@@ -37,7 +37,9 @@ export class NotificationController {
   // 읽지 않은 알림 개수 조회
   @Get('unread-count')
   async getUnreadCount(@Req() req): Promise<{ count: number }> {
-    const count = await this.notificationService.getUnreadCount(req.user.userId);
+    const count = await this.notificationService.getUnreadCount(
+      req.user.userId,
+    );
     return { count };
   }
 
@@ -45,7 +47,7 @@ export class NotificationController {
   @Patch(':id/read')
   async markAsRead(
     @Req() req,
-    @Param('id') notificationId: string
+    @Param('id') notificationId: string,
   ): Promise<NotificationResponseDto> {
     return this.notificationService.markAsRead(req.user.userId, notificationId);
   }
@@ -60,9 +62,12 @@ export class NotificationController {
   @Delete(':id')
   async hideNotification(
     @Req() req,
-    @Param('id') notificationId: string
+    @Param('id') notificationId: string,
   ): Promise<{ success: boolean }> {
-    await this.notificationService.hideNotification(req.user.userId, notificationId);
+    await this.notificationService.hideNotification(
+      req.user.userId,
+      notificationId,
+    );
     return { success: true };
   }
 
@@ -74,19 +79,16 @@ export class NotificationController {
 
   // 알림 설정 업데이트
   @Put('preferences')
-  async updateNotificationPrefs(
-    @Req() req,
-    @Body() dto: NotificationPrefsDto
-  ) {
-    return this.notificationService.updateNotificationPrefs(req.user.userId, dto);
+  async updateNotificationPrefs(@Req() req, @Body() dto: NotificationPrefsDto) {
+    return this.notificationService.updateNotificationPrefs(
+      req.user.userId,
+      dto,
+    );
   }
 
   // 디바이스 토큰 등록
   @Post('device-tokens')
-  async registerDeviceToken(
-    @Req() req,
-    @Body() dto: DeviceTokenDto
-  ) {
+  async registerDeviceToken(@Req() req, @Body() dto: DeviceTokenDto) {
     return this.notificationService.registerDeviceToken(req.user.userId, dto);
   }
 }

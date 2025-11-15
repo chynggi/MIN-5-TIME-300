@@ -6,7 +6,9 @@ export class SpotifyController {
   constructor(private readonly spotifyService: SpotifyService) {}
 
   @Get('search')
-  async search(@Query('q') q: string): Promise<{ tracks: { items: SpotifyTrackFormatted[] } }> {
+  async search(
+    @Query('q') q: string,
+  ): Promise<{ tracks: { items: SpotifyTrackFormatted[] } }> {
     return await this.spotifyService.searchTracks(q);
   }
 

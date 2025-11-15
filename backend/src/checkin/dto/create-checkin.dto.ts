@@ -1,7 +1,23 @@
-import { IsArray, IsDateString, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min, ArrayUnique } from 'class-validator';
+import {
+  IsArray,
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  ArrayUnique,
+} from 'class-validator';
 
 // 허용 활동 종류
-export const ALLOWED_ACTIVITY_TYPES = ['운동', '명상', '스트레칭', '산책'] as const;
+export const ALLOWED_ACTIVITY_TYPES = [
+  '운동',
+  '명상',
+  '스트레칭',
+  '산책',
+] as const;
 
 export class CreateCheckinDto {
   @IsOptional()
@@ -13,20 +29,30 @@ export class CreateCheckinDto {
   @IsDateString()
   diaryDate?: string;
 
-  @IsInt() @Min(1) @Max(10)
+  @IsInt()
+  @Min(1)
+  @Max(10)
   mood_1to10!: number;
 
-  @IsInt() @Min(1) @Max(10)
+  @IsInt()
+  @Min(1)
+  @Max(10)
   energy_1to10!: number;
 
-  @IsInt() @Min(1) @Max(10)
+  @IsInt()
+  @Min(1)
+  @Max(10)
   stress_1to10!: number;
 
   // 1~9 (9=9+)
-  @IsInt() @Min(1) @Max(9)
+  @IsInt()
+  @Min(1)
+  @Max(9)
   sleep_hours_1to9p!: number;
 
-  @IsInt() @Min(1) @Max(10)
+  @IsInt()
+  @Min(1)
+  @Max(10)
   sleep_quality_1to10!: number;
 
   @IsArray()
@@ -35,19 +61,29 @@ export class CreateCheckinDto {
   activity_types!: string[];
 
   // 운동 포함 시 1~10, 아니면 0 허용
-  @IsInt() @Min(0) @Max(10)
+  @IsInt()
+  @Min(0)
+  @Max(10)
   workout_intensity_1to10!: number;
 
-  @IsInt() @Min(1) @Max(10)
+  @IsInt()
+  @Min(1)
+  @Max(10)
   focus_1to10!: number;
 
-  @IsInt() @Min(1) @Max(10)
+  @IsInt()
+  @Min(1)
+  @Max(10)
   fatigue_1to10!: number;
 
-  @IsInt() @Min(1) @Max(10)
+  @IsInt()
+  @Min(1)
+  @Max(10)
   social_count_1to10!: number;
 
-  @IsInt() @Min(1) @Max(10)
+  @IsInt()
+  @Min(1)
+  @Max(10)
   social_satisfaction_1to10!: number;
 }
 
@@ -60,7 +96,9 @@ export function normalizeToStartOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-export function computeGaugePercent(payload: CreateCheckinDto): GaugePercentResult {
+export function computeGaugePercent(
+  payload: CreateCheckinDto,
+): GaugePercentResult {
   const requiredKeys = [
     'mood_1to10',
     'energy_1to10',
@@ -87,7 +125,9 @@ export function computeGaugePercent(payload: CreateCheckinDto): GaugePercentResu
   const needsWorkoutIntensity = payload.activity_types?.includes('운동');
   if (needsWorkoutIntensity) {
     denom += 1;
-    if (payload.workout_intensity_1to10 && payload.workout_intensity_1to10 > 0) filled += 1; else missing.push('workout_intensity_1to10');
+    if (payload.workout_intensity_1to10 && payload.workout_intensity_1to10 > 0)
+      filled += 1;
+    else missing.push('workout_intensity_1to10');
   }
   const percent = Math.round((filled / denom) * 100);
   return { percent, missingKeys: missing };

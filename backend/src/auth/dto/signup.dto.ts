@@ -1,4 +1,15 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength, IsArray, ValidateNested, IsInt, Min, Max } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+  IsArray,
+  ValidateNested,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class InterestDto {
@@ -22,7 +33,7 @@ export class BaselineCheckinDto {
   @IsInt() @Min(1) @Max(10) mood_1to10!: number;
   @IsInt() @Min(1) @Max(10) energy_1to10!: number;
   @IsInt() @Min(1) @Max(10) stress_1to10!: number;
-  @IsInt() @Min(1) @Max(9)  sleep_hours_1to9p!: number; // 9=9+ 버킷
+  @IsInt() @Min(1) @Max(9) sleep_hours_1to9p!: number; // 9=9+ 버킷
   @IsInt() @Min(1) @Max(10) sleep_quality_1to10!: number;
   @IsArray() activity_types!: string[]; // 프리지정 셋: 운동/명상/스트레칭/산책
   @IsInt() @Min(0) @Max(10) workout_intensity_1to10!: number; // 운동 포함 시 1~10, 아니면 0

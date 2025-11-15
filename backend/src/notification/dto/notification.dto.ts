@@ -1,10 +1,18 @@
-import { IsOptional, IsString, IsBoolean, IsNumber, IsEnum, IsUUID, IsJSON } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsBoolean,
+  IsNumber,
+  IsEnum,
+  IsUUID,
+  IsJSON,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum NotificationStatus {
   UNREAD = 'UNREAD',
   READ = 'READ',
-  HIDDEN = 'HIDDEN'
+  HIDDEN = 'HIDDEN',
 }
 
 export enum NotificationType {
@@ -16,8 +24,8 @@ export enum NotificationType {
   JOURNAL_COMMENTED = 'journal_commented',
   MENTION_CREATED = 'mention_created',
   FRIEND_ACCEPTED = 'friend_accepted',
-  DIARY_PUBLISHED = 'diary_published'
-  , WELLBEING_SEVERE = 'wellbeing_severe'
+  DIARY_PUBLISHED = 'diary_published',
+  WELLBEING_SEVERE = 'wellbeing_severe',
 }
 
 export class CreateNotificationDto {
@@ -128,7 +136,7 @@ export class NotificationResponseDto {
   createdAt: Date;
   updatedAt: Date;
   expiresAt?: Date;
-  
+
   // 추가 렌더링 정보
   title?: string;
   body?: string;

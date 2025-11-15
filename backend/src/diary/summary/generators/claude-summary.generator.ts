@@ -1,4 +1,8 @@
-import { SummaryGeneratorInterface, DiarySummaryRequest, DiarySummaryResponse } from '../interfaces/summary-generator.interface';
+import {
+  SummaryGeneratorInterface,
+  DiarySummaryRequest,
+  DiarySummaryResponse,
+} from '../interfaces/summary-generator.interface';
 import { Anthropic } from '@anthropic-ai/sdk';
 
 export class ClaudeSummaryGenerator extends SummaryGeneratorInterface {
@@ -12,7 +16,12 @@ export class ClaudeSummaryGenerator extends SummaryGeneratorInterface {
 
   async summarize(req: DiarySummaryRequest): Promise<DiarySummaryResponse> {
     if (!this.anthropic) {
-      return { text: this.enforceRange(this.maskPII(req.rawContent)), modelUsed: this.modelName, truncated: false, fallbackUsed: true };
+      return {
+        text: this.enforceRange(this.maskPII(req.rawContent)),
+        modelUsed: this.modelName,
+        truncated: false,
+        fallbackUsed: true,
+      };
     }
     const systemPrompt = this.buildSystemPrompt();
     const userPrompt = this.buildUserPrompt(req);
@@ -22,15 +31,27 @@ export class ClaudeSummaryGenerator extends SummaryGeneratorInterface {
         max_tokens: 600,
         temperature: 0.5,
         system: systemPrompt,
-        messages: [ { role: 'user', content: userPrompt } ],
+        messages: [{ role: 'user', content: userPrompt }],
       });
       const first = response.content?.[0];
-      const raw = (first && first.type === 'text') ? first.text : '';
+      const raw = first && first.type === 'text' ? first.text : '';
       const diary = this.extractDiary(raw) || req.rawContent;
       const finalText = this.enforceRange(this.maskPII(diary));
-      return { text: finalText, modelUsed: this.modelName, truncated: false, fallbackUsed: !this.extractDiary(raw), rawOutput: process.env.NODE_ENV==='development'?raw:undefined };
+      return {
+        text: finalText,
+        modelUsed: this.modelName,
+        truncated: false,
+        fallbackUsed: !this.extractDiary(raw),
+        rawOutput: process.env.NODE_ENV === 'development' ? raw : undefined,
+      };
     } catch (e: any) {
-      return { text: this.enforceRange(this.maskPII(req.rawContent)), modelUsed: this.modelName, truncated: false, fallbackUsed: true, rawOutput: e?.message };
+      return {
+        text: this.enforceRange(this.maskPII(req.rawContent)),
+        modelUsed: this.modelName,
+        truncated: false,
+        fallbackUsed: true,
+        rawOutput: e?.message,
+      };
     }
   }
 
@@ -70,7 +91,7 @@ ${req.rawContent}
   }
 
   private maskPII(text: string) {
-    return (text||'')
+    return (text || '')
       .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[이메일]')
       .replace(/\b\d{2,3}-\d{3,4}-\d{4}\b/g, '[연락처]')
       .replace(/\b\d{10,11}\b/g, '[연락처]');
@@ -88,6 +109,8 @@ ${req.rawContent}
       const json = match ? JSON.parse(match[0]) : JSON.parse(cleaned);
       const d = json?.diary;
       return typeof d === 'string' && d.trim() ? d.trim() : null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 }

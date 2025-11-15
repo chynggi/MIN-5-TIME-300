@@ -1,11 +1,28 @@
-import { Body, Controller, Get, Post, Put, Delete, Param, Query, Req, UseGuards, UploadedFile, UseInterceptors, UseFilters } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Query,
+  Req,
+  UseGuards,
+  UploadedFile,
+  UseInterceptors,
+  UseFilters,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Multer } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { DiaryService } from './diary.service';
 import { CreateDiaryDto } from './dto/create-diary.dto';
 import { RateDiaryDto } from './dto/rate-diary.dto';
-import { DiaryListResponseDto, DiaryDetailResponseDto } from './dto/diary-response.dto';
+import {
+  DiaryListResponseDto,
+  DiaryDetailResponseDto,
+} from './dto/diary-response.dto';
 import { TodayQuestionResponseDto } from './dto/today-question-response.dto';
 import { VectorDbService } from '../vector-db/vector-db.service';
 import { diaryMediaUploadOptions } from '../common/config/multer.config';
@@ -55,7 +72,10 @@ export class DiaryController {
   }
 
   @Get(':id')
-  async getDiary(@Req() req, @Param('id') id: string): Promise<DiaryDetailResponseDto> {
+  async getDiary(
+    @Req() req,
+    @Param('id') id: string,
+  ): Promise<DiaryDetailResponseDto> {
     return this.diaryService.getDiary(req, id);
   }
 
@@ -66,24 +86,48 @@ export class DiaryController {
     @Req() req,
     @Body() dto: CreateDiaryDto,
     @UploadedFile() file?: Multer.File,
-  ): Promise<{ id: string; content: string; createdAt: string; isPublic: boolean; question: string; mediaUrl?: string; mediaType?: string; lat?: number | null; lng?: number | null }> {
+  ): Promise<{
+    id: string;
+    content: string;
+    createdAt: string;
+    isPublic: boolean;
+    question: string;
+    mediaUrl?: string;
+    mediaType?: string;
+    lat?: number | null;
+    lng?: number | null;
+  }> {
     // 디버깅: 들어온 FormData 필드 로그
     try {
       console.log('[CreateDiary] raw body dto:', dto);
       if (file) {
-        console.log('[CreateDiary] uploaded file:', { originalname: file.originalname, mimetype: file.mimetype, size: file.size });
+        console.log('[CreateDiary] uploaded file:', {
+          originalname: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+        });
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      /* ignore */
+    }
     return this.diaryService.createDiary(req, dto, file);
   }
 
   @Post(':id/rate')
-  async rateDiary(@Req() req, @Param('id') id: string, @Body() dto: RateDiaryDto): Promise<{ id: string; emotionScore: number; updatedAt: string }> {
+  async rateDiary(
+    @Req() req,
+    @Param('id') id: string,
+    @Body() dto: RateDiaryDto,
+  ): Promise<{ id: string; emotionScore: number; updatedAt: string }> {
     return this.diaryService.rateDiary(req, id, dto);
   }
 
   @Put(':id/share')
-  async shareDiary(@Req() req, @Param('id') id: string, @Body('isPublic') isPublic: boolean): Promise<{ id: string; isPublic: boolean; updatedAt: string }> {
+  async shareDiary(
+    @Req() req,
+    @Param('id') id: string,
+    @Body('isPublic') isPublic: boolean,
+  ): Promise<{ id: string; isPublic: boolean; updatedAt: string }> {
     return this.diaryService.shareDiary(req, id, isPublic);
   }
 
@@ -104,7 +148,11 @@ export class DiaryController {
     try {
       console.log('[UpdateDiary] id:', id, 'dto:', dto);
       if (file) {
-        console.log('[UpdateDiary] uploaded file:', { originalname: file.originalname, mimetype: file.mimetype, size: file.size });
+        console.log('[UpdateDiary] uploaded file:', {
+          originalname: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+        });
       }
     } catch {}
     return this.diaryService.updateDiary(req, id, dto, file);
@@ -114,7 +162,11 @@ export class DiaryController {
    * 입력 텍스트(또는 최근 일기) 기반 유사 일기 추천
    */
   @Post('search-similar')
-  async searchSimilarDiaries(@Req() req, @Body('text') text?: string, @Body('limit') limit = 5) {
+  async searchSimilarDiaries(
+    @Req() req,
+    @Body('text') text?: string,
+    @Body('limit') limit = 5,
+  ) {
     return this.diaryService.searchSimilarDiaries(req, text, limit);
   }
 
@@ -124,11 +176,20 @@ export class DiaryController {
    * body: { rawContent: string; title?: string; modelId?: string }
    */
   @Post('summarize')
-  async summarize(@Req() req, @Body('rawContent') rawContent: string, @Body('title') title?: string, @Body('modelId') modelId?: string) {
+  async summarize(
+    @Req() req,
+    @Body('rawContent') rawContent: string,
+    @Body('title') title?: string,
+    @Body('modelId') modelId?: string,
+  ) {
     if (!rawContent || typeof rawContent !== 'string') {
       return { ok: false, message: 'rawContent가 필요합니다.' };
     }
-    const res = await this.summaryService.summarize(rawContent, { title, modelId, userId: req.user?.userId });
+    const res = await this.summaryService.summarize(rawContent, {
+      title,
+      modelId,
+      userId: req.user?.userId,
+    });
     return { ok: true, ...res };
   }
 
@@ -140,7 +201,6 @@ export class DiaryController {
   async saveQuestionAnswers(@Req() req, @Body() dto: SaveQuestionAnswersDto) {
     return this.diaryService.saveQuestionAnswers(req, dto);
   }
-
 
   // === Reactions (Like) ===
   @Post(':id/like')
@@ -155,4 +215,3 @@ export class DiaryController {
 }
 
 // DTO는 './dto/save-question-answers.dto'로 분리되었습니다.
-

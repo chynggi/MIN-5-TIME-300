@@ -65,7 +65,7 @@ export class ProfileEditDataDto {
   basicInfo: ProfileBasicInfoDto;
   interests: InterestInfoDto[];
   lifestyle: LifestyleInfoDto;
-  
+
   // 개인정보 공개 설정
   privacySettings: {
     isProfilePublic: boolean;
@@ -84,7 +84,7 @@ export class ProfileEditDataDto {
 export class InterestOptionsDto {
   // 선택 가능한 모든 관심사 옵션들 (프론트엔드에서 미리 정의된 목록)
   availableInterests: string[];
-  
+
   // 현재 사용자가 선택한 관심사들
   selectedInterests: InterestInfoDto[];
 }
@@ -98,7 +98,7 @@ export class LifestyleOptionsDto {
   exerciseFrequencyOptions: string[];
   sleepPatternOptions: string[];
   socialActivityOptions: string[];
-  
+
   // 현재 사용자가 선택한 값들
   currentSelections: LifestyleInfoDto;
 }

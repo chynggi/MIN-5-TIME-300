@@ -7,25 +7,30 @@ import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  
+
   // Validation Pipe 설정
-  app.useGlobalPipes(new ValidationPipe({
-    transform: true,
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    // 400 발생 시 어떤 필드가 문제인지 콘솔에 자세히 출력
-    exceptionFactory: (errors) => {
-      const simplified = errors.map(err => ({
-        property: err.property,
-        constraints: err.constraints,
-        value: err.value,
-        children: err.children?.length ? err.children : undefined,
-      }));
-      console.error('\n[Validation Error] Incoming request validation failed:', JSON.stringify(simplified, null, 2));
-      return new BadRequestException(simplified);
-    }
-  }));
-  
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      // 400 발생 시 어떤 필드가 문제인지 콘솔에 자세히 출력
+      exceptionFactory: (errors) => {
+        const simplified = errors.map((err) => ({
+          property: err.property,
+          constraints: err.constraints,
+          value: err.value,
+          children: err.children?.length ? err.children : undefined,
+        }));
+        console.error(
+          '\n[Validation Error] Incoming request validation failed:',
+          JSON.stringify(simplified, null, 2),
+        );
+        return new BadRequestException(simplified);
+      },
+    }),
+  );
+
   // CORS 설정
   app.enableCors({
     origin: true, // 또는 origin: true로 모든 도메인 허용

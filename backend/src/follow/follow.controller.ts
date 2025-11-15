@@ -9,7 +9,7 @@ import {
   UseGuards,
   Request,
   HttpCode,
-  HttpStatus
+  HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FollowService } from './follow.service';
@@ -19,7 +19,7 @@ import {
   FollowResponseDto,
   FollowListResponseDto,
   FollowCountersDto,
-  BlockUserDto
+  BlockUserDto,
 } from './dto';
 
 @Controller('api/v1/follow')
@@ -34,7 +34,7 @@ export class FollowController {
   @HttpCode(HttpStatus.OK)
   async followUser(
     @Param('userId') userId: string,
-    @Request() req: any
+    @Request() req: any,
   ): Promise<FollowResponseDto> {
     return this.followService.followUser(req.user.userId, userId);
   }
@@ -46,7 +46,7 @@ export class FollowController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async unfollowUser(
     @Param('userId') userId: string,
-    @Request() req: any
+    @Request() req: any,
   ): Promise<void> {
     return this.followService.unfollowUser(req.user.userId, userId);
   }
@@ -58,7 +58,7 @@ export class FollowController {
   @HttpCode(HttpStatus.OK)
   async approveFollowRequest(
     @Param('userId') followerId: string,
-    @Request() req: any
+    @Request() req: any,
   ): Promise<FollowResponseDto> {
     return this.followService.approveFollowRequest(req.user.userId, followerId);
   }
@@ -70,7 +70,7 @@ export class FollowController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async rejectFollowRequest(
     @Param('userId') followerId: string,
-    @Request() req: any
+    @Request() req: any,
   ): Promise<void> {
     return this.followService.rejectFollowRequest(req.user.userId, followerId);
   }
@@ -82,7 +82,7 @@ export class FollowController {
   async getFollowers(
     @Param('userId') userId: string,
     @Query() query: FollowListQueryDto,
-    @Request() req: any
+    @Request() req: any,
   ): Promise<FollowListResponseDto> {
     return this.followService.getFollowers(userId, query, req.user.userId);
   }
@@ -94,7 +94,7 @@ export class FollowController {
   async getFollowing(
     @Param('userId') userId: string,
     @Query() query: FollowListQueryDto,
-    @Request() req: any
+    @Request() req: any,
   ): Promise<FollowListResponseDto> {
     return this.followService.getFollowing(userId, query, req.user.userId);
   }
@@ -105,7 +105,7 @@ export class FollowController {
   @Get('requests')
   async getFollowRequests(
     @Query() query: FollowListQueryDto,
-    @Request() req: any
+    @Request() req: any,
   ): Promise<FollowListResponseDto> {
     return this.followService.getFollowRequests(req.user.userId, query);
   }
@@ -115,7 +115,7 @@ export class FollowController {
    */
   @Get(':userId/counters')
   async getFollowCounters(
-    @Param('userId') userId: string
+    @Param('userId') userId: string,
   ): Promise<FollowCountersDto> {
     return this.followService.getFollowCounters(userId);
   }
@@ -126,7 +126,7 @@ export class FollowController {
   @Get(':userId/relationship')
   async getFollowRelationship(
     @Param('userId') userId: string,
-    @Request() req: any
+    @Request() req: any,
   ) {
     return this.followService.getFollowRelationship(req.user.userId, userId);
   }
@@ -136,10 +136,7 @@ export class FollowController {
    */
   @Post(':userId/block')
   @HttpCode(HttpStatus.CREATED)
-  async blockUser(
-    @Param('userId') userId: string,
-    @Request() req: any
-  ) {
+  async blockUser(@Param('userId') userId: string, @Request() req: any) {
     return this.followService.blockUser(req.user.userId, userId);
   }
 
@@ -148,10 +145,7 @@ export class FollowController {
    */
   @Delete(':userId/block')
   @HttpCode(HttpStatus.OK)
-  async unblockUser(
-    @Param('userId') userId: string,
-    @Request() req: any
-  ) {
+  async unblockUser(@Param('userId') userId: string, @Request() req: any) {
     return this.followService.unblockUser(req.user.userId, userId);
   }
 

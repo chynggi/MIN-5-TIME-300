@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { FollowStatus } from '@prisma/client';
-import { 
-  SocialFriendsQueryDto, 
-  SocialFriendsResponseDto, 
-  FriendWithDiary 
+import {
+  SocialFriendsQueryDto,
+  SocialFriendsResponseDto,
+  FriendWithDiary,
 } from './dto';
 
 @Injectable()
@@ -14,7 +18,10 @@ export class SocialService {
   /**
    * 탭별 친구 목록 조회 (통합 API)
    */
-  async getFriends(userId: string, query: SocialFriendsQueryDto): Promise<SocialFriendsResponseDto> {
+  async getFriends(
+    userId: string,
+    query: SocialFriendsQueryDto,
+  ): Promise<SocialFriendsResponseDto> {
     const limit = Number(query.limit) || 20;
     let cursorId: string | undefined;
 
@@ -27,10 +34,10 @@ export class SocialService {
       }
     }
 
-    let whereClause: any = {
+    const whereClause: any = {
       followerId: userId,
       status: FollowStatus.ACTIVE,
-      deletedAt: null
+      deletedAt: null,
     };
 
     // 탭별 필터링
@@ -42,12 +49,12 @@ export class SocialService {
           where: {
             followeeId: userId, // 나를 팔로우하는 사람들
             status: FollowStatus.ACTIVE,
-            deletedAt: null
+            deletedAt: null,
           },
-          select: { followerId: true }
+          select: { followerId: true },
         });
-        
-        const mutualIds = mutualUserIds.map(f => f.followerId);
+
+        const mutualIds = mutualUserIds.map((f) => f.followerId);
         whereClause.followeeId = { in: mutualIds };
         break;
       case 'following':
@@ -56,12 +63,12 @@ export class SocialService {
           where: {
             followeeId: userId, // 나를 팔로우하는 사람들
             status: FollowStatus.ACTIVE,
-            deletedAt: null
+            deletedAt: null,
           },
-          select: { followerId: true }
+          select: { followerId: true },
         });
-        
-        const followingMeUserIds = followingMeIds.map(f => f.followerId);
+
+        const followingMeUserIds = followingMeIds.map((f) => f.followerId);
         whereClause.followeeId = { notIn: followingMeUserIds };
         break;
       case 'favorites':
@@ -76,8 +83,8 @@ export class SocialService {
         ...whereClause.followee,
         username: {
           contains: query.q.trim(),
-          mode: 'insensitive'
-        }
+          mode: 'insensitive',
+        },
       };
     }
 
@@ -106,11 +113,11 @@ export class SocialService {
                 createdAt: true,
                 mediaUrl: true,
                 mediaType: true,
-              }
-            }
-          }
-        }
-      }
+              },
+            },
+          },
+        },
+      },
     });
 
     const hasMore = follows.length > limit;
@@ -123,26 +130,32 @@ export class SocialService {
     }
 
     // 결과 매핑
-    const items: FriendWithDiary[] = data.map(follow => {
+    const items: FriendWithDiary[] = data.map((follow) => {
       const lastJournal = follow.followee.journals[0];
-      
+
       return {
         id: follow.id,
         user: {
           id: follow.followee.id,
           username: follow.followee.username,
           mbti: follow.followee.mbti || '',
-          profileImageUrl: follow.followee.profileImageUrl
+          profileImageUrl: follow.followee.profileImageUrl,
         },
         status: follow.status,
         isFavorite: follow.isFavorite,
-        lastDiary: lastJournal ? {
-          id: lastJournal.id,
-          createdAt: lastJournal.createdAt.toISOString(),
-          hasPhoto: !!(lastJournal.mediaUrl && lastJournal.mediaType?.includes('image')),
-          hasAudio: !!(lastJournal.mediaUrl && lastJournal.mediaType?.includes('audio')),
-          hasMusic: false // 음악 필드가 별도로 있다면 수정 필요
-        } : undefined
+        lastDiary: lastJournal
+          ? {
+              id: lastJournal.id,
+              createdAt: lastJournal.createdAt.toISOString(),
+              hasPhoto: !!(
+                lastJournal.mediaUrl && lastJournal.mediaType?.includes('image')
+              ),
+              hasAudio: !!(
+                lastJournal.mediaUrl && lastJournal.mediaType?.includes('audio')
+              ),
+              hasMusic: false, // 음악 필드가 별도로 있다면 수정 필요
+            }
+          : undefined,
       };
     });
 
@@ -150,29 +163,33 @@ export class SocialService {
     const total = await this.prisma.follow.count({
       where: {
         ...whereClause,
-        id: undefined // 커서 조건 제외
-      }
+        id: undefined, // 커서 조건 제외
+      },
     });
 
     return {
       items,
       nextCursor,
-      total
+      total,
     };
   }
 
   /**
    * 즐겨찾기 토글
    */
-  async toggleFavorite(userId: string, followId: string, isFavorite: boolean): Promise<void> {
+  async toggleFavorite(
+    userId: string,
+    followId: string,
+    isFavorite: boolean,
+  ): Promise<void> {
     // 해당 팔로우가 현재 사용자의 것인지 확인
     const follow = await this.prisma.follow.findFirst({
       where: {
         id: followId,
         followerId: userId,
         status: FollowStatus.ACTIVE,
-        deletedAt: null
-      }
+        deletedAt: null,
+      },
     });
 
     if (!follow) {
@@ -182,9 +199,9 @@ export class SocialService {
     // 즐겨찾기 상태 업데이트
     await this.prisma.follow.update({
       where: { id: followId },
-      data: { 
-        isFavorite
-      }
+      data: {
+        isFavorite,
+      },
     });
   }
 }

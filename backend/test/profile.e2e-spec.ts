@@ -23,9 +23,7 @@ beforeAll(async () => {
   await app.init();
 
   // 회원가입 및 로그인 후 토큰 획득
-  await request(app.getHttpServer())
-    .post('/api/v1/signup')
-    .send(testUser);
+  await request(app.getHttpServer()).post('/api/v1/signup').send(testUser);
   const loginRes = await request(app.getHttpServer())
     .post('/api/v1/login')
     .send({ email: testUser.email, password: testUser.password });

@@ -1,4 +1,8 @@
-import { SummaryGeneratorInterface, DiarySummaryRequest, DiarySummaryResponse } from '../interfaces/summary-generator.interface';
+import {
+  SummaryGeneratorInterface,
+  DiarySummaryRequest,
+  DiarySummaryResponse,
+} from '../interfaces/summary-generator.interface';
 import { GoogleGenAI } from '@google/genai';
 
 export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
@@ -7,7 +11,7 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
     super('gemini-2.5-flash'); // 기본 요약 모델 (질문 생성과 동기화 가능)
     const apiKey = process.env.GEMINI_API_KEY;
     // SDK는 환경변수로도 키를 인식하지만, 명시적으로 전달하여 런타임 환경차 이슈를 최소화
-    this.genai = new GoogleGenAI(apiKey ? { apiKey } as any : {} as any);
+    this.genai = new GoogleGenAI(apiKey ? ({ apiKey } as any) : ({} as any));
   }
 
   async summarize(req: DiarySummaryRequest): Promise<DiarySummaryResponse> {
@@ -74,10 +78,12 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
       const json = match ? JSON.parse(match[0]) : JSON.parse(cleaned);
       const d = json?.diary;
       return typeof d === 'string' && d.trim() ? d.trim() : null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
   private maskPII(text: string) {
-    return (text||'')
+    return (text || '')
       .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[이메일]')
       .replace(/\b\d{2,3}-\d{3,4}-\d{4}\b/g, '[연락처]')
       .replace(/\b\d{10,11}\b/g, '[연락처]');

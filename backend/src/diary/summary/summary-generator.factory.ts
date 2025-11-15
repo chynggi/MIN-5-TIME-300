@@ -1,5 +1,8 @@
 import { AIModel } from '../../question/interfaces/question-generator.interface';
-import { SummaryGeneratorInterface, DiarySummaryRequest } from './interfaces/summary-generator.interface';
+import {
+  SummaryGeneratorInterface,
+  DiarySummaryRequest,
+} from './interfaces/summary-generator.interface';
 import { GeminiSummaryGenerator } from './generators/gemini-summary.generator';
 import { GPTSummaryGenerator } from './generators/gpt-summary.generator';
 import { ClaudeSummaryGenerator } from './generators/claude-summary.generator';
@@ -8,7 +11,7 @@ export class SummaryGeneratorFactory {
   private static generators: Map<string, SummaryGeneratorInterface> = new Map();
 
   static getGenerator(model: AIModel | string): SummaryGeneratorInterface {
-    const normalized = model as string;
+    const normalized = model;
     if (!this.generators.has(normalized)) {
       this.generators.set(normalized, this.createGenerator(normalized));
     }

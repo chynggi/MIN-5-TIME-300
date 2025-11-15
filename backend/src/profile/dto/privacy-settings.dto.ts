@@ -1,9 +1,15 @@
-import { IsOptional, IsBoolean, IsEnum, IsArray, IsString } from 'class-validator';
+import {
+  IsOptional,
+  IsBoolean,
+  IsEnum,
+  IsArray,
+  IsString,
+} from 'class-validator';
 
 export enum VisibilityLevel {
-  PUBLIC = 'PUBLIC',        // 모든 사람에게 공개
-  FRIENDS = 'FRIENDS',      // 친구들에게만 공개
-  PRIVATE = 'PRIVATE'       // 비공개
+  PUBLIC = 'PUBLIC', // 모든 사람에게 공개
+  FRIENDS = 'FRIENDS', // 친구들에게만 공개
+  PRIVATE = 'PRIVATE', // 비공개
 }
 
 export class DetailedPrivacyDto {

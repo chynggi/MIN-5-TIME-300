@@ -1,23 +1,37 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { StreakBadgeService } from '../activity/streak-badge.service';
-import { CreateCheckinDto, computeGaugePercent, normalizeToStartOfDay } from './dto/create-checkin.dto';
+import {
+  CreateCheckinDto,
+  computeGaugePercent,
+  normalizeToStartOfDay,
+} from './dto/create-checkin.dto';
 
 @Injectable()
 export class CheckinService {
-  constructor(private readonly prisma: PrismaService, private readonly streaks: StreakBadgeService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly streaks: StreakBadgeService,
+  ) {}
 
   async create(userId: string, dto: CreateCheckinDto) {
     // 퍼센트 계산 및 100% 검증
     const { percent, missingKeys } = computeGaugePercent(dto);
     if (percent < 100) {
-      throw new BadRequestException(`체크인이 완료되지 않았습니다. 누락 항목: ${missingKeys.join(', ')}`);
+      throw new BadRequestException(
+        `체크인이 완료되지 않았습니다. 누락 항목: ${missingKeys.join(', ')}`,
+      );
     }
 
     // 운동 포함 시 강도 필수 규칙(서버 재검증)
     const needsIntensity = dto.activity_types?.includes('운동');
-    if (needsIntensity && (!dto.workout_intensity_1to10 || dto.workout_intensity_1to10 < 1)) {
-      throw new BadRequestException('운동을 선택하면 강도(1~10)를 반드시 입력해야 합니다.');
+    if (
+      needsIntensity &&
+      (!dto.workout_intensity_1to10 || dto.workout_intensity_1to10 < 1)
+    ) {
+      throw new BadRequestException(
+        '운동을 선택하면 강도(1~10)를 반드시 입력해야 합니다.',
+      );
     }
 
     const diaryDate = dto.diaryDate ? new Date(dto.diaryDate) : new Date();
@@ -52,15 +66,21 @@ export class CheckinService {
       },
     });
 
-  // 스트릭 업데이트
-  this.streaks.onDiaryOrCheckin(userId, dayStart).catch(() => {});
-  return { id: created.id, percent: 100, diaryDate: created.diaryDate.toISOString() };
+    // 스트릭 업데이트
+    this.streaks.onDiaryOrCheckin(userId, dayStart).catch(() => {});
+    return {
+      id: created.id,
+      percent: 100,
+      diaryDate: created.diaryDate.toISOString(),
+    };
   }
 
   async getToday(userId: string) {
     const now = new Date();
     const dayStart = normalizeToStartOfDay(now);
-    const row = await this.prisma.dailyCheckin.findFirst({ where: { userId, diaryDate: dayStart } });
+    const row = await this.prisma.dailyCheckin.findFirst({
+      where: { userId, diaryDate: dayStart },
+    });
     if (!row) return { exists: false, percent: 0 };
     return { exists: true, percent: 100, checkin: row };
   }

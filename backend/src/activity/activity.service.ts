@@ -16,24 +16,27 @@ const GAIN_LIKE = 0.005; // 커뮤니티 활동 (좋아요)
 // 요구사항: 최고등급은 99.5% (Level 12)
 // 여기서는 약간 가속 곡선 형태로 커스텀 threshold 제공 (필요시 조정 가능)
 const LEVEL_THRESHOLDS: number[] = [
-  0,    // L1 시작
-  5,    // L2
-  10,   // L3
-  17,   // L4
-  25,   // L5
-  35,   // L6
-  47,   // L7
-  60,   // L8
-  72,   // L9
-  82,   // L10
-  91,   // L11
-  96,   // L12 (99.5는 cap)
+  0, // L1 시작
+  5, // L2
+  10, // L3
+  17, // L4
+  25, // L5
+  35, // L6
+  47, // L7
+  60, // L8
+  72, // L9
+  82, // L10
+  91, // L11
+  96, // L12 (99.5는 cap)
 ];
 
 @Injectable()
 export class ActivityService {
   private readonly logger = new Logger(ActivityService.name);
-  constructor(private readonly prisma: PrismaService, private readonly realtime: RealtimeGateway) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeGateway,
+  ) {}
 
   private clampScore(score: number) {
     if (score < 0) return 0;
@@ -53,15 +56,25 @@ export class ActivityService {
 
   private async applyDelta(userId: string, delta: number) {
     const updated = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId }, select: { activityScore: true } });
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { activityScore: true },
+      });
       if (!user) return null;
       const newScoreRaw = (user.activityScore || 0) + delta;
       const newScore = this.clampScore(newScoreRaw);
       const newLevel = this.calcLevel(newScore);
-      return tx.user.update({ where: { id: userId }, data: { activityScore: newScore, activityLevel: newLevel } });
+      return tx.user.update({
+        where: { id: userId },
+        data: { activityScore: newScore, activityLevel: newLevel },
+      });
     });
     if (updated) {
-      this.realtime.emitActivityUpdate({ userId, activityScore: updated.activityScore, activityLevel: updated.activityLevel });
+      this.realtime.emitActivityUpdate({
+        userId,
+        activityScore: updated.activityScore,
+        activityLevel: updated.activityLevel,
+      });
     }
     return updated;
   }
@@ -78,7 +91,10 @@ export class ActivityService {
   // 하루 decay (CRON 등에서 호출 가정). 등록 사용자가 마지막 decay 이후 지난 일수만큼 감점.
   async dailyDecay(userId: string, today = new Date()) {
     const updated = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId }, select: { activityScore: true, lastActivityDecayAt: true } });
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { activityScore: true, lastActivityDecayAt: true },
+      });
       if (!user) return null;
       const last = user.lastActivityDecayAt || userCreatedFallback(today); // fallback
       const days = diffInDays(last, today);
@@ -86,10 +102,21 @@ export class ActivityService {
       const decayAmount = days * DAILY_DECAY; // 퍼센트 포인트 차감
       const newScore = this.clampScore(user.activityScore - decayAmount);
       const newLevel = this.calcLevel(newScore);
-      return tx.user.update({ where: { id: userId }, data: { activityScore: newScore, activityLevel: newLevel, lastActivityDecayAt: today } });
+      return tx.user.update({
+        where: { id: userId },
+        data: {
+          activityScore: newScore,
+          activityLevel: newLevel,
+          lastActivityDecayAt: today,
+        },
+      });
     });
     if (updated) {
-      this.realtime.emitActivityUpdate({ userId, activityScore: updated.activityScore, activityLevel: updated.activityLevel });
+      this.realtime.emitActivityUpdate({
+        userId,
+        activityScore: updated.activityScore,
+        activityLevel: updated.activityLevel,
+      });
     }
     return updated;
   }
@@ -98,11 +125,17 @@ export class ActivityService {
   // 입력: 선택 정보(bio, interests 등)를 사용해 대략적인 초기 활동 성향 점수 산출
   async assignInitialScore(userId: string) {
     const updated = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId }, include: { interests: true, lifestyleAnswers: true } });
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        include: { interests: true, lifestyleAnswers: true },
+      });
       if (!user) return null;
       // 이미 기본값 100%로 설정된 경우 로직 스킵 (재실행 방지)
       if (user.activityScore >= 100) {
-        return tx.user.update({ where: { id: userId }, data: { lastActivityDecayAt: new Date() } });
+        return tx.user.update({
+          where: { id: userId },
+          data: { lastActivityDecayAt: new Date() },
+        });
       }
       let score = 0;
       score += (user.interests?.length || 0) * 1.2;
@@ -111,10 +144,21 @@ export class ActivityService {
       if (user.mbti) score += 1.5;
       if (score > 30) score = 30;
       const level = this.calcLevel(score);
-      return tx.user.update({ where: { id: userId }, data: { activityScore: score, activityLevel: level, lastActivityDecayAt: new Date() } });
+      return tx.user.update({
+        where: { id: userId },
+        data: {
+          activityScore: score,
+          activityLevel: level,
+          lastActivityDecayAt: new Date(),
+        },
+      });
     });
     if (updated) {
-      this.realtime.emitActivityUpdate({ userId, activityScore: updated.activityScore, activityLevel: updated.activityLevel });
+      this.realtime.emitActivityUpdate({
+        userId,
+        activityScore: updated.activityScore,
+        activityLevel: updated.activityLevel,
+      });
     }
     return updated;
   }
@@ -124,7 +168,11 @@ export class ActivityService {
     const today = new Date();
     const users = await this.prisma.user.findMany({ select: { id: true } });
     for (const u of users) {
-      try { await this.dailyDecay(u.id, today); } catch (e: any) { this.logger.warn(`dailyDecay 실패 user=${u.id} ${e.message}`); }
+      try {
+        await this.dailyDecay(u.id, today);
+      } catch (e: any) {
+        this.logger.warn(`dailyDecay 실패 user=${u.id} ${e.message}`);
+      }
     }
   }
 }

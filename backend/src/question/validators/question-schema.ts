@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const QuestionItemSchema = z.object({
-  domain: z.enum(['emotion','relationship','recovery','action','goal']),
+  domain: z.enum(['emotion', 'relationship', 'recovery', 'action', 'goal']),
   text: z.string().min(3).max(120),
 });
 
@@ -15,6 +15,8 @@ export type QuestionSet = z.infer<typeof QuestionSetSchema>;
 export function tryParseQuestionJson(jsonText: string): QuestionSet | null {
   try {
     const obj = JSON.parse(jsonText);
-    return QuestionSetSchema.safeParse(obj).success ? (obj as any) : null;
-  } catch { return null; }
+    return QuestionSetSchema.safeParse(obj).success ? obj : null;
+  } catch {
+    return null;
+  }
 }
