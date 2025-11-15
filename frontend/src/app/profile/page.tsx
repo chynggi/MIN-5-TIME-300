@@ -548,8 +548,10 @@ export default function ProfilePage() {
                       ? mentalTrend
                       : [];
                     const w = 320;
-                    const h = 72;
+                    const h = 88;
                     const pad = 8;
+                    const axisLabelOffset = 14;
+                    const plotBottom = h - axisLabelOffset;
                     const scores = data.map(d => typeof d.score === 'number' ? d.score : Number(d.score));
                     const n = scores.length;
                     const min = n ? Math.min(...scores) : 0;
@@ -561,12 +563,24 @@ export default function ProfilePage() {
                     };
                     const toY = (v: number) => {
                       const norm = (v - min) / range;
-                      return h - pad - norm * (h - 2 * pad);
+                      return plotBottom - norm * (plotBottom - pad);
                     };
                     const points = (n ? scores : [0, 0, 0]).map((v, i) => `${toX(i)},${toY(v)}`).join(' ');
                     const accent = 'rgb(var(--c-accent-rgb, 99 102 241))';
                     const gridColor = 'rgba(0,0,0,0.08)';
-                    const label = data.map(d => d.date.slice(5)).join(' · ');
+                    const formatTickLabel = (date: string) => date.slice(5);
+                    const desiredTicks = mentalPeriod === 'recent7' ? Math.min(n, 7) : Math.min(n, 6);
+                    const tickIndices: number[] = [];
+                    if (desiredTicks > 0) {
+                      const step = desiredTicks > 1 ? Math.floor((n - 1) / (desiredTicks - 1)) : 1;
+                      for (let i = 0; i < n; i += step) {
+                        tickIndices.push(i);
+                        if (tickIndices.length === desiredTicks - 1) break;
+                      }
+                      if (tickIndices[tickIndices.length - 1] !== n - 1) {
+                        tickIndices.push(n - 1);
+                      }
+                    }
                     const rangeLabel = mentalPeriod === 'recent7' ? '최근 7일' : '최근 30일';
                     return (
                       <div>
@@ -612,16 +626,36 @@ export default function ProfilePage() {
                           {/* 가이드 라인 */}
                           <line x1={pad} y1={toY(min)} x2={w - pad} y2={toY(min)} stroke={gridColor} strokeDasharray="4 4" />
                           <line x1={pad} y1={toY(max)} x2={w - pad} y2={toY(max)} stroke={gridColor} strokeDasharray="4 4" />
+                          <line x1={pad} y1={plotBottom} x2={w - pad} y2={plotBottom} stroke={gridColor} strokeOpacity={0.4} />
                           {/* 라인 */}
                           <polyline fill="none" stroke={accent} strokeWidth={2} points={points} />
                           {/* 포인트 */}
                           {scores.map((v, i) => (
                             <circle key={i} cx={toX(i)} cy={toY(v)} r={2.5} fill={accent} />
                           ))}
+                          {/* X축 눈금 */}
+                          {tickIndices.map(idx => (
+                            <g key={`tick-${idx}`}>
+                              <line
+                                x1={toX(idx)}
+                                x2={toX(idx)}
+                                y1={plotBottom}
+                                y2={plotBottom + 4}
+                                stroke={gridColor}
+                                strokeWidth={1}
+                              />
+                              <text
+                                x={toX(idx)}
+                                y={h - 2}
+                                textAnchor="middle"
+                                fontSize="8"
+                                fill="rgba(255,255,255,0.72)"
+                              >
+                                {formatTickLabel(data[idx].date)}
+                              </text>
+                            </g>
+                          ))}
                         </svg>
-                        {data.length > 0 && (
-                          <div style={{ marginTop: '4px', fontSize: '0.7rem', opacity: 0.6 }}>{label}</div>
-                        )}
                       </div>
                     );
                   })()
