@@ -100,6 +100,7 @@ export default function ProfilePage() {
   const [mentalLoading, setMentalLoading] = useState(false);
   const [mentalError, setMentalError] = useState<string | null>(null);
   const [mentalDataSource, setMentalDataSource] = useState<'api' | 'sample' | null>(null);
+  const [mentalPeriod, setMentalPeriod] = useState<'recent7' | 'month'>('recent7');
 
   // 감정 이모지 매핑
   const emotionEmojis: { [key: string]: string } = {
@@ -342,32 +343,55 @@ export default function ProfilePage() {
     }
   };
 
+  const loadMentalTrend = async (
+    period: 'recent7' | 'month',
+    options: { force?: boolean; prefillSample?: boolean } = {}
+  ) => {
+    const shouldPrefill = options.prefillSample ?? (mentalTrend.length === 0);
+    if (!options.force && mentalTrend.length > 0 && mentalDataSource === 'api' && period === mentalPeriod) {
+      return;
+    }
+    try {
+      setMentalLoading(true);
+      setMentalError(null);
+      if (shouldPrefill && mentalTrend.length === 0) {
+        setMentalTrend([...mentalTrendSample]);
+        setMentalDataSource('sample');
+      }
+      const stats = await statisticsApi.getDashboardStats(period);
+      const apiData = (stats.mentalTrend && stats.mentalTrend.length ? stats.mentalTrend : stats.emotionTrend) || [];
+      if (apiData.length > 0) {
+        setMentalTrend(apiData);
+        setMentalDataSource('api');
+      } else if (shouldPrefill) {
+        setMentalTrend([...mentalTrendSample]);
+        setMentalDataSource('sample');
+      }
+    } catch (e: any) {
+      console.error('멘탈 그래프 로드 실패:', e);
+      setMentalError('그래프를 불러오지 못했습니다.');
+      if (shouldPrefill) {
+        setMentalTrend([...mentalTrendSample]);
+        setMentalDataSource('sample');
+      }
+    } finally {
+      setMentalLoading(false);
+    }
+  };
+
   const toggleMentalGraph = async () => {
     const next = !showMentalGraph;
     setShowMentalGraph(next);
-    if (next && mentalTrend.length === 0 && !mentalLoading) {
-      try {
-        setMentalLoading(true);
-        setMentalError(null);
-        setMentalTrend([...mentalTrendSample]);
-        setMentalDataSource('sample');
-        const stats = await statisticsApi.getDashboardStats('recent7');
-        const apiData = (stats.mentalTrend && stats.mentalTrend.length ? stats.mentalTrend : stats.emotionTrend) || [];
-        if (apiData.length > 0) {
-          setMentalTrend(apiData);
-          setMentalDataSource('api');
-        } else {
-          setMentalTrend([...mentalTrendSample]);
-          setMentalDataSource('sample');
-        }
-      } catch (e: any) {
-        console.error('멘탈 그래프 로드 실패:', e);
-        setMentalError('그래프를 불러오지 못했습니다.');
-        setMentalTrend([...mentalTrendSample]);
-        setMentalDataSource('sample');
-      } finally {
-        setMentalLoading(false);
-      }
+    if (next) {
+      await loadMentalTrend(mentalPeriod, { prefillSample: mentalTrend.length === 0 });
+    }
+  };
+
+  const handleMentalPeriodChange = (period: 'recent7' | 'month') => {
+    if (period === mentalPeriod) return;
+    setMentalPeriod(period);
+    if (showMentalGraph) {
+      loadMentalTrend(period, { force: true });
     }
   };
 
@@ -543,13 +567,43 @@ export default function ProfilePage() {
                     const accent = 'rgb(var(--c-accent-rgb, 99 102 241))';
                     const gridColor = 'rgba(0,0,0,0.08)';
                     const label = data.map(d => d.date.slice(5)).join(' · ');
+                    const rangeLabel = mentalPeriod === 'recent7' ? '최근 7일' : '최근 30일';
                     return (
                       <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '6px',
+                            gap: '0.5rem',
+                            flexWrap: 'wrap',
+                          }}
+                        >
                           <strong style={{ fontSize: '0.9rem' }}>최근 멘탈 추세</strong>
-                          {data.length > 0 && (
-                            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>최근 7일</span>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>{rangeLabel}</span>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              {(['recent7', 'month'] as const).map(period => (
+                                <button
+                                  key={period}
+                                  type="button"
+                                  onClick={() => handleMentalPeriodChange(period)}
+                                  aria-pressed={period === mentalPeriod}
+                                  style={{
+                                    fontSize: '0.7rem',
+                                    padding: '2px 10px',
+                                    borderRadius: '999px',
+                                    border: '1px solid rgba(0,0,0,0.12)',
+                                    background: period === mentalPeriod ? 'rgba(99,102,241,0.18)' : 'transparent',
+                                    color: period === mentalPeriod ? 'rgb(var(--c-accent-rgb, 99 102 241))' : 'inherit',
+                                  }}
+                                >
+                                  {period === 'recent7' ? '7일' : '30일'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                         {mentalDataSource === 'sample' && (
                           <div style={{ fontSize: '0.7rem', color: '#2563eb', marginBottom: '4px' }}>디버그: 샘플 데이터 표시 중</div>

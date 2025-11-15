@@ -65,7 +65,9 @@ export class StatisticsService {
     const now = new Date();
     let from: Date;
     if (period === 'month') {
-      from = new Date(now.getFullYear(), now.getMonth(), 1);
+      from = new Date(now);
+      from.setHours(0, 0, 0, 0);
+      from.setDate(from.getDate() - 29);
     } else if (period === 'year') {
       from = new Date(now.getFullYear(), 0, 1);
     } else if (period === 'recent7') {
