@@ -121,49 +121,71 @@ describe('MBTI diary save answers E2E (mass test)', () => {
     'relationship',
   ];
 
+  async function generateQuestionAndSaveDiary(
+    token: string,
+    content: string,
+    diaryDate: string,
+  ) {
+    const genRes = await request(httpServer)
+      .post('/api/v1/questions/generate')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(201);
+
+    const body = genRes.body;
+    const firstQuestion = body.questions && body.questions[0];
+
+    expect(firstQuestion).toBeDefined();
+
+    const payload = {
+      qa: [
+        {
+          domain: firstQuestion.domain ?? 'emotion',
+          question: firstQuestion.text ?? '오늘 기분은 어땠나요?',
+          answer: content,
+        },
+      ],
+      diaryDate,
+    };
+
+    const res = await request(httpServer)
+      .post('/api/v1/diaries/save-answers')
+      .set('Authorization', `Bearer ${token}`)
+      .send(payload)
+      .expect(201);
+
+    expect(res.body.id).toBeDefined();
+    expect(res.body.summary).toBeDefined();
+    expect(Array.isArray(res.body.selectedQuestions)).toBeTruthy();
+  }
+
   for (const mbti of MBTIS) {
     describe(`MBTI: ${mbti}`, () => {
-      for (const styleKey of STYLE_KEYS) {
-        describe(`style: ${styleKey}`, () => {
-          for (const lengthKey of LENGTH_KEYS) {
-            it(
-              `saves diary successfully for style=${styleKey}, length=${lengthKey}`,
-              async () => {
-                const users = userMap[mbti];
-                expect(users && users.length).toBeGreaterThan(0);
+      it(
+        `MBTI=${mbti} 유저들이 실제 질문 기반으로 7일간 일기를 작성한다`,
+        async () => {
+          const users = userMap[mbti];
+          expect(users && users.length).toBeGreaterThan(0);
 
-                for (const user of users) {
-                  const token = user.token;
-                  const content = diaries[mbti][styleKey][lengthKey];
-                  const diaryDate = new Date().toISOString().slice(0, 10);
+          for (const user of users) {
+            const token = user.token;
 
-                  const payload = {
-                    qa: [
-                      {
-                        domain: 'emotion',
-                        question: '오늘 기분은 어땠나요?',
-                        answer: content,
-                      },
-                    ],
-                    diaryDate,
-                  };
+            for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+              const diaryDate = new Date(
+                Date.now() - dayOffset * 24 * 60 * 60 * 1000,
+              )
+                .toISOString()
+                .slice(0, 10);
 
-                  const res = await request(httpServer)
-                    .post('/api/v1/diaries/save-answers')
-                    .set('Authorization', `Bearer ${token}`)
-                    .send(payload)
-                    .expect(201);
+              const styleKey = STYLE_KEYS[dayOffset % STYLE_KEYS.length];
+              const lengthKey = LENGTH_KEYS[dayOffset % LENGTH_KEYS.length];
+              const content = diaries[mbti][styleKey][lengthKey];
 
-                  expect(res.body.id).toBeDefined();
-                  expect(res.body.summary).toBeDefined();
-                  expect(Array.isArray(res.body.selectedQuestions)).toBeTruthy();
-                }
-              },
-              60000,
-            );
+              await generateQuestionAndSaveDiary(token, content, diaryDate);
+            }
           }
-        });
-      }
+        },
+        180000,
+      );
     });
   }
 });
