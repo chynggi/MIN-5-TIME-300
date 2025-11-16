@@ -16,13 +16,21 @@ const LENGTH_CONFIG = {
   very_long: { min: 1000, max: 1400 },
 } as const;
 
-type LengthKey = keyof typeof LENGTH_CONFIG;
+const STYLE_KEYS = ['emotional', 'analytical', 'action', 'relationship'] as const;
 
-type MbtiProfileConfig = Record<string, { style: string; description: string }>;
+type LengthKey = keyof typeof LENGTH_CONFIG;
+type StyleKey = (typeof STYLE_KEYS)[number];
+
+type MbtiProfileConfig = Record<
+  string,
+  {
+    styles: Record<StyleKey, string>;
+  }
+>;
 
 type GeneratedDiarySet = Record<
   (typeof MBTIS)[number],
-  Record<LengthKey, string>
+  Record<StyleKey, Record<LengthKey, string>>
 >;
 
 async function main() {
@@ -47,42 +55,55 @@ async function main() {
 
     result[mbti] = {} as any;
 
-    for (const lengthKey of Object.keys(LENGTH_CONFIG) as LengthKey[]) {
-      const { min, max } = LENGTH_CONFIG[lengthKey];
+    for (const styleKey of STYLE_KEYS) {
+      const styleDesc = profile.styles[styleKey];
+      if (!styleDesc) {
+        throw new Error(`스타일 설정 없음: ${mbti} / ${styleKey}`);
+      }
 
-      const prompt = `당신은 MBTI 전문가이자 감성적인 한국어 작가입니다.
+      result[mbti][styleKey] = {} as any;
+
+      for (const lengthKey of Object.keys(LENGTH_CONFIG) as LengthKey[]) {
+        const { min, max } = LENGTH_CONFIG[lengthKey];
+
+        const prompt = `당신은 MBTI 전문가이자 감성적인 한국어 작가입니다.
 MBTI 유형: ${mbti}
-문체 특징: ${profile.description}
+요청 문체(스타일): ${styleKey}
+문체 설명: ${styleDesc}
 요청: 아래 조건을 만족하는 "하루 일기" 텍스트를 한 개만 작성하세요.
 
 - 1인칭 시점의 자연스러운 한국어 문장
 - 사용자의 하루 기분, 행동, 생각, 관계, 계획 등이 적절히 섞일 것
+- 위 문체 설명이 잘 드러나도록 작성할 것
 - 줄바꿈은 자유롭게 사용해도 되지만, HTML 태그는 사용하지 마세요.
 - 글자 수는 공백 포함 대략 ${min}~${max}자 정도로 맞춰주세요.
 
 출력 형식: 순수 한국어 일기 텍스트만 출력하고, 설명이나 따옴표는 붙이지 마세요.`;
 
-      const message = await client.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 2048,
-        temperature: 0.9,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-      });
+        const message = await client.messages.create({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 2048,
+          temperature: 0.9,
+          messages: [
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+        });
 
-      const text = message.content
-        .map((c) => (c.type === 'text' ? c.text : ''))
-        .join('\n')
-        .trim();
+        const text = message.content
+          .map((c) => (c.type === 'text' ? c.text : ''))
+          .join('\n')
+          .trim();
 
-      result[mbti][lengthKey] = text;
-      // 간단 로그
-      // eslint-disable-next-line no-console
-      console.log(`[generated] ${mbti} / ${lengthKey} length=${text.length}`);
+        result[mbti][styleKey][lengthKey] = text;
+        // 간단 로그
+        // eslint-disable-next-line no-console
+        console.log(
+          `[generated] ${mbti} / ${styleKey} / ${lengthKey} length=${text.length}`,
+        );
+      }
     }
   }
 

@@ -1,18 +1,130 @@
 {
-  "INTJ": { "style": "analytical", "description": "계획적이고 체계적인 분석형 문체" },
-  "INTP": { "style": "analytical", "description": "가설과 가능성을 탐구하는 이론 중심 문체" },
-  "ENTJ": { "style": "planning", "description": "목표와 전략, 실행 계획을 중시하는 문체" },
-  "ENTP": { "style": "analytical", "description": "아이디어 실험과 논쟁을 즐기는 분석적 문체" },
-  "INFJ": { "style": "relationship", "description": "관계와 가치, 의미를 강조하는 문체" },
-  "INFP": { "style": "emotional", "description": "감정, 내적 의미, 이상을 중시하는 문체" },
-  "ENFJ": { "style": "relationship", "description": "타인과의 관계, 조화, 배려를 강조하는 문체" },
-  "ENFP": { "style": "emotional", "description": "에너지와 감정을 솔직하게 표현하는 문체" },
-  "ISTJ": { "style": "planning", "description": "사실과 절차, 책임을 강조하는 문체" },
-  "ISFJ": { "style": "relationship", "description": "헌신과 보호, 세심함이 드러나는 문체" },
-  "ESTJ": { "style": "action", "description": "실행, 규칙, 조직을 강조하는 문체" },
-  "ESFJ": { "style": "relationship", "description": "사람 간의 분위기와 조화를 중시하는 문체" },
-  "ISTP": { "style": "action", "description": "조용하지만 실용적이고 행동 중심의 문체" },
-  "ISFP": { "style": "emotional", "description": "감각과 감정을 섬세하게 묘사하는 문체" },
-  "ESTP": { "style": "action", "description": "현재의 자극과 행동, 즉흥성을 강조하는 문체" },
-  "ESFP": { "style": "action", "description": "즐거움, 경험, 즉흥성을 강조하는 문체" }
+  "INTJ": {
+    "styles": {
+      "analytical": "논리와 구조 중심, 계획적인 분석형 일기 문체",
+      "planning": "장기 목표와 전략, 우선순위를 구체적으로 정리하는 문체",
+      "action": "오늘 실행한 업무와 다음 할 일을 체크리스트처럼 정리하는 문체",
+      "relationship": "팀원, 동료와의 협업 경험을 간단히 언급하는 문체"
+    }
+  },
+  "INTP": {
+    "styles": {
+      "analytical": "가설과 가능성을 따져보며 머릿속 생각을 풀어내는 문체",
+      "planning": "다음에 실험해보고 싶은 아이디어와 계획을 적는 문체",
+      "action": "오늘 시도한 실험과 시도 과정의 행동을 적는 문체",
+      "relationship": "소수의 가까운 사람들과 나눈 대화와 느낌을 간단히 적는 문체"
+    }
+  },
+  "ENTJ": {
+    "styles": {
+      "analytical": "성과와 지표를 중심으로 하루를 평가하는 문체",
+      "planning": "목표, 전략, 실행 계획을 명확히 정리하는 문체",
+      "action": "오늘 밀어붙인 일과 결정들을 강하게 서술하는 문체",
+      "relationship": "조직 내 사람들과의 협력/조율 경험을 리더 시각에서 적는 문체"
+    }
+  },
+  "ENTP": {
+    "styles": {
+      "analytical": "여러 관점과 아이디어를 비교하며 논리적으로 풀어내는 문체",
+      "planning": "새로운 시도와 실험 계획을 유쾌하게 정리하는 문체",
+      "action": "즉흥적으로 뛰어든 일과 사건을 생동감 있게 적는 문체",
+      "relationship": "재치 있게 사람들과의 대화, 토론, 농담을 묘사하는 문체"
+    }
+  },
+  "INFJ": {
+    "styles": {
+      "emotional": "감정과 의미, 가치에 집중하여 내면을 서정적으로 표현하는 문체",
+      "analytical": "사람과 상황을 조용히 분석하며 통찰을 정리하는 문체",
+      "action": "오늘 실천한 작은 선행이나 가치 실현 행동을 기록하는 문체",
+      "relationship": "주변 사람들의 마음과 관계 변화를 섬세하게 적는 문체"
+    }
+  },
+  "INFP": {
+    "styles": {
+      "emotional": "감정, 상상, 이상을 자유롭게 풀어내는 감성적인 문체",
+      "analytical": "자기 성찰과 감정의 원인을 조용히 분석하는 문체",
+      "action": "하루 중 의미 있었던 작은 행동과 선택을 담담히 적는 문체",
+      "relationship": "중요한 사람과의 교류에서 느낀 감정을 따뜻하게 적는 문체"
+    }
+  },
+  "ENFJ": {
+    "styles": {
+      "emotional": "타인의 감정과 분위기를 함께 느끼며 공감적으로 적는 문체",
+      "analytical": "사람 간 상호작용 패턴과 조직 분위기를 정리하는 문체",
+      "action": "이끌고 조율한 행동들을 리더로서 되돌아보는 문체",
+      "relationship": "주변 사람들을 돌보고 챙긴 경험을 중심으로 적는 문체"
+    }
+  },
+  "ENFP": {
+    "styles": {
+      "emotional": "기분과 에너지를 생생하게 표현하는 자유로운 문체",
+      "analytical": "하루 동안 떠오른 아이디어와 통찰을 정리하는 문체",
+      "action": "즉흥적으로 움직인 활동과 모험을 재밌게 풀어내는 문체",
+      "relationship": "사람들과의 즐거운 사건, 대화, 연결감을 중심으로 적는 문체"
+    }
+  },
+  "ISTJ": {
+    "styles": {
+      "analytical": "사실과 데이터를 중심으로 하루를 정리하는 문체",
+      "planning": "해야 할 일과 완료된 일을 체크리스트처럼 적는 문체",
+      "action": "책임지고 처리한 실무와 업무 흐름을 차분히 적는 문체",
+      "relationship": "가족이나 가까운 동료와의 안정적인 관계를 짧게 기록하는 문체"
+    }
+  },
+  "ISFJ": {
+    "styles": {
+      "emotional": "조용한 감정의 변화와 세심한 배려를 담아 적는 문체",
+      "analytical": "주변 사람들의 필요와 상황을 관찰해 정리하는 문체",
+      "action": "뒤에서 챙긴 일과 보이지 않는 수고를 기록하는 문체",
+      "relationship": "가족, 친구, 동료를 돌본 경험과 따뜻한 순간을 적는 문체"
+    }
+  },
+  "ESTJ": {
+    "styles": {
+      "analytical": "성과, 효율, 결과를 중심으로 하루를 평가하는 문체",
+      "planning": "규칙과 계획, 조직 정비 내용을 구체적으로 적는 문체",
+      "action": "주도적으로 처리한 일과 지시, 실행 과정을 강하게 적는 문체",
+      "relationship": "팀원과의 협력, 갈등 조율을 리더 관점에서 적는 문체"
+    }
+  },
+  "ESFJ": {
+    "styles": {
+      "emotional": "사람들 사이의 분위기와 감정을 섬세하게 묘사하는 문체",
+      "analytical": "모임/행사의 준비와 진행 과정을 정리하는 문체",
+      "action": "하루 동안 돌본 사람들과 한 일들을 구체적으로 적는 문체",
+      "relationship": "주변 사람들의 반응과 감사, 관계의 온도를 중심으로 적는 문체"
+    }
+  },
+  "ISTP": {
+    "styles": {
+      "emotional": "겉으로는 담담하지만 내면의 미묘한 감정을 짧게 적는 문체",
+      "analytical": "문제 해결 과정과 원인 분석을 간결하게 정리하는 문체",
+      "action": "직접 손으로 해본 활동과 실험을 중심으로 적는 문체",
+      "relationship": "소수의 사람들과의 느슨하지만 의미 있는 관계를 적는 문체"
+    }
+  },
+  "ISFP": {
+    "styles": {
+      "emotional": "감각과 감정을 섬세하게 묘사하는 예술적인 문체",
+      "analytical": "자기 감정의 뿌리를 조용히 탐색하는 문체",
+      "action": "조용히 즐긴 취미 활동과 경험을 중심으로 적는 문체",
+      "relationship": "소중한 사람과의 따뜻한 순간과 분위기를 그리는 문체"
+    }
+  },
+  "ESTP": {
+    "styles": {
+      "emotional": "현재의 자극과 스릴을 솔직하게 표현하는 문체",
+      "analytical": "상황 판단과 즉흥적 결정 과정을 짧게 분석하는 문체",
+      "action": "스피디한 행동, 모험, 사건을 생생하게 적는 문체",
+      "relationship": "사람들과 어울린 흥겨운 순간과 유머를 중심으로 적는 문체"
+    }
+  },
+  "ESFP": {
+    "styles": {
+      "emotional": "즐거움과 설렘, 순간의 감정을 풍부하게 표현하는 문체",
+      "analytical": "즐거운 경험 속에서 느낀 교훈과 생각을 정리하는 문체",
+      "action": "하루 동안 벌어진 이벤트와 활동을 현장감 있게 적는 문체",
+      "relationship": "사람들과의 웃음, 공연, 모임에서 느낀 연결감을 적는 문체"
+    }
+  }
 }

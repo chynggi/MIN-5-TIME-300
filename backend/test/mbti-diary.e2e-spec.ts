@@ -6,17 +6,32 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const MBTIS = [
-  'INTJ','INTP','ENTJ','ENTP',
-  'INFJ','INFP','ENFJ','ENFP',
-  'ISTJ','ISFJ','ESTJ','ESFJ',
-  'ISTP','ISFP','ESTP','ESFP',
+  'INTJ',
+  'INTP',
+  'ENTJ',
+  'ENTP',
+  'INFJ',
+  'INFP',
+  'ENFJ',
+  'ENFP',
+  'ISTJ',
+  'ISFJ',
+  'ESTJ',
+  'ESFJ',
+  'ISTP',
+  'ISFP',
+  'ESTP',
+  'ESFP',
 ] as const;
 
 type LengthKey = 'short' | 'medium' | 'long' | 'very_long';
+type StyleKey = 'emotional' | 'analytical' | 'action' | 'relationship';
 
 interface GeneratedDiarySet {
   [mbti: string]: {
-    [length in LengthKey]: string;
+    [style in StyleKey]: {
+      [length in LengthKey]: string;
+    };
   };
 }
 
@@ -25,6 +40,8 @@ interface FakeUserMeta {
   password: string;
   username: string;
   mbti: string;
+  interests: { interest: string; priority?: number }[];
+  lifestyle: { question: string; answer: string }[];
 }
 
 interface AuthenticatedUser extends FakeUserMeta {
@@ -74,7 +91,9 @@ describe('MBTI diary save answers E2E (mass test)', () => {
             email: u.email,
             password: u.password,
             username: u.username,
-            // 실제 API에서 MBTI 필드가 필요하면 여기에 추가
+            mbti: u.mbti,
+            interests: u.interests,
+            lifestyle: u.lifestyle,
           })
           .expect(201);
 
@@ -95,46 +114,55 @@ describe('MBTI diary save answers E2E (mass test)', () => {
   });
 
   const LENGTH_KEYS: LengthKey[] = ['short', 'medium', 'long', 'very_long'];
+  const STYLE_KEYS: StyleKey[] = [
+    'emotional',
+    'analytical',
+    'action',
+    'relationship',
+  ];
 
   for (const mbti of MBTIS) {
     describe(`MBTI: ${mbti}`, () => {
-      for (const lengthKey of LENGTH_KEYS) {
-        it(
-          `saves diary successfully for length=${lengthKey}`,
-          async () => {
-            const users = userMap[mbti];
-            expect(users && users.length).toBeGreaterThan(0);
+      for (const styleKey of STYLE_KEYS) {
+        describe(`style: ${styleKey}`, () => {
+          for (const lengthKey of LENGTH_KEYS) {
+            it(
+              `saves diary successfully for style=${styleKey}, length=${lengthKey}`,
+              async () => {
+                const users = userMap[mbti];
+                expect(users && users.length).toBeGreaterThan(0);
 
-            // 계정 3개를 순회하면서 같은 길이의 다른 텍스트를 모두 저장
-            for (const user of users) {
-              const token = user.token;
-              const content = diaries[mbti][lengthKey];
-              const diaryDate = new Date().toISOString().slice(0, 10);
+                for (const user of users) {
+                  const token = user.token;
+                  const content = diaries[mbti][styleKey][lengthKey];
+                  const diaryDate = new Date().toISOString().slice(0, 10);
 
-              const payload = {
-                qa: [
-                  {
-                    domain: 'emotion',
-                    question: '오늘 기분은 어땠나요?',
-                    answer: content,
-                  },
-                ],
-                diaryDate,
-              };
+                  const payload = {
+                    qa: [
+                      {
+                        domain: 'emotion',
+                        question: '오늘 기분은 어땠나요?',
+                        answer: content,
+                      },
+                    ],
+                    diaryDate,
+                  };
 
-              const res = await request(httpServer)
-                .post('/api/v1/diaries/save-answers')
-                .set('Authorization', `Bearer ${token}`)
-                .send(payload)
-                .expect(201);
+                  const res = await request(httpServer)
+                    .post('/api/v1/diaries/save-answers')
+                    .set('Authorization', `Bearer ${token}`)
+                    .send(payload)
+                    .expect(201);
 
-              expect(res.body.id).toBeDefined();
-              expect(res.body.summary).toBeDefined();
-              expect(Array.isArray(res.body.selectedQuestions)).toBeTruthy();
-            }
-          },
-          60000,
-        );
+                  expect(res.body.id).toBeDefined();
+                  expect(res.body.summary).toBeDefined();
+                  expect(Array.isArray(res.body.selectedQuestions)).toBeTruthy();
+                }
+              },
+              60000,
+            );
+          }
+        });
       }
     });
   }
