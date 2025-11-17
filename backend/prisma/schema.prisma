@@ -125,6 +125,9 @@ model Journal {
   diaryDate       DateTime @default(now()) // 일기 작성 날짜 (사용자가 지정, 기본값은 현재 시각)
   isRetrospective Boolean  @default(false) // 과거 날짜 회고 작성 여부
   isPublic        Boolean  @default(false)
+  postVisibility       String  @default("public")
+  contentVisibility    String  @default("public")
+  weather              String  @default("sunny")
   emotionScore    Int
   emotion         String?           // 감정 이모지 저장
   mediaUrl        String?

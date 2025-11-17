@@ -53,4 +53,21 @@ describe('일기 위치 저장 (e2e)', () => {
     expect(res.body.lat).toBeCloseTo(parseFloat(form.lat));
     expect(res.body.lng).toBeCloseTo(parseFloat(form.lng));
   });
+
+  it('DELETE /api/v1/diaries/:id - 작성자가 일기를 삭제할 수 있다', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/api/v1/diaries')
+      .set('Authorization', `Bearer ${token}`)
+      .field({ content: '삭제 테스트 일기', writingDuration: '15' })
+      .expect(201);
+
+    const diaryId = createRes.body.id;
+
+    const deleteRes = await request(app.getHttpServer())
+      .delete(`/api/v1/diaries/${diaryId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(deleteRes.body).toMatchObject({ id: diaryId, deleted: true });
+  });
 });

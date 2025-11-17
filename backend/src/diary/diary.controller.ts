@@ -91,6 +91,9 @@ export class DiaryController {
     content: string;
     createdAt: string;
     isPublic: boolean;
+    postVisibility: string;
+    contentVisibility: string;
+    weather: string;
     question: string;
     mediaUrl?: string;
     mediaType?: string;
@@ -156,6 +159,11 @@ export class DiaryController {
       }
     } catch {}
     return this.diaryService.updateDiary(req, id, dto, file);
+  }
+
+  @Delete(':id')
+  async deleteDiary(@Req() req, @Param('id') id: string) {
+    return this.diaryService.deleteDiary(req, id);
   }
 
   /**
