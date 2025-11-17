@@ -7,6 +7,9 @@ export class DiaryListItemDto {
   diaryDate: string; // 일기 날짜 필드 추가
   isRetrospective?: boolean; // 회고 작성 여부
   isPublic: boolean;
+  postVisibility?: string;
+  contentVisibility?: string;
+  weather?: string;
   emotionScore: number;
   emotion?: string; // 감정 이모지 필드 추가
   mediaUrl?: string;
@@ -45,6 +48,9 @@ export class DiaryDetailResponseDto {
   diaryDate: string; // 일기 날짜 필드 추가
   isRetrospective?: boolean; // 회고 작성 여부
   isPublic: boolean;
+  postVisibility?: string;
+  contentVisibility?: string;
+  weather?: string;
   emotionScore: number;
   emotion?: string; // 감정 이모지 필드 추가
   mediaUrl?: string;

@@ -3,6 +3,7 @@ import {
   IsOptional,
   IsBooleanString,
   IsNumberString,
+  IsIn,
 } from 'class-validator';
 
 export class CreateDiaryDto {
@@ -50,6 +51,18 @@ export class CreateDiaryDto {
   @IsOptional()
   @IsString()
   preset?: string;
+
+  @IsOptional()
+  @IsIn(['public', 'private', 'friends'])
+  postVisibility?: string;
+
+  @IsOptional()
+  @IsIn(['public', 'private'])
+  contentVisibility?: string;
+
+  @IsOptional()
+  @IsIn(['sunny', 'cloudy', 'rainy', 'snowy', 'night', 'rain', 'snow'])
+  weather?: string;
 
   @IsNumberString()
   writingDuration: string; // FormData에서 문자열로 전달

@@ -78,6 +78,61 @@ function normalizeStringArray(v: any): string[] | undefined {
   return undefined;
 }
 
+const VALID_POST_VISIBILITY = new Set(['public', 'private', 'friends']);
+const VALID_CONTENT_VISIBILITY = new Set(['public', 'private']);
+const VALID_WEATHER = new Set([
+  'sunny',
+  'cloudy',
+  'rainy',
+  'snowy',
+  'night',
+  'rain',
+  'snow',
+]);
+
+function resolvePostVisibility(
+  raw: any,
+  fallbackIsPublic?: boolean,
+  current?: string,
+): 'public' | 'private' | 'friends' {
+  if (typeof raw === 'string' && VALID_POST_VISIBILITY.has(raw)) {
+    return raw as 'public' | 'private' | 'friends';
+  }
+  if (current && VALID_POST_VISIBILITY.has(current)) {
+    return current as 'public' | 'private' | 'friends';
+  }
+  if (fallbackIsPublic === true) return 'public';
+  if (fallbackIsPublic === false) return 'private';
+  return 'private';
+}
+
+function resolveContentVisibility(
+  raw: any,
+  postVisibility: 'public' | 'private' | 'friends',
+  current?: string,
+): 'public' | 'private' {
+  if (postVisibility === 'private' || postVisibility === 'friends') {
+    return 'private';
+  }
+  if (typeof raw === 'string' && VALID_CONTENT_VISIBILITY.has(raw)) {
+    return raw as 'public' | 'private';
+  }
+  if (current && VALID_CONTENT_VISIBILITY.has(current)) {
+    return current as 'public' | 'private';
+  }
+  return 'public';
+}
+
+function resolveWeather(raw: any, current?: string): string {
+  if (typeof raw === 'string' && VALID_WEATHER.has(raw)) {
+    return raw;
+  }
+  if (current && VALID_WEATHER.has(current)) {
+    return current;
+  }
+  return 'sunny';
+}
+
 @Injectable()
 export class DiaryService {
   constructor(
@@ -264,10 +319,15 @@ export class DiaryService {
           diaryDate: true,
           isRetrospective: true as any,
           isPublic: true,
+          postVisibility: true as any,
+          contentVisibility: true as any,
+          weather: true as any,
           emotionScore: true,
           emotion: true,
           mediaUrl: true,
           mediaType: true,
+          lat: true as any,
+          lng: true as any,
           user: { select: { username: true, profileImageUrl: true } },
           reactions: { select: { reactionType: true } },
         },
@@ -288,6 +348,14 @@ export class DiaryService {
           diaryDate: p.diaryDate.toISOString(),
           isRetrospective: (p as any).isRetrospective ?? undefined,
           isPublic: p.isPublic,
+          postVisibility:
+            (p as any).postVisibility ?? (p.isPublic ? 'public' : 'private'),
+          contentVisibility:
+            (p as any).contentVisibility ??
+            (['private', 'friends'].includes((p as any).postVisibility)
+              ? 'private'
+              : 'public'),
+          weather: (p as any).weather ?? 'sunny',
           emotionScore: p.emotionScore,
           emotion: p.emotion ?? undefined,
           mediaUrl: p.mediaUrl ?? undefined,
@@ -333,6 +401,14 @@ export class DiaryService {
         diaryDate: d.diaryDate.toISOString(), // 일기 날짜 포함
         isRetrospective: (d as any).isRetrospective ?? undefined,
         isPublic: d.isPublic,
+        postVisibility:
+          (d as any).postVisibility ?? (d.isPublic ? 'public' : 'private'),
+        contentVisibility:
+          (d as any).contentVisibility ??
+          (['private', 'friends'].includes((d as any).postVisibility)
+            ? 'private'
+            : 'public'),
+        weather: (d as any).weather ?? 'sunny',
         emotionScore: d.emotionScore,
         emotion: d.emotion ?? undefined, // 감정 이모지 포함
         mediaUrl: d.mediaUrl ?? undefined,
@@ -408,6 +484,14 @@ export class DiaryService {
           createdAt: r.createdAt.toISOString(),
           updatedAt: r.updatedAt.toISOString(),
           isPublic: r.isPublic,
+          postVisibility:
+            (r as any).postVisibility ?? (r.isPublic ? 'public' : 'private'),
+          contentVisibility:
+            (r as any).contentVisibility ??
+            (['private', 'friends'].includes((r as any).postVisibility)
+              ? 'private'
+              : 'public'),
+          weather: (r as any).weather ?? 'sunny',
           userId: r.userId,
           lat: (r as any).lat,
           lng: (r as any).lng,
@@ -433,6 +517,9 @@ export class DiaryService {
           createdAt: true,
           updatedAt: true,
           isPublic: true,
+          postVisibility: true as any,
+          contentVisibility: true as any,
+          weather: true as any,
           lat: true as any,
           lng: true as any,
           userId: true,
@@ -455,6 +542,14 @@ export class DiaryService {
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
         isPublic: r.isPublic,
+        postVisibility:
+          (r as any).postVisibility ?? (r.isPublic ? 'public' : 'private'),
+        contentVisibility:
+          (r as any).contentVisibility ??
+          (['private', 'friends'].includes((r as any).postVisibility)
+            ? 'private'
+            : 'public'),
+        weather: (r as any).weather ?? 'sunny',
         userId: r.userId,
         lat: (r as any).lat,
         lng: (r as any).lng,
@@ -506,6 +601,14 @@ export class DiaryService {
       diaryDate: diary.diaryDate.toISOString(), // 일기 날짜 포함
       isRetrospective: (diary as any).isRetrospective ?? undefined,
       isPublic: diary.isPublic,
+      postVisibility:
+        (diary as any).postVisibility ?? (diary.isPublic ? 'public' : 'private'),
+      contentVisibility:
+        (diary as any).contentVisibility ??
+        (['private', 'friends'].includes((diary as any).postVisibility)
+          ? 'private'
+          : 'public'),
+      weather: (diary as any).weather ?? 'sunny',
       emotionScore: diary.emotionScore,
       emotion: diary.emotion ?? undefined, // 감정 이모지 포함
       mediaUrl: diary.mediaUrl ?? undefined,
@@ -602,6 +705,9 @@ export class DiaryService {
     content: string;
     createdAt: string;
     isPublic: boolean;
+    postVisibility: string;
+    contentVisibility: string;
+    weather: string;
     question: string;
     mediaUrl?: string;
     mediaType?: string;
@@ -651,8 +757,15 @@ export class DiaryService {
     }
 
     // FormData로 전달된 문자열 값들을 올바른 타입으로 변환
-    const isPublic =
+    const legacyIsPublicTrue =
       (dto.isPublic as any) === true || (dto.isPublic as any) === 'true';
+    const legacyIsPublicFalse =
+      (dto.isPublic as any) === false || (dto.isPublic as any) === 'false';
+    const legacyIsPublicValue = legacyIsPublicTrue
+      ? true
+      : legacyIsPublicFalse
+        ? false
+        : undefined;
     // writingDuration은 DTO에서 문자열(@IsNumberString)로 들어오므로 확실하게 number로 파싱
     const writingDurationParsed = (() => {
       const n = parseInt(dto.writingDuration as any, 10);
@@ -723,6 +836,19 @@ export class DiaryService {
     const selectedQuestionTexts = normalizeStringArray(
       (dto as any).selectedQuestionTexts,
     );
+    const postVisibility = resolvePostVisibility(
+      (dto as any).postVisibility,
+      legacyIsPublicValue,
+    );
+    const isPublic =
+      legacyIsPublicValue !== undefined
+        ? legacyIsPublicValue
+        : postVisibility === 'public';
+    const contentVisibility = resolveContentVisibility(
+      (dto as any).contentVisibility,
+      postVisibility,
+    );
+    const weather = resolveWeather((dto as any).weather);
 
     // 동일 날짜 일기 존재 시 업데이트로 전환
     let diary = await this.prisma.journal.findFirst({
@@ -735,6 +861,9 @@ export class DiaryService {
           content: cleanedContent,
           isPublic,
           emotion: dto.emotion,
+          postVisibility,
+          contentVisibility,
+          weather,
           // 날짜는 유지(dayStart)
           mediaUrl,
           mediaType,
@@ -762,6 +891,9 @@ export class DiaryService {
           content: cleanedContent,
           isPublic,
           emotion: dto.emotion, // 감정 이모지 저장
+          postVisibility,
+          contentVisibility,
+          weather,
           diaryDate: dayStart, // 일기 날짜는 정규화된 00:00:00으로 저장
           ...(useCustomCreatedAt ? { createdAt: dayStart } : {}),
           mediaUrl,
@@ -820,6 +952,10 @@ export class DiaryService {
       content: diary.content,
       createdAt: diary.createdAt.toISOString(),
       isPublic: diary.isPublic,
+      postVisibility: (diary as any).postVisibility ?? postVisibility,
+      contentVisibility:
+        (diary as any).contentVisibility ?? contentVisibility,
+      weather: (diary as any).weather ?? weather,
       question: '', // deprecated
       mediaUrl,
       mediaType,
@@ -938,6 +1074,12 @@ export class DiaryService {
       content: journal.content,
       createdAt: journal.createdAt.toISOString(),
       isPublic: journal.isPublic,
+      postVisibility:
+        (journal as any).postVisibility ?? (journal.isPublic ? 'public' : 'private'),
+      contentVisibility:
+        (journal as any).contentVisibility ??
+        ((journal as any).postVisibility === 'private' ? 'private' : 'public'),
+      weather: (journal as any).weather ?? 'sunny',
       question: '',
       diaryDate: journal.diaryDate.toISOString(),
       summary: {
@@ -986,13 +1128,51 @@ export class DiaryService {
       throw new ForbiddenException('본인 일기만 공유 설정할 수 있습니다.');
     const updated = await this.prisma.journal.update({
       where: { id },
-      data: { isPublic },
+      data: {
+        isPublic,
+        postVisibility: isPublic ? 'public' : 'private',
+      },
     });
     return {
       id: updated.id,
       isPublic: updated.isPublic,
       updatedAt: updated.updatedAt.toISOString(),
     };
+  }
+
+  async deleteDiary(req: any, id: string) {
+    const userId = req.user.userId;
+    const diary = await this.prisma.journal.findUnique({ where: { id } });
+    if (!diary) throw new NotFoundException('일기를 찾을 수 없습니다.');
+    if (diary.userId !== userId)
+      throw new ForbiddenException('본인 일기만 삭제할 수 있습니다.');
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.journalReaction.deleteMany({ where: { journalId: id } });
+      await tx.journal.delete({ where: { id } });
+    });
+
+    if (diary.mediaUrl && diary.mediaUrl.startsWith('/uploads/')) {
+      await this.fileUploadService.deleteFile(diary.mediaUrl);
+    }
+
+    this.vectorDbService.delete([id]).catch((err) => {
+      console.warn('일기 삭제 후 벡터 삭제 실패:', err?.message || err);
+    });
+
+    this.prisma.journal
+      .count({ where: { userId } })
+      .then((count) => {
+        this.realtimeGateway.emitProfileCountersUpdate({
+          userId,
+          diaryCount: count,
+        });
+      })
+      .catch((err) => {
+        console.warn('일기 삭제 후 실시간 카운터 전송 실패:', err?.message);
+      });
+
+    return { id, deleted: true };
   }
 
   /**
@@ -1050,8 +1230,15 @@ export class DiaryService {
     }
 
     // 타입 변환
-    const isPublic =
+    const legacyIsPublicTrue =
       (dto.isPublic as any) === true || (dto.isPublic as any) === 'true';
+    const legacyIsPublicFalse =
+      (dto.isPublic as any) === false || (dto.isPublic as any) === 'false';
+    const legacyIsPublicValue = legacyIsPublicTrue
+      ? true
+      : legacyIsPublicFalse
+        ? false
+        : undefined;
     const writingDurationParsed = (() => {
       const n = parseInt(dto.writingDuration as any, 10);
       if (Number.isNaN(n) || n < 0) return 0;
@@ -1065,6 +1252,21 @@ export class DiaryService {
       dto.lng !== undefined && dto.lng !== null && dto.lng !== ''
         ? parseFloat(dto.lng)
         : (diary as any).lng;
+    const postVisibility = resolvePostVisibility(
+      (dto as any).postVisibility,
+      legacyIsPublicValue,
+      (diary as any).postVisibility,
+    );
+    const isPublic =
+      legacyIsPublicValue !== undefined
+        ? legacyIsPublicValue
+        : postVisibility === 'public';
+    const contentVisibility = resolveContentVisibility(
+      (dto as any).contentVisibility,
+      postVisibility,
+      (diary as any).contentVisibility,
+    );
+    const weather = resolveWeather((dto as any).weather, (diary as any).weather);
 
     // finalize=true일 때만 요약 적용
     let finalContent = dto.content;
@@ -1099,6 +1301,9 @@ export class DiaryService {
       data: {
         content: cleanedContent,
         isPublic,
+        postVisibility,
+        contentVisibility,
+        weather,
         emotion: dto.emotion,
         mediaUrl,
         mediaType,
@@ -1159,6 +1364,10 @@ export class DiaryService {
       content: updated.content,
       createdAt: updated.createdAt.toISOString(),
       isPublic: updated.isPublic,
+      postVisibility: (updated as any).postVisibility ?? postVisibility,
+      contentVisibility:
+        (updated as any).contentVisibility ?? contentVisibility,
+      weather: (updated as any).weather ?? weather,
       question: '',
       mediaUrl,
       mediaType,
