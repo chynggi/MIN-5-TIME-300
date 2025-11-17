@@ -1,150 +1,255 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
+import OpenAI from 'openai';
+import { z } from 'zod';
 
 type RiskFlag = 'none' | 'mild' | 'moderate' | 'severe';
+type AdviceCategory = 'recovery' | 'shift' | 'reflect' | 'general';
 
-function clamp(n: number, a: number, b: number) {
-  return Math.max(a, Math.min(b, n));
+interface AdviceKeyword {
+  token: string;
+  type: string;
+  count: number;
 }
+
+interface AdviceContextSnapshot {
+  profile: {
+    age?: number | null;
+    mbti?: string | null;
+    interests: string[];
+    lifestyle: {
+      sleep_target?: number | null;
+    };
+  };
+  checkin?: {
+    mood?: number | null;
+    stress?: number | null;
+    energy?: number | null;
+    sleep_hours?: number | null;
+  };
+  diary_summary?: string | null;
+  keywords: AdviceKeyword[];
+  metrics: {
+    sleep_hours?: number | null;
+    screen_time?: number | null;
+    steps?: number | null;
+    social_interactions?: number | null;
+  };
+  baselines: {
+    mood?: number | null;
+    stress?: number | null;
+    energy?: number | null;
+    sleep_hours?: number | null;
+  };
+  streaks: {
+    low_sleep_days: number;
+    high_stress_days: number;
+    low_mood_days: number;
+  };
+  locale: string;
+  yesterdayDiaryDate?: string;
+}
+
+interface RiskEvaluation {
+  risk_flag: RiskFlag;
+  score: number;
+  reasons: string[];
+  category: AdviceCategory;
+}
+
+interface AdviceLLMResponse {
+  advice: string;
+  tags: string[];
+  risk_flag: RiskFlag;
+}
+
+const TAG_WHITELIST = new Set([
+  '수면',
+  '스트레스',
+  '운동',
+  '호흡',
+  '휴식',
+  '관계',
+  '성과압박',
+  '자기연민',
+  '루틴',
+  '에너지',
+  '전환',
+  '성찰',
+  '산책',
+  '음악',
+]);
+
+const STOPWORDS = new Set([
+  '오늘',
+  '어제',
+  '정말',
+  '조금',
+  '그냥',
+  '그리고',
+  '그래서',
+  '하지만',
+  '너무',
+  '정도',
+  '이번',
+  '하면서',
+  '이번주',
+]);
+
+const FALLBACK_LIBRARY: Record<AdviceCategory, string[]> = {
+  recovery: [
+    '밤이 짧았다면 오늘은 스스로에게 관대하게—가능하면 평소보다 조금 일찍 눕는 걸 목표로 해요.',
+    '기운이 달릴 땐 따뜻한 음료 한 잔과 가벼운 스트레칭으로 몸을 깨워주세요.',
+    '어깨를 툭 떨구고 숨을 길게 내쉬어 보세요—그것만으로도 몸이 잠깐 리셋돼요.',
+  ],
+  shift: [
+    '비슷한 기분이 이어졌다면 짧은 산책이나 음악 한 곡으로 흐름을 바꿔보는 건 어때요?',
+    '해야 할 일 많아도 오늘은 가장 작은 것 하나만 끝내보면 어제와 다른 흐름이 생겨요.',
+    '답장을 잠시 미뤄도 괜찮아요—당신의 속도를 존중하는 작은 쉼을 허락해 주세요.',
+  ],
+  reflect: [
+    '어제 마음에 남았던 장면 하나를 떠올리며, 그 감정을 오늘 작은 행동으로 이어가볼까요?',
+    '비교 대신 기록—오늘 당신이 고마웠던 한 가지를 짧게 적어보면 마음이 정리돼요.',
+    '스스로에게 부드럽게, 오늘 한 가지를 덜어내도 괜찮다는 말을 적어두세요.',
+  ],
+  general: [
+    '작게 시작해도 충분해요—지금 할 수 있는 5분짜리 쉬는 시간을 먼저 확보해봐요.',
+    '완벽보다 지속이 힘이 돼요, 오늘은 한 걸음만 옮겨도 충분하다는 걸 기억해 주세요.',
+    '호흡을 세 번 길게 내쉬고 어깨를 풀어보세요—생각은 잠시 뒤로 미뤄도 괜찮아요.',
+  ],
+};
+
+const SYSTEM_PROMPT = `당신은 멘탈 웰빙 코치입니다. 한국어로, 1문장(120자 이내)으로만 답하세요.
+- 따뜻하고 단정한 톤. 명령이나 비난, 병명 추측 금지.
+- 사용자의 선택권을 열어두는 제안형 문장.
+- 이모지는 최대 1개, 문장 끝에만 사용.
+- 위험 신호가 감지된 경우에도 공포를 조장하지 말고, 전문 도움을 선택지로 제시.
+- 답변은 반드시 JSON으로만 반환: {"advice":"…", "tags":[…], "risk_flag":"none|mild|moderate|severe"}`;
+
+const DEVELOPER_PROMPT = `규칙:
+1) 120자 이내 1문장.
+2) 금지어: 진단/치료 단정 표현(예: 우울증, 약 필요).
+3) 오늘 실천 가능한 작은 행동을 1개만 제안.
+4) 사용 정보를 노출하지 말 것(예: "당신은 INFJ이므로" 금지).
+5) 태그는 1~3개. 후보: ["수면","스트레스","운동","호흡","휴식","관계","성과압박","자기연민","루틴","에너지","전환","성찰","산책","음악"].
+6) 카테고리 우선순위: 회복(Recovery) > 전환(Shift) > 성찰(Reflect).`;
+
+const AdviceResponseSchema = z.object({
+  advice: z.string().min(8).max(240),
+  tags: z.array(z.string().min(1)).min(1).max(3),
+  risk_flag: z.enum(['none', 'mild', 'moderate', 'severe']).default('none'),
+});
 
 @Injectable()
 export class AdviceService {
+  private readonly logger = new Logger(AdviceService.name);
+  private readonly openai?: OpenAI;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationService,
-  ) {}
+  ) {
+    if (process.env.OPENAI_API_KEY) {
+      this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    }
+  }
 
   async getLatest(userId: string) {
     const latest = await this.prisma.advice.findFirst({
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
-    if (!latest) return null;
+    if (!latest) {
+      return null;
+    }
     return {
       id: latest.id,
       advice: latest.advice,
       tags: latest.tags,
       risk_flag: this.toRiskStr(latest.risk),
+      createdAt: latest.createdAt.toISOString(),
     };
   }
 
   async generate(userId: string) {
-    // 1) 컨텍스트 수집: 최근 일기 요약(간단), 어제/최근 14일 체크인, 베이스라인
-    const today = new Date();
-    const end = new Date(today);
-    const start14 = new Date(today);
-    start14.setDate(start14.getDate() - 14);
-    const start3 = new Date(today);
-    start3.setDate(start3.getDate() - 3);
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yStart = new Date(
-      yesterday.getFullYear(),
-      yesterday.getMonth(),
-      yesterday.getDate(),
-    );
-
-    const [lastDiary, recentDiaries, checkins14, checkins3, baseline] =
-      await Promise.all([
-        this.prisma.journal.findFirst({
-          where: { userId },
-          orderBy: { createdAt: 'desc' },
-        }),
-        this.prisma.journal.findMany({
-          where: { userId, createdAt: { gte: start3, lte: end } },
-          orderBy: { createdAt: 'desc' },
-          take: 3,
-        }),
-        this.prisma.dailyCheckin.findMany({
-          where: { userId, diaryDate: { gte: start14, lte: end } },
-        }),
-        this.prisma.dailyCheckin.findMany({
-          where: { userId, diaryDate: { gte: start3, lte: end } },
-        }),
-        this.prisma.userBaselineCheckin.findUnique({ where: { userId } }),
-      ]);
-
-    const yesterdayCheckin = await this.prisma.dailyCheckin.findFirst({
-      where: { userId, diaryDate: yStart },
-    });
-
-    const diarySummary = this.summarizeDiaries(recentDiaries);
-    const signals = this.evalSignals(
-      yesterdayCheckin,
-      checkins14,
-      checkins3,
-      baseline,
-    );
-    const risk = this.computeRisk(signals, checkins14);
-
-    const { advice, tags } = this.composeAdvice(diarySummary, signals, risk);
-
-    // 저장 및 반환
-    const saved = await this.prisma.advice.create({
-      data: { userId, advice, tags, risk: this.toRiskEnum(risk) },
-    });
-    if (risk === 'severe') {
-      // 심각 위험 알림(인앱)
-      try {
-        await this.notifications.createNotification({
-          recipientId: userId,
-          type: NotificationType.WELLBEING_SEVERE,
-          actorIds: [userId],
-          objectType: 'advice',
-          objectId: saved.id,
-          payload: { risk: 'SEVERE' } as any,
-          groupKey: 'wellbeing_severe',
-        } as any);
-      } catch {}
+    this.logger.log(`generate: start advice generation for userId=${userId}`);
+    const context = await this.buildContextSnapshot(userId);
+    if (!context) {
+      throw new BadRequestException('조언 생성을 위한 데이터가 부족합니다.');
     }
-    return { id: saved.id, advice, tags, risk_flag: risk };
+
+    const riskEval = this.evaluateRisk(context);
+    const userPayload = this.buildUserPayload(context, riskEval);
+    let llmResult: AdviceLLMResponse | null = null;
+
+    if (!this.openai) {
+      this.logger.warn('OpenAI API 키가 설정되지 않았습니다. 페일세이프 문장을 사용합니다.');
+    } else {
+      llmResult = await this.callLLM(userPayload).catch((err) => {
+        this.logger.error(
+          `generate: LLM 호출 실패 userId=${userId}: ${err?.message}`,
+        );
+        return null;
+      });
+    }
+
+    const finalAdvice = this.composeFinalAdvice(llmResult, riskEval);
+    const saved = await this.prisma.advice.create({
+      data: {
+        userId,
+        advice: finalAdvice.advice,
+        tags: finalAdvice.tags,
+        risk: this.toRiskEnum(finalAdvice.risk_flag),
+      },
+    });
+
+    if (finalAdvice.risk_flag === 'severe') {
+      await this.notifySevereRisk(userId, saved.id).catch((err) => {
+        this.logger.warn(
+          `generate: severe notification failed userId=${userId} adviceId=${saved.id} err=${err?.message}`,
+        );
+      });
+    }
+
+    return {
+      id: saved.id,
+      advice: saved.advice,
+      tags: saved.tags,
+      risk_flag: finalAdvice.risk_flag,
+      createdAt: saved.createdAt.toISOString(),
+    };
   }
 
-  // 24h TTL 캐시: 최근 생성본이 24시간 내면 반환, 단 force=true거나 스파이크면 재생성
   async generateWithCache(userId: string, force = false) {
-    const now = new Date();
-    const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const latest = await this.prisma.advice.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-    });
-    if (!force && latest && latest.createdAt > since) {
-      return {
-        id: latest.id,
-        advice: latest.advice,
-        tags: latest.tags,
-        risk_flag: this.toRiskStr(latest.risk),
-        cached: true,
-      };
-    }
-    // 스파이크 감지: 어제 대비 스트레스>=8이거나 mood<=3 등 단순 규칙
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yStart = new Date(
-      yesterday.getFullYear(),
-      yesterday.getMonth(),
-      yesterday.getDate(),
+    this.logger.log(
+      `generateWithCache: called userId=${userId} force=${force}`,
     );
-    const y = await this.prisma.dailyCheckin.findFirst({
-      where: { userId, diaryDate: yStart },
-    });
-    const spike = y ? y.stress_1to10 >= 8 || y.mood_1to10 <= 3 : false;
-    const result = await this.generate(userId);
+    const latest = await this.getLatest(userId);
+    const isSpike = await this.detectSpike(userId);
+    if (!force && !isSpike && latest) {
+      const createdAt = new Date(latest.createdAt);
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      if (createdAt > twentyFourHoursAgo) {
+        return { ...latest, cached: true };
+      }
+    }
+
+    const regenerated = await this.generate(userId);
     return {
-      ...result,
+      ...regenerated,
       cached: false,
-      regenerated_due_to: force ? 'force' : spike ? 'spike' : 'ttl_expired',
+      regenerated_due_to: force
+        ? 'force'
+        : isSpike
+        ? 'spike'
+        : 'ttl_expired',
     };
   }
 
   async feedback(userId: string, adviceId: string, isHelpful: boolean) {
-    // 조인 검증: 해당 advice가 본인 소유인지 확인
-    const advice = await this.prisma.advice.findUnique({
-      where: { id: adviceId },
-    });
+    const advice = await this.prisma.advice.findUnique({ where: { id: adviceId } });
     if (!advice || advice.userId !== userId) {
       throw new BadRequestException('잘못된 요청입니다.');
     }
@@ -156,259 +261,479 @@ export class AdviceService {
     return { id: up.id, adviceId, isHelpful };
   }
 
-  private summarizeDiaries(diaries: any[]): string {
-    if (!diaries || !diaries.length) return '';
-    // 150~200자 요약 간소화: 최근 1~2개 문장 취합 후 트림
-    const raw = diaries
-      .map((d) => (d.content || '').replace(/\s+/g, ' ').trim())
-      .join(' ');
-    const masked = this.maskPII(raw);
-    return masked.slice(0, 200);
-  }
+  private async buildContextSnapshot(userId: string): Promise<AdviceContextSnapshot | null> {
+    const today = new Date();
+    const yesterdayStart = this.startOfDay(new Date(today.getTime() - 24 * 60 * 60 * 1000));
+    const yesterdayEnd = new Date(yesterdayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+    const twoWeeksAgo = new Date(today.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const threeDaysAgo = new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000);
 
-  private maskPII(text: string): string {
-    if (!text) return text;
-    return (
-      text
-        // 이메일/전화 간단 마스킹
-        .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[이메일]')
-        .replace(/\b\d{2,3}-\d{3,4}-\d{4}\b/g, '[연락처]')
-        .replace(/\b\d{10,11}\b/g, '[연락처]')
+    const [user, yesterdayJournal, checkins14, recentCheckins] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          birthDate: true,
+          mbti: true,
+          interests: { select: { interest: true }, orderBy: { priority: 'asc' }, take: 5 },
+          lifestyleAnswers: { select: { question: true, answer: true } },
+        },
+      }),
+      this.prisma.journal.findFirst({
+        where: { userId, diaryDate: { gte: yesterdayStart, lte: yesterdayEnd } },
+        orderBy: { diaryDate: 'desc' },
+      }),
+      this.prisma.dailyCheckin.findMany({
+        where: { userId, diaryDate: { gte: twoWeeksAgo, lte: today } },
+        orderBy: { diaryDate: 'desc' },
+      }),
+      this.prisma.dailyCheckin.findMany({
+        where: { userId, diaryDate: { gte: threeDaysAgo, lte: today } },
+        orderBy: { diaryDate: 'desc' },
+      }),
+    ]);
+
+    if (!user) {
+      return null;
+    }
+
+    const yesterdayCheckin = recentCheckins.find((c) =>
+      this.isSameDay(c.diaryDate, yesterdayStart),
     );
-  }
 
-  private evalSignals(
-    y: any | null,
-    ck14: any[],
-    ck3: any[],
-    baseline: any | null,
-  ) {
-    const avg = (arr: number[]) =>
-      arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-    const base = {
-      mood:
-        baseline?.mood_1to10 ??
-        Math.round(avg(ck14.map((c) => c.mood_1to10)) || 6),
-      stress:
-        baseline?.stress_1to10 ??
-        Math.round(avg(ck14.map((c) => c.stress_1to10)) || 4),
-      energy:
-        baseline?.energy_1to10 ??
-        Math.round(avg(ck14.map((c) => c.energy_1to10)) || 6),
-      sleep_hours:
-        baseline?.sleep_hours_1to9p ??
-        Math.round(avg(ck14.map((c) => c.sleep_hours_1to9p)) || 7),
-    };
-    const yv = y || {};
-    const sleepLow = y ? yv.sleep_hours_1to9p <= base.sleep_hours - 1.5 : false;
-    const moodLow = y
-      ? yv.mood_1to10 <= 4 || yv.mood_1to10 <= base.mood - 1
-      : false;
-    const stressHigh = y
-      ? yv.stress_1to10 >= 7 || yv.stress_1to10 >= base.stress + 2
-      : false;
-    const energyLow = y ? yv.energy_1to10 <= base.energy - 1 : false;
-
-    // 최근 3일 중 부정 신호 반복
-    const negDays = ck3.filter(
-      (c) => c.stress_1to10 >= 7 || c.mood_1to10 <= 4,
-    ).length;
-    const repeatedNegative = negDays >= 2;
+    const baselines = this.computeBaselines(checkins14);
+    const streaks = this.computeStreaks(recentCheckins);
+    const diary_summary = this.buildDiarySummary(yesterdayJournal?.content);
 
     return {
-      base,
-      yesterday: yv,
-      sleepLow,
-      moodLow,
-      stressHigh,
-      energyLow,
-      repeatedNegative,
+      profile: {
+        age: this.deriveAge(user.birthDate),
+        mbti: user.mbti,
+        interests: user.interests.map((i) => i.interest).filter(Boolean),
+        lifestyle: {
+          sleep_target: baselines.sleep_hours ?? 7,
+        },
+      },
+      checkin: yesterdayCheckin
+        ? {
+            mood: yesterdayCheckin.mood_1to10,
+            stress: yesterdayCheckin.stress_1to10,
+            energy: yesterdayCheckin.energy_1to10,
+            sleep_hours: yesterdayCheckin.sleep_hours_1to9p,
+          }
+        : undefined,
+      diary_summary,
+      keywords: this.extractKeywords(yesterdayJournal?.content || ''),
+      metrics: {
+        sleep_hours: yesterdayCheckin?.sleep_hours_1to9p ?? null,
+        screen_time: null,
+        steps: null,
+        social_interactions: yesterdayCheckin?.social_count_1to10 ?? null,
+      },
+      baselines,
+      streaks,
+      locale: 'ko-KR',
+      yesterdayDiaryDate: yesterdayJournal?.diaryDate?.toISOString(),
     };
   }
 
-  private computeRisk(
-    signals: ReturnType<AdviceService['evalSignals']>,
-    ck14: any[],
-  ): RiskFlag {
-    // z-score 기반: 14일 분포 대비 어제의 편차를 표준화
-    const vals = {
-      mood: ck14
-        .map((c) => c.mood_1to10)
-        .filter((v: any) => typeof v === 'number'),
-      stress: ck14
-        .map((c) => c.stress_1to10)
-        .filter((v: any) => typeof v === 'number'),
-      energy: ck14
-        .map((c) => c.energy_1to10)
-        .filter((v: any) => typeof v === 'number'),
-      sleepH: ck14
-        .map((c) => c.sleep_hours_1to9p)
-        .filter((v: any) => typeof v === 'number'),
-      sleepQ: ck14
-        .map((c) => c.sleep_quality_1to10)
-        .filter((v: any) => typeof v === 'number'),
-    } as any;
-    const stat = (arr: number[]) => {
-      if (!arr.length) return { mean: NaN, std: NaN };
-      const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-      const v =
-        arr.reduce((a, b) => a + (b - mean) * (b - mean), 0) /
-        (arr.length || 1);
-      const std = Math.sqrt(v || 1e-6);
-      return { mean, std };
-    };
-    const S = {
-      mood: stat(vals.mood),
-      stress: stat(vals.stress),
-      energy: stat(vals.energy),
-      sleepH: stat(vals.sleepH),
-      sleepQ: stat(vals.sleepQ),
-    };
-    const y = signals.yesterday || ({} as any);
-    const z = (x: number | undefined, m: number, s: number) =>
-      typeof x === 'number' && isFinite(m) && isFinite(s) && s > 0
-        ? (x - m) / s
-        : 0;
-
-    const zMood = z(y.mood_1to10, S.mood.mean, S.mood.std); // 낮을수록 위험
-    const zStress = z(y.stress_1to10, S.stress.mean, S.stress.std); // 높을수록 위험
-    const zEnergy = z(y.energy_1to10, S.energy.mean, S.energy.std); // 낮을수록 위험
-    const zSleepH = z(y.sleep_hours_1to9p, S.sleepH.mean, S.sleepH.std); // 낮을수록 위험
-    const zSleepQ = z(y.sleep_quality_1to10, S.sleepQ.mean, S.sleepQ.std); // 낮을수록 위험
-
-    // 가중 점수: 표준화된 편차를 방향에 맞게 합산
-    // 기준: |z| 0.5 미만은 소음, 0.5~1.0 주의, 1.0~2.0 경고, ≥2.0 심각
+  private evaluateRisk(context: AdviceContextSnapshot): RiskEvaluation {
+    const reasons: string[] = [];
+    const baselines = context.baselines;
+    const yesterday = context.checkin;
     let score = 0;
-    if (zStress >= 0.5) score += zStress; // 스트레스는 양의 z만 위험
-    if (zMood <= -0.5) score += Math.abs(zMood);
-    if (zEnergy <= -0.5) score += Math.abs(zEnergy) * 0.7;
-    if (zSleepH <= -0.5) score += Math.abs(zSleepH) * 0.6;
-    if (zSleepQ <= -0.5) score += Math.abs(zSleepQ) * 0.6;
-    if (signals.repeatedNegative) score += 0.8; // 반복된 부정 신호 가산
+    const categoryPriority: AdviceCategory[] = ['recovery', 'shift', 'reflect', 'general'];
+    let category: AdviceCategory = 'general';
 
-    // 단계화: 누적 위험 점수로 레벨 판정
-    if (score < 1.0) return 'mild';
-    if (score < 2.0) return 'moderate';
-    return 'severe';
-  }
-
-  private composeAdvice(
-    summary: string,
-    s: ReturnType<AdviceService['evalSignals']>,
-    risk: RiskFlag,
-  ): { advice: string; tags: string[] } {
-    const signal = this.buildSignalMessage(s);
-    const lead = this.buildSummaryLead(summary);
-    const tags = new Set(signal.tags);
-
-    let sentence = signal.text;
-    if (lead) {
-      sentence = `${lead.lead} ${signal.text}`.trim();
-      lead.tags.forEach((tag) => tags.add(tag));
-      tags.add('개인화');
-    }
-
-    if (risk === 'severe') {
-      sentence = this.appendSevereNotice(sentence);
-      tags.add('지원');
-    }
-
-    sentence = this.clipSentence(sentence);
-    return { advice: sentence, tags: Array.from(tags) };
-  }
-
-  private buildSignalMessage(s: ReturnType<AdviceService['evalSignals']>): {
-    text: string;
-    tags: string[];
-  } {
-    if (s.sleepLow) {
-      return {
-        text: '어제 잠이 짧았다면 오늘은 평소보다 조금 일찍 눕는 걸 목표로 해봐요—몸이 고마워할 거예요.',
-        tags: ['수면', '휴식', '루틴'],
-      };
-    }
-    if (s.stressHigh) {
-      return {
-        text: '어제 긴장이 컸다면 3분만 호흡에 집중해요—생각은 잠시 쉬어도 괜찮아요.',
-        tags: ['스트레스', '호흡', '휴식'],
-      };
-    }
-    if (s.energyLow) {
-      return {
-        text: '기운이 달렸다면 따뜻한 음료와 5분 스트레칭으로 부드럽게 시작해봐요.',
-        tags: ['에너지', '스트레칭', '루틴'],
-      };
-    }
-    if (s.repeatedNegative) {
-      return {
-        text: '비슷한 기분이 이어졌다면 오늘은 루틴에 작은 변화를—짧은 산책이나 음악 한 곡 어떨까요?',
-        tags: ['전환', '산책', '음악'],
-      };
-    }
-    return {
-      text: '어제 마음에 남은 장면 하나만 떠올려 봐요—그중 하나를 오늘 작은 행동으로 이어가볼까요?',
-      tags: ['성찰', '루틴'],
-    };
-  }
-
-  private buildSummaryLead(
-    summary: string,
-  ): { lead: string; tags: string[] } | null {
-    const snippet = this.pickSummarySnippet(summary);
-    if (!snippet) return null;
-
-    const patterns: Array<{ regex: RegExp; lead: string; tags: string[] }> = [
-      {
-        regex: /(불안|걱정|긴장|압박|초조)/i,
-        lead: `"${snippet}" 때문에 마음이 조여 있다면`,
-        tags: ['정서', '스트레스'],
-      },
-      {
-        regex: /(피곤|지침|무기력|번아웃|휴식)/i,
-        lead: `"${snippet}"처럼 몸이 느려졌다면`,
-        tags: ['휴식', '회복'],
-      },
-      {
-        regex: /(감사|고마움|행복|설렘|뿌듯|기쁨)/i,
-        lead: `"${snippet}" 순간이 고마웠다면`,
-        tags: ['감사', '긍정'],
-      },
-      {
-        regex: /(친구|가족|사람|대화|만남|관계)/i,
-        lead: `"${snippet}"에 담긴 관계를 떠올린다면`,
-        tags: ['관계', '연결'],
-      },
-      {
-        regex: /(도전|시도|성장|배움|계획|목표)/i,
-        lead: `"${snippet}" 계획을 마음에 새겼다면`,
-        tags: ['성장', '계획'],
-      },
-    ];
-
-    for (const pattern of patterns) {
-      if (pattern.regex.test(summary)) {
-        return { lead: pattern.lead, tags: pattern.tags };
+    if (yesterday) {
+      if (
+        typeof yesterday.sleep_hours === 'number' &&
+        typeof baselines.sleep_hours === 'number' &&
+        yesterday.sleep_hours <= (baselines.sleep_hours ?? 0) - 1.5
+      ) {
+        reasons.push('sleep_low');
+        score += 1;
+        category = 'recovery';
+      }
+      if (
+        typeof yesterday.mood === 'number' &&
+        (yesterday.mood <= 4 ||
+          (typeof baselines.mood === 'number' &&
+            yesterday.mood <= (baselines.mood ?? 0) - 1))
+      ) {
+        reasons.push('mood_low');
+        score += 1;
+        category = 'recovery';
+      }
+      if (
+        typeof yesterday.stress === 'number' &&
+        (yesterday.stress >= 7 ||
+          (typeof baselines.stress === 'number' &&
+            yesterday.stress >= (baselines.stress ?? 0) + 2))
+      ) {
+        reasons.push('stress_high');
+        score += 1;
+        category = 'recovery';
+      }
+      if (
+        typeof yesterday.energy === 'number' &&
+        typeof baselines.energy === 'number' &&
+        yesterday.energy <= (baselines.energy ?? 0) - 1
+      ) {
+        reasons.push('energy_low');
+        score += 1;
+        category = 'recovery';
       }
     }
 
-    return { lead: `"${snippet}" 마음이 남아 있다면`, tags: ['성찰'] };
+    if (
+      context.streaks.low_sleep_days >= 3 ||
+      context.streaks.high_stress_days >= 3 ||
+      context.streaks.low_mood_days >= 3
+    ) {
+      reasons.push('streak_warning');
+      score += 1;
+      if (category === 'general') {
+        category = 'shift';
+      }
+    }
+
+    if (category === 'general' && context.streaks.high_stress_days >= 2) {
+      category = 'shift';
+    }
+
+    if (category === 'general' && context.keywords.length) {
+      category = 'reflect';
+    }
+
+    const normalizedCategory = categoryPriority.includes(category)
+      ? category
+      : 'general';
+
+    let risk_flag: RiskFlag = 'none';
+    if (score === 1) {
+      risk_flag = 'mild';
+    } else if (score >= 2 && score <= 3) {
+      risk_flag = 'moderate';
+    } else if (score >= 4) {
+      risk_flag = 'severe';
+    }
+
+    return {
+      risk_flag,
+      score,
+      reasons,
+      category: normalizedCategory,
+    };
   }
 
-  private pickSummarySnippet(summary: string, max = 28): string | null {
-    if (!summary) return null;
-    const compact = summary.replace(/\s+/g, ' ').trim();
-    if (!compact) return null;
-    if (compact.length <= max) return compact;
-    return `${compact.slice(0, max - 1)}…`;
+  private buildUserPayload(
+    context: AdviceContextSnapshot,
+    risk: RiskEvaluation,
+  ): string {
+    return JSON.stringify(
+      {
+        context: {
+          profile: context.profile,
+          checkin: context.checkin ?? null,
+          diary_summary: context.diary_summary ?? '',
+          keywords: context.keywords,
+          metrics: context.metrics,
+          baselines: context.baselines,
+          streaks: context.streaks,
+          locale: context.locale,
+          category_hint: risk.category,
+          risk_reasons: risk.reasons,
+        },
+        policy: {
+          max_chars: 120,
+          allow_emoji: true,
+          locale: context.locale,
+        },
+      },
+      null,
+      2,
+    );
   }
 
-  private appendSevereNotice(sentence: string): string {
-    const trimmed = sentence.replace(/\.$/, '');
-    return `${trimmed} 도움이 급하면 가까운 사람이나 전문기관과 연결해도 괜찮아요.`;
+  private async callLLM(payload: string): Promise<AdviceLLMResponse> {
+    if (!this.openai) {
+      throw new Error('OpenAI client not configured');
+    }
+
+    const input = [
+      {
+        role: 'system',
+        content: [{ type: 'input_text', text: SYSTEM_PROMPT }],
+      },
+      {
+        role: 'developer',
+        content: [{ type: 'input_text', text: DEVELOPER_PROMPT }],
+      },
+      { role: 'user', content: [{ type: 'input_text', text: payload }] },
+    ];
+
+    const response = await this.openai.responses.create({
+      model: 'gpt-5.1',
+      input,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'AdviceResponse',
+          schema: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['advice', 'tags', 'risk_flag'],
+            properties: {
+              advice: {
+                type: 'string',
+                maxLength: 240,
+              },
+              tags: {
+                type: 'array',
+                minItems: 1,
+                maxItems: 3,
+                items: { type: 'string' },
+              },
+              risk_flag: {
+                type: 'string',
+                enum: ['none', 'mild', 'moderate', 'severe'],
+              },
+            },
+          },
+        },
+        verbosity: 'medium',
+      },
+      reasoning: {
+        effort: 'medium',
+      },
+      store: false,
+    } as any);
+
+    const raw = this.extractResponseText(response);
+    const parsed = AdviceResponseSchema.safeParse(this.parseLLMJson(raw));
+    if (!parsed.success) {
+      throw new Error('LLM 응답 파싱 실패');
+    }
+    return {
+      advice: this.trimSentence(parsed.data.advice),
+      tags: this.sanitizeTags(parsed.data.tags),
+      risk_flag: parsed.data.risk_flag,
+    };
   }
 
-  private clipSentence(sentence: string): string {
-    return sentence.length > 120 ? `${sentence.slice(0, 119)}…` : sentence;
+  private composeFinalAdvice(
+    llmResult: AdviceLLMResponse | null,
+    risk: RiskEvaluation,
+  ): AdviceLLMResponse {
+    if (llmResult) {
+      const normalizedTags = this.sanitizeTags(llmResult.tags);
+      const normalizedRisk = llmResult.risk_flag || risk.risk_flag;
+      return {
+        advice: this.trimSentence(llmResult.advice),
+        tags: normalizedTags.length ? normalizedTags : this.defaultTagsFor(risk.category),
+        risk_flag: normalizedRisk,
+      };
+    }
+
+    const fallbackAdvice = this.pickFallbackAdvice(risk.category);
+    return {
+      advice: fallbackAdvice,
+      tags: this.defaultTagsFor(risk.category),
+      risk_flag: risk.risk_flag || 'none',
+    };
+  }
+
+  private async notifySevereRisk(userId: string, adviceId: string) {
+    await this.notifications.createNotification({
+      recipientId: userId,
+      type: NotificationType.WELLBEING_SEVERE,
+      actorIds: [userId],
+      objectType: 'advice',
+      objectId: adviceId,
+      payload: { risk: 'SEVERE' } as any,
+      groupKey: 'wellbeing_severe',
+    } as any);
+  }
+
+  private async detectSpike(userId: string): Promise<boolean> {
+    const today = this.startOfDay(new Date());
+    const start = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    const checkin = await this.prisma.dailyCheckin.findFirst({
+      where: { userId, diaryDate: { gte: start, lt: end } },
+    });
+    if (!checkin) return false;
+    return (
+      checkin.stress_1to10 >= 7 ||
+      checkin.mood_1to10 <= 3 ||
+      checkin.sleep_hours_1to9p <= 4
+    );
+  }
+
+  private computeBaselines(records: any[]) {
+    if (!records.length) {
+      return {};
+    }
+    const avg = (selector: (r: any) => number | null | undefined) => {
+      const values = records
+        .map((r) => selector(r))
+        .filter((v): v is number => typeof v === 'number');
+      if (!values.length) return null;
+      return Number(
+        (values.reduce((sum, val) => sum + val, 0) / values.length).toFixed(1),
+      );
+    };
+    return {
+      mood: avg((r) => r.mood_1to10),
+      stress: avg((r) => r.stress_1to10),
+      energy: avg((r) => r.energy_1to10),
+      sleep_hours: avg((r) => r.sleep_hours_1to9p),
+    };
+  }
+
+  private computeStreaks(records: any[]) {
+    const sorted = [...records].sort(
+      (a, b) => new Date(b.diaryDate).getTime() - new Date(a.diaryDate).getTime(),
+    );
+    const calcStreak = (predicate: (record: any) => boolean) => {
+      let streak = 0;
+      let lastDate: Date | null = null;
+      for (const record of sorted) {
+        const currentDate = this.startOfDay(new Date(record.diaryDate));
+        if (lastDate && lastDate.getTime() - currentDate.getTime() > 24 * 60 * 60 * 1000) {
+          break;
+        }
+        if (!predicate(record)) {
+          break;
+        }
+        streak += 1;
+        lastDate = currentDate;
+      }
+      return streak;
+    };
+
+    return {
+      low_sleep_days: calcStreak((r) => r.sleep_hours_1to9p <= 5),
+      high_stress_days: calcStreak((r) => r.stress_1to10 >= 7),
+      low_mood_days: calcStreak((r) => r.mood_1to10 <= 4),
+    };
+  }
+
+  private extractKeywords(text: string, limit = 3): AdviceKeyword[] {
+    if (!text) return [];
+    const tokens = text
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .map((w) => w.trim())
+      .filter((w) => w.length >= 2 && !STOPWORDS.has(w));
+    const counts = new Map<string, number>();
+    tokens.forEach((token) => {
+      counts.set(token, (counts.get(token) || 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([token, count]) => ({ token, type: 'event', count }));
+  }
+
+  private buildDiarySummary(content?: string | null): string | null {
+    if (!content) return null;
+    const masked = this.maskPII(content).replace(/\s+/g, ' ').trim();
+    if (!masked) return null;
+    return masked.length > 200 ? masked.slice(0, 200) : masked;
+  }
+
+  private sanitizeTags(tags: string[] = []): string[] {
+    const unique = Array.from(new Set(tags.map((t) => t.trim())));
+    const filtered = unique.filter((tag) => TAG_WHITELIST.has(tag));
+    return filtered.slice(0, 3);
+  }
+
+  private defaultTagsFor(category: AdviceCategory): string[] {
+    switch (category) {
+      case 'recovery':
+        return ['휴식', '루틴'];
+      case 'shift':
+        return ['전환', '루틴'];
+      case 'reflect':
+        return ['성찰'];
+      default:
+        return ['루틴'];
+    }
+  }
+
+  private pickFallbackAdvice(category: AdviceCategory): string {
+    const library = FALLBACK_LIBRARY[category] || FALLBACK_LIBRARY.general;
+    return library[Math.floor(Math.random() * library.length)];
+  }
+
+  private trimSentence(sentence: string): string {
+    const trimmed = sentence.trim();
+    return trimmed.length > 120 ? `${trimmed.slice(0, 119)}…` : trimmed;
+  }
+
+  private maskPII(text: string): string {
+    return (text || '')
+      .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[이메일]')
+      .replace(/\b\d{2,3}-\d{3,4}-\d{4}\b/g, '[연락처]')
+      .replace(/\b\d{10,11}\b/g, '[연락처]');
+  }
+
+  private deriveAge(birthDate?: string | null): number | null {
+    if (!birthDate) return null;
+    const date = new Date(birthDate);
+    if (Number.isNaN(date.getTime())) return null;
+    const diff = Date.now() - date.getTime();
+    const ageDate = new Date(diff);
+    return Math.abs(ageDate.getUTCFullYear() - 1970);
+  }
+
+  private startOfDay(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  private isSameDay(a: Date, b: Date) {
+    const dateA = new Date(a);
+    return (
+      dateA.getFullYear() === b.getFullYear() &&
+      dateA.getMonth() === b.getMonth() &&
+      dateA.getDate() === b.getDate()
+    );
+  }
+
+  private extractResponseText(resp: any): string {
+    if (!resp) throw new Error('빈 응답입니다');
+    if (resp.output_text) {
+      if (Array.isArray(resp.output_text) && resp.output_text.length) {
+        return resp.output_text.join('\n');
+      }
+      if (typeof resp.output_text === 'string' && resp.output_text.trim().length) {
+        return resp.output_text;
+      }
+    }
+    if (Array.isArray(resp.output)) {
+      const text = resp.output
+        .map((item: any) =>
+          (item?.content || [])
+            .map((c: any) => c?.text)
+            .filter(Boolean)
+            .join('\n'),
+        )
+        .filter(Boolean)
+        .join('\n');
+      if (text) return text;
+    }
+    throw new Error('LLM 응답을 찾을 수 없습니다.');
+  }
+
+  private parseLLMJson(raw: string) {
+    const cleaned = raw
+      .trim()
+      .replace(/^```(?:json)?/i, '')
+      .replace(/```$/i, '')
+      .trim();
+    return JSON.parse(cleaned);
   }
 
   private toRiskEnum(r: RiskFlag) {
@@ -423,11 +748,12 @@ export class AdviceService {
         return 'NONE';
     }
   }
+
   private toRiskStr(r: any): RiskFlag {
-    const m = String(r || '').toUpperCase();
-    if (m === 'MILD') return 'mild';
-    if (m === 'MODERATE') return 'moderate';
-    if (m === 'SEVERE') return 'severe';
+    const value = String(r || '').toUpperCase();
+    if (value === 'MILD') return 'mild';
+    if (value === 'MODERATE') return 'moderate';
+    if (value === 'SEVERE') return 'severe';
     return 'none';
   }
 }

@@ -313,9 +313,11 @@ export class StatisticsService {
   }
 
   private formatDateKey(date: Date): string {
-    const year = date.getFullYear();
-    const month = `${date.getMonth() + 1}`.padStart(2, '0');
-    const day = `${date.getDate()}`.padStart(2, '0');
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    const year = normalized.getFullYear();
+    const month = `${normalized.getMonth() + 1}`.padStart(2, '0');
+    const day = `${normalized.getDate()}`.padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
 }

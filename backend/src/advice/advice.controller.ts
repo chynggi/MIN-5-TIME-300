@@ -27,23 +27,24 @@ export class AdviceController {
     // 10분 단기 캐시
     const cacheKey = `advice_latest:${userId}`;
     const cached = this.rate.getCache<any>(cacheKey, 10 * 60 * 1000);
-    if (cached) return cached;
+    if (cached) {
+      // 캐시 적중 로그는 RateCacheService 내부 또는 글로벌 로거에서 확인 가능
+      return cached;
+    }
     const latest = await this.service.getLatest(userId);
-    this.rate.setCache(
-      cacheKey,
-      latest ?? {
-        advice: '작게 시작해도 좋아요—오늘은 5분만 쉬어가요.',
-        risk_flag: 'none',
-        tags: ['루틴'],
-      },
-    );
-    return (
-      latest ?? {
-        advice: '작게 시작해도 좋아요—오늘은 5분만 쉬어가요.',
-        risk_flag: 'none',
-        tags: ['루틴'],
-      }
-    );
+    const fallback = {
+      id: undefined,
+      advice: '작게 시작해도 좋아요—오늘은 5분만 쉬어가요.',
+      risk_flag: 'none' as const,
+      tags: ['루틴'],
+      createdAt: new Date().toISOString(),
+      cached: true,
+    };
+    const payload = latest
+      ? { ...latest, cached: false }
+      : fallback;
+    this.rate.setCache(cacheKey, payload);
+    return payload;
   }
 
   @Post('generate')
@@ -56,7 +57,9 @@ export class AdviceController {
       );
     }
     const f = String(force || '').toLowerCase() === 'true';
-    return this.service.generateWithCache(userId, f);
+    const result = await this.service.generateWithCache(userId, f);
+    this.rate.setCache(`advice_latest:${userId}`, { ...result, cached: false });
+    return result;
   }
 
   @Post('feedback')
@@ -90,6 +93,7 @@ export class AdviceController {
       );
     }
     const result = await this.service.generateWithCache(userId, true);
+    this.rate.setCache(`advice_latest:${userId}`, { ...result, cached: false });
     return { ok: true, ...result };
   }
 }

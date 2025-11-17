@@ -184,20 +184,67 @@ export class StatisticsService {
       if (!firstValue.done) carryScore = firstValue.value;
     }
 
-    const series: { date: string; score: number }[] = [];
+    const dayKeys: string[] = [];
     const cursor = new Date(dayStart);
     while (cursor <= dayEnd) {
-      const key = this.formatDateKey(cursor);
+      dayKeys.push(this.formatDateKey(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    if (!dayKeys.length) return [];
+
+    const prevInfo: Array<{ index: number; score: number } | null> = new Array(dayKeys.length).fill(null);
+    const nextInfo: Array<{ index: number; score: number } | null> = new Array(dayKeys.length).fill(null);
+
+    let lastActual: { index: number; score: number } | null = null;
+    if (carryScore !== undefined) {
+      lastActual = { index: -1, score: carryScore };
+    }
+    for (let i = 0; i < dayKeys.length; i++) {
+      const key = dayKeys[i];
+      const actual = trendMap.get(key);
+      if (actual !== undefined) {
+        lastActual = { index: i, score: actual };
+      }
+      prevInfo[i] = lastActual;
+    }
+
+    let nextActual: { index: number; score: number } | null = null;
+    for (let i = dayKeys.length - 1; i >= 0; i--) {
+      const key = dayKeys[i];
+      const actual = trendMap.get(key);
+      if (actual !== undefined) {
+        nextActual = { index: i, score: actual };
+      }
+      nextInfo[i] = nextActual;
+    }
+
+    const fallbackScore = carryScore ?? baselineScore;
+    const series: { date: string; score: number }[] = [];
+    for (let i = 0; i < dayKeys.length; i++) {
+      const key = dayKeys[i];
       let score01 = trendMap.get(key);
-      if (score01 === undefined) score01 = carryScore;
+      if (score01 === undefined) {
+        const prev = prevInfo[i];
+        const next = nextInfo[i];
+        if (prev && next && prev.index !== next.index) {
+          const span = next.index - prev.index;
+          const ratio = (i - prev.index) / span;
+          score01 = prev.score + (next.score - prev.score) * ratio;
+        } else if (prev) {
+          score01 = prev.score;
+        } else if (next) {
+          score01 = next.score;
+        } else if (fallbackScore !== undefined) {
+          score01 = fallbackScore;
+        }
+      }
       if (score01 !== undefined) {
-        carryScore = score01;
         series.push({
           date: key,
           score: Math.round(Math.max(0, Math.min(1, score01)) * 100),
         });
       }
-      cursor.setDate(cursor.getDate() + 1);
     }
 
     if (!series.length && baselineScore !== undefined) {
@@ -213,7 +260,10 @@ export class StatisticsService {
   private formatDateKey(date: Date): string {
     const normalized = new Date(date);
     normalized.setHours(0, 0, 0, 0);
-    return normalized.toISOString().slice(0, 10);
+    const year = normalized.getFullYear();
+    const month = `${normalized.getMonth() + 1}`.padStart(2, '0');
+    const day = `${normalized.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   private calcStreak(diaries: any[]): number {

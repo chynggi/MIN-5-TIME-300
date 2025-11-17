@@ -552,17 +552,28 @@ export default function ProfilePage() {
                     const pad = 8;
                     const axisLabelOffset = 14;
                     const plotBottom = h - axisLabelOffset;
+                    const graphTextColor = '#111';
                     const scores = data.map(d => typeof d.score === 'number' ? d.score : Number(d.score));
                     const n = scores.length;
                     const min = n ? Math.min(...scores) : 0;
                     const max = n ? Math.max(...scores) : 100;
-                    const range = Math.max(1, max - min);
+                    const [visualMin, visualMax] = (() => {
+                      if (!n) return [0, 100];
+                      if (max === min) {
+                        const padding = Math.max(8, max * 0.1);
+                        return [Math.max(0, min - padding), Math.min(100, max + padding)];
+                      }
+                      return [Math.max(0, min - 5), Math.min(100, max + 5)];
+                    })();
+                    const visualRange = Math.max(1, visualMax - visualMin);
+                    const gridPercents = [20, 40, 60, 80];
                     const toX = (i: number) => {
                       if (n <= 1) return pad;
                       return pad + (i * (w - 2 * pad)) / (n - 1);
                     };
                     const toY = (v: number) => {
-                      const norm = (v - min) / range;
+                      const clamped = Math.min(visualMax, Math.max(visualMin, v));
+                      const norm = (clamped - visualMin) / visualRange;
                       return plotBottom - norm * (plotBottom - pad);
                     };
                     const points = (n ? scores : [0, 0, 0]).map((v, i) => `${toX(i)},${toY(v)}`).join(' ');
@@ -594,9 +605,9 @@ export default function ProfilePage() {
                             flexWrap: 'wrap',
                           }}
                         >
-                          <strong style={{ fontSize: '0.9rem' }}>최근 멘탈 추세</strong>
+                          <strong style={{ fontSize: '0.9rem', color: graphTextColor }}>최근 멘탈 추세</strong>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>{rangeLabel}</span>
+                            <span style={{ fontSize: '0.75rem', opacity: 0.7, color: graphTextColor }}>{rangeLabel}</span>
                             <div style={{ display: 'flex', gap: '4px' }}>
                               {(['recent7', 'month'] as const).map(period => (
                                 <button
@@ -620,13 +631,38 @@ export default function ProfilePage() {
                           </div>
                         </div>
                         {mentalDataSource === 'sample' && (
-                          <div style={{ fontSize: '0.7rem', color: '#2563eb', marginBottom: '4px' }}>디버그: 샘플 데이터 표시 중</div>
+                          <div style={{ fontSize: '0.7rem', color: graphTextColor, marginBottom: '4px' }}>디버그: 샘플 데이터 표시 중</div>
                         )}
                         <svg width={w} height={h} role="img" aria-label="멘탈 추세 스파크라인">
                           {/* 가이드 라인 */}
                           <line x1={pad} y1={toY(min)} x2={w - pad} y2={toY(min)} stroke={gridColor} strokeDasharray="4 4" />
                           <line x1={pad} y1={toY(max)} x2={w - pad} y2={toY(max)} stroke={gridColor} strokeDasharray="4 4" />
                           <line x1={pad} y1={plotBottom} x2={w - pad} y2={plotBottom} stroke={gridColor} strokeOpacity={0.4} />
+                          {gridPercents.map((pct) => {
+                            if (pct < visualMin || pct > visualMax) return null;
+                            const y = toY(pct);
+                            return (
+                              <g key={`grid-${pct}`}>
+                                <line
+                                  x1={pad}
+                                  y1={y}
+                                  x2={w - pad}
+                                  y2={y}
+                                  stroke={gridColor}
+                                  strokeDasharray="3 3"
+                                />
+                                <text
+                                  x={pad - 4}
+                                  y={y + 3}
+                                  textAnchor="end"
+                                  fontSize="8"
+                                  fill={graphTextColor}
+                                >
+                                  {pct}%
+                                </text>
+                              </g>
+                            );
+                          })}
                           {/* 라인 */}
                           <polyline fill="none" stroke={accent} strokeWidth={2} points={points} />
                           {/* 포인트 */}
@@ -649,7 +685,7 @@ export default function ProfilePage() {
                                 y={h - 2}
                                 textAnchor="middle"
                                 fontSize="8"
-                                fill="rgba(255,255,255,0.72)"
+                                fill={graphTextColor}
                               >
                                 {formatTickLabel(data[idx].date)}
                               </text>
