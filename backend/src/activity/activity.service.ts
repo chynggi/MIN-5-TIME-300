@@ -121,33 +121,18 @@ export class ActivityService {
     return updated;
   }
 
-  // 가입 시 초기값 AI 추정 (현재는 간단 heuristic, 추후 LLM 연동 가능)
-  // 입력: 선택 정보(bio, interests 등)를 사용해 대략적인 초기 활동 성향 점수 산출
   async assignInitialScore(userId: string) {
     const updated = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
         where: { id: userId },
-        include: { interests: true, lifestyleAnswers: true },
       });
       if (!user) return null;
-      // 이미 기본값 100%로 설정된 경우 로직 스킵 (재실행 방지)
-      if (user.activityScore >= 100) {
-        return tx.user.update({
-          where: { id: userId },
-          data: { lastActivityDecayAt: new Date() },
-        });
-      }
-      let score = 0;
-      score += (user.interests?.length || 0) * 1.2;
-      score += (user.lifestyleAnswers?.length || 0) * 0.8;
-      if (user.bio) score += 2;
-      if (user.mbti) score += 1.5;
-      if (score > 30) score = 30;
-      const level = this.calcLevel(score);
+      const targetScore = MAX_SCORE;
+      const level = this.calcLevel(targetScore);
       return tx.user.update({
         where: { id: userId },
         data: {
-          activityScore: score,
+          activityScore: targetScore,
           activityLevel: level,
           lastActivityDecayAt: new Date(),
         },

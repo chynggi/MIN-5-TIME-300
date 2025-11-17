@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import styles from './profile.module.css';
 import { profileApi } from '../../services/profile-api';
@@ -101,6 +101,8 @@ export default function ProfilePage() {
   const [mentalError, setMentalError] = useState<string | null>(null);
   const [mentalDataSource, setMentalDataSource] = useState<'api' | 'sample' | null>(null);
   const [mentalPeriod, setMentalPeriod] = useState<'recent7' | 'month'>('recent7');
+  const graphContainerRef = useRef<HTMLDivElement | null>(null);
+  const [mentalGraphWidth, setMentalGraphWidth] = useState(0);
 
   // 감정 이모지 매핑
   const emotionEmojis: { [key: string]: string } = {
@@ -256,6 +258,28 @@ export default function ProfilePage() {
   useEffect(() => {
     generateCalendarData();
   }, [currentDate]);
+
+  useEffect(() => {
+    if (!showMentalGraph) return;
+    const target = graphContainerRef.current;
+    if (!target) return;
+
+    const updateWidth = () => {
+      const nextWidth = target.clientWidth;
+      setMentalGraphWidth(prev => (nextWidth && nextWidth !== prev ? nextWidth : prev));
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => updateWidth());
+      observer.observe(target);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, [showMentalGraph]);
 
   const checkConnection = async () => {
     const isConnected = await testConnection();
@@ -527,6 +551,7 @@ export default function ProfilePage() {
             </div>
             {showMentalGraph && (
               <div
+                ref={graphContainerRef}
                 role="region"
                 aria-label="최근 멘탈 추세 그래프"
                 style={{
@@ -547,7 +572,7 @@ export default function ProfilePage() {
                     const data = (mentalTrend && mentalTrend.length > 0)
                       ? mentalTrend
                       : [];
-                    const w = 320;
+                    const w = Math.max(mentalGraphWidth || 0, 320);
                     const h = 88;
                     const pad = 8;
                     const axisLabelOffset = 14;

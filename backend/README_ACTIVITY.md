@@ -1,7 +1,7 @@
 # 활동지수(Activity Score) 설계
 
 ## 개요
-사용자의 플랫폼 내 활동을 0% ~ 99.5% 범위의 점수로 표현하고 12등급(Level 1~12)으로 분류합니다. 최고 점수는 99.5%로 캡핑됩니다.
+사용자의 플랫폼 내 활동을 0% ~ 100% 범위의 점수로 표현하고 12등급(Level 1~12)으로 분류합니다. 등급 산정은 99.5%를 최고 임계값으로 삼지만 데이터는 100%까지 저장합니다.
 
 ## 증가 규칙
 - 일기 작성 (질문 받고 작성): +0.25%  
@@ -12,12 +12,7 @@
 - 하루 경과마다 -0.3% (스케줄러/CRON에서 `ActivityService.dailyDecay` 호출 예상). 현재 CRON은 미구현.
 
 ## 초기값 산정 (가입 시)
-`ActivityService.assignInitialScore` 가 아래 휴리스틱으로 초기 점수를 산정 후 저장:
-- 관심사 개수 * 1.2
-- 라이프스타일 응답 수 * 0.8
-- 자기소개(bio) 존재 시 +2
-- MBTI 존재 시 +1.5
-- 최대 30%로 클램프 후 등급 계산
+`ActivityService.assignInitialScore` 는 새 사용자에게 즉시 100% 활동지수와 최고 등급(Level 12)을 부여하고 `lastActivityDecayAt` 를 현재 시각으로 초기화합니다. 가입 직후부터 하루 -0.3% decay가 곧바로 적용될 수 있도록 타임스탬프를 남깁니다.
 
 ## 등급(Threshold)
 커스텀 임계값 (포함 이상):
@@ -38,7 +33,7 @@ L12: 96 (99.5% 캡)
 
 ## 필드
 `prisma/schema.prisma` User 모델:
-- `activityScore Float @default(0)`
+- `activityScore Float @default(100)`
 - `activityLevel Int @default(1)`
 - `lastActivityDecayAt DateTime?`
 
