@@ -61,4 +61,7 @@ $RECYCLE.BIN/
 # DB 덤프
 *.sql
 *.dump
+
 backend/.env
+frontend/.env
+
