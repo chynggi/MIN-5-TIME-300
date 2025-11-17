@@ -75,13 +75,30 @@ export class CheckinService {
     };
   }
 
-  async getToday(userId: string) {
-    const now = new Date();
-    const dayStart = normalizeToStartOfDay(now);
+  async getToday(userId: string, date?: string) {
+    const dayStart = normalizeToStartOfDay(
+      date ? this.parseDateOnly(date) ?? new Date() : new Date(),
+    );
     const row = await this.prisma.dailyCheckin.findFirst({
       where: { userId, diaryDate: dayStart },
     });
     if (!row) return { exists: false, percent: 0 };
     return { exists: true, percent: 100, checkin: row };
+  }
+
+  private parseDateOnly(value: string): Date | null {
+    const match = value?.match(/^\d{4}-\d{2}-\d{2}$/);
+    if (!match) return null;
+    const [year, month, day] = value.split('-').map((v) => Number(v));
+    if (
+      [year, month, day].some((v) => Number.isNaN(v)) ||
+      month < 1 ||
+      month > 12 ||
+      day < 1 ||
+      day > 31
+    ) {
+      return null;
+    }
+    return new Date(year, month - 1, day);
   }
 }

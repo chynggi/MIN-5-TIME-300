@@ -20,8 +20,9 @@ export type CheckinPayload = {
 };
 
 export const checkinApi = {
-  getToday: (): Promise<{ exists: boolean; percent: number; checkin?: any }> => {
-    return apiRequest('/checkin/today');
+  getToday: (date?: string): Promise<{ exists: boolean; percent: number; checkin?: any }> => {
+    const query = date ? `?date=${encodeURIComponent(date)}` : '';
+    return apiRequest(`/checkin/today${query}`);
   },
   create: (data: CheckinPayload): Promise<{ id: string; percent: number; diaryDate: string }> => {
     return apiRequest('/checkin', { method: 'POST', body: JSON.stringify(data) });

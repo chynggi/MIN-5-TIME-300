@@ -80,12 +80,12 @@ function NewDiaryContent() {
   // 오늘(또는 선택 날짜)의 체크인 퍼센트 조회
   useEffect(() => {
     let mounted = true;
-    checkinApi.getToday().then((res) => {
+    checkinApi.getToday(selectedDate).then((res) => {
       if (!mounted) return;
       setCheckinPercent(res?.percent ?? 0);
     }).catch(() => {});
     return () => { mounted = false; };
-  }, []);
+  }, [selectedDate]);
 
   // Diary settings
   const [diarySettings, setDiarySettings] = useState({

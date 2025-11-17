@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { CheckinService } from './checkin.service';
 import { CreateCheckinDto } from './dto/create-checkin.dto';
 import { AuthGuard } from '@nestjs/passport';
@@ -14,7 +22,7 @@ export class CheckinController {
   }
 
   @Get('today')
-  async getToday(@Req() req: any) {
-    return this.service.getToday(req.user.userId);
+  async getToday(@Req() req: any, @Query('date') date?: string) {
+    return this.service.getToday(req.user.userId, date);
   }
 }
