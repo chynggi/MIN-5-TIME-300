@@ -272,6 +272,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
       return;
     }
     const shouldSummarize = finalizeRequested;
+    console.log('[GenerateDiary] shouldSummarize:', shouldSummarize);
     const rawContent = contentLines.join('\n\n').trim();
 
     if (shouldSummarize) {
