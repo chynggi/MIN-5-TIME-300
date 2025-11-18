@@ -379,41 +379,45 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
           >
             ← 뒤로
           </button>
-          {!initialQuestions?.length && (
-            <div className="relative model-selector">
-              <button
-                onClick={() => setShowModelSelector(!showModelSelector)}
-                className={`${btn.base} ${btn.outline} ${btn.sm} flex items-center space-x-2`}
-              >
-                <span>{availableModels.find(m => m.id === selectedModel)?.icon || "🤖"}</span>
-                <span className="font-semibold hidden sm:inline">{availableModels.find(m => m.id === selectedModel)?.name || "AI 모델"}</span>
-                <span className="text-[10px]">▼</span>
-              </button>
-              {showModelSelector && (
-                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-30 min-w-[300px] overflow-hidden">
-                  <div className="max-h-[360px] overflow-y-auto">
-                    {availableModels.filter(m => enabledModels.includes(m.id)).map(model => (
-                      <button
-                        key={model.id}
-                        onClick={() => { setSelectedModel(model.id); setShowModelSelector(false); generateQuestions(model.id); }}
-                        className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors border-b last:border-b-0 ${selectedModel === model.id ? 'bg-blue-50/70' : 'hover:bg-gray-50'}`}
-                      >
-                        <span className="text-2xl pt-0.5">{model.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-gray-800 truncate">{model.name}</span>
-                            <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-md font-medium">{model.confidence}</span>
-                          </div>
-                          <p className="text-xs text-gray-600 mt-1 leading-relaxed">{model.description}</p>
+          <div className="relative model-selector">
+            <button
+              onClick={() => setShowModelSelector(!showModelSelector)}
+              className={`${btn.base} ${btn.outline} ${btn.sm} flex items-center space-x-2`}
+            >
+              <span>{availableModels.find(m => m.id === selectedModel)?.icon || "🤖"}</span>
+              <span className="font-semibold hidden sm:inline">{availableModels.find(m => m.id === selectedModel)?.name || "AI 모델"}</span>
+              <span className="text-[10px]">▼</span>
+            </button>
+            {showModelSelector && (
+              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-30 min-w-[300px] overflow-hidden">
+                <div className="max-h-[360px] overflow-y-auto">
+                  {availableModels.filter(m => enabledModels.includes(m.id)).map(model => (
+                    <button
+                      key={model.id}
+                      onClick={() => { 
+                        setSelectedModel(model.id); 
+                        setShowModelSelector(false); 
+                        if (!initialQuestions?.length) {
+                          generateQuestions(model.id);
+                        }
+                      }}
+                      className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors border-b last:border-b-0 ${selectedModel === model.id ? 'bg-blue-50/70' : 'hover:bg-gray-50'}`}
+                    >
+                      <span className="text-2xl pt-0.5">{model.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-800 truncate">{model.name}</span>
+                          <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-md font-medium">{model.confidence}</span>
                         </div>
-                        {selectedModel === model.id && <span className="text-blue-600 text-xs font-bold">✓</span>}
-                      </button>
-                    ))}
-                  </div>
+                        <p className="text-xs text-gray-600 mt-1 leading-relaxed">{model.description}</p>
+                      </div>
+                      {selectedModel === model.id && <span className="text-blue-600 text-xs font-bold">✓</span>}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
           {!initialQuestions?.length && (
             <button
               onClick={() => generateQuestions()}
@@ -451,7 +455,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
       </div>
 
       {/* 모델 정보 배너 */}
-      {!initialQuestions?.length && enabledModels.length > 0 && (
+      {enabledModels.length > 0 && (
         <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-xl px-4 py-3 border border-blue-100 flex items-start gap-3">
           <span className="text-3xl leading-none mt-0.5">
             {availableModels.find(m => m.id === selectedModel)?.icon || '🤖'}
@@ -467,6 +471,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
             </div>
             <p className="text-xs md:text-sm text-gray-600 mt-1 leading-relaxed">
               {availableModels.find(m => m.id === selectedModel)?.description || 'AI가 개인화된 질문을 생성합니다'}
+              {initialQuestions?.length ? ' (편집 모드: 요약 시 사용됩니다)' : ''}
             </p>
           </div>
         </div>
