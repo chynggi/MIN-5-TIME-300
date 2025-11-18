@@ -335,8 +335,9 @@ export default function DiaryDetailPage() {
   if (!diary) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-rose-50 to-indigo-50 py-10 px-4">
-      <div className="max-w-5xl mx-auto">
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-rose-50 to-indigo-50 py-10 px-4">
+        <div className="max-w-5xl mx-auto">
         {/* Top Navigation / Breadcrumb */}
         <div className="flex items-center gap-3 mb-6">
           <Link href="/dashboard" className="group inline-flex items-center justify-center w-9 h-9 rounded-full bg-white shadow-sm border border-slate-200 hover:border-slate-300 hover:shadow transition">
@@ -617,74 +618,75 @@ export default function DiaryDetailPage() {
             )}
           </aside>
         </div>
-      </div>
-    </div>
-    {showDeleteModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div
-          className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-          aria-hidden="true"
-          onClick={() => !deleteLoading && setShowDeleteModal(false)}
-        />
-        <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-200 p-6">
-          <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M5.64 5.64l12.72 12.72M6 19h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z" /></svg>
-          </div>
-          <h3 className="text-lg font-semibold text-slate-900 text-center">일기를 삭제할까요?</h3>
-          <p className="text-sm text-slate-600 text-center mt-2">삭제된 일기는 되돌릴 수 없습니다. 정말로 삭제하시겠어요?</p>
-          <div className="mt-6 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={handleFirstDeleteConfirmation}
-              disabled={deleteLoading}
-              className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow transition ${deleteLoading ? 'bg-rose-400 cursor-not-allowed' : 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700'}`}
-            >
-              계속 삭제하기
-            </button>
-            <button
-              type="button"
-              onClick={() => !deleteLoading && setShowDeleteModal(false)}
-              className="w-full inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50 transition"
-            >
-              취소
-            </button>
-          </div>
         </div>
       </div>
-    )}
-    {showFinalConfirmModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div
-          className="absolute inset-0 bg-slate-900/70 backdrop-blur"
-          aria-hidden="true"
-          onClick={() => !deleteLoading && setShowFinalConfirmModal(false)}
-        />
-        <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-200 p-6">
-          <div className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M5 4h14l-1.2 14.4a2 2 0 0 1-1.99 1.8H8.19a2 2 0 0 1-1.99-1.8L5 4Z"/></svg>
-          </div>
-          <h3 className="text-lg font-semibold text-slate-900 text-center">정말 삭제하시겠어요?</h3>
-          <p className="text-sm text-slate-600 text-center mt-2">이 작업은 되돌릴 수 없습니다. 모든 기록이 즉시 삭제됩니다.</p>
-          <div className="mt-6 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => handleDelete()}
-              disabled={deleteLoading}
-              className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow transition ${deleteLoading ? 'bg-rose-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}
-            >
-              {deleteLoading && <span className="w-4 h-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" aria-hidden="true" />}
-              영구적으로 삭제
-            </button>
-            <button
-              type="button"
-              onClick={() => !deleteLoading && setShowFinalConfirmModal(false)}
-              className="w-full inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50 transition"
-            >
-              돌아가기
-            </button>
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            aria-hidden="true"
+            onClick={() => !deleteLoading && setShowDeleteModal(false)}
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-200 p-6">
+            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M5.64 5.64l12.72 12.72M6 19h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z" /></svg>
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 text-center">일기를 삭제할까요?</h3>
+            <p className="text-sm text-slate-600 text-center mt-2">삭제된 일기는 되돌릴 수 없습니다. 정말로 삭제하시겠어요?</p>
+            <div className="mt-6 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleFirstDeleteConfirmation}
+                disabled={deleteLoading}
+                className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow transition ${deleteLoading ? 'bg-rose-400 cursor-not-allowed' : 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700'}`}
+              >
+                계속 삭제하기
+              </button>
+              <button
+                type="button"
+                onClick={() => !deleteLoading && setShowDeleteModal(false)}
+                className="w-full inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50 transition"
+              >
+                취소
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
+      {showFinalConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-slate-900/70 backdrop-blur"
+            aria-hidden="true"
+            onClick={() => !deleteLoading && setShowFinalConfirmModal(false)}
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-200 p-6">
+            <div className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center mx-auto mb-4">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M5 4h14l-1.2 14.4a2 2 0 0 1-1.99 1.8H8.19a2 2 0 0 1-1.99-1.8L5 4Z"/></svg>
+            </div>
+            <h3 className="text-lg font-semibold text-slate-900 text-center">정말 삭제하시겠어요?</h3>
+            <p className="text-sm text-slate-600 text-center mt-2">이 작업은 되돌릴 수 없습니다. 모든 기록이 즉시 삭제됩니다.</p>
+            <div className="mt-6 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => handleDelete()}
+                disabled={deleteLoading}
+                className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow transition ${deleteLoading ? 'bg-rose-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}
+              >
+                {deleteLoading && <span className="w-4 h-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" aria-hidden="true" />}
+                영구적으로 삭제
+              </button>
+              <button
+                type="button"
+                onClick={() => !deleteLoading && setShowFinalConfirmModal(false)}
+                className="w-full inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50 transition"
+              >
+                돌아가기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
