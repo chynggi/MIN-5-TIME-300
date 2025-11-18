@@ -47,6 +47,10 @@ export class CreateDiaryDto {
   @IsString()
   mediaType?: string;
 
+  @IsOptional()
+  @IsString()
+  music?: string; // Spotify track payload(JSON 문자열)
+
   // 기본 프리셋 이미지 키 (spring, summer, autumn, winter, sunny, night, rain, snow)
   @IsOptional()
   @IsString()
@@ -74,6 +78,18 @@ export class CreateDiaryDto {
   @IsOptional()
   @IsNumberString()
   lng?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  voiceDuration?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  removeVoice?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  removeMusic?: string;
 
   // 일기 완성하기 버튼 여부: 'true'일 때 최종 요약 실행
   @IsOptional()

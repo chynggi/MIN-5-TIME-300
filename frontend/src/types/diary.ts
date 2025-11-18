@@ -43,6 +43,11 @@ export interface DiaryEntry {
   reactions?: any[];
 }
 
+export interface VoiceRecordPayload {
+  blob: Blob;
+  duration: number;
+}
+
 // Component props types
 export interface ImageUploadProps {
   onImageSelect: (file: File | null) => void;
@@ -52,7 +57,7 @@ export interface ImageUploadProps {
 export interface EmotionVoiceProps {
   emotion: string;
   onEmotionChange: (emotion: string) => void;
-  onVoiceRecord: (audioBlob: Blob | null) => void;
+  onVoiceRecord: (payload: VoiceRecordPayload | null) => void;
 }
 
 export interface MusicSettingProps {

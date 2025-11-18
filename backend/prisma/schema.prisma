@@ -132,6 +132,10 @@ model Journal {
   emotion         String?           // 감정 이모지 저장
   mediaUrl        String?
   mediaType       String?
+  voiceUrl        String?
+  voiceMime       String?
+  voiceDuration   Int?
+  music           Json?
   writingDuration Int
   reactions       JournalReaction[] // 좋아요 저장 모델과 연결
   // (Removed) communityComments CommunityComment[]

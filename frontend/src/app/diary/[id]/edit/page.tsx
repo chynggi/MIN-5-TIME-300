@@ -10,6 +10,7 @@ import DiarySettings from "@/components/diary/DiarySettings";
 import AIQuestionWriter from "@/components/diary/AIQuestionWriter";
 import FreeWriter from "@/components/diary/FreeWriter";
 import Link from "next/link";
+import type { VoiceRecordPayload, SpotifyTrack as SpotifyTrackType } from "@/types/diary";
 
 // 기본 제공 이미지들 (작성 페이지와 동일)
 const defaultImages = [
@@ -34,7 +35,12 @@ interface DiaryDataResponse {
   diaryDate?: string;
   lat?: number;
   lng?: number;
+  music?: SpotifyTrackType | string | null;
+  voiceUrl?: string | null;
+  voiceDuration?: number | null;
 }
+
+type SpotifyTrack = SpotifyTrackType;
 
 function EditDiaryInner() {
   const { id } = useParams();
@@ -49,8 +55,9 @@ function EditDiaryInner() {
   const [presetKey, setPresetKey] = useState<string | null>(null); // 프리셋 선택 키
   const [showDefaultImageSelect, setShowDefaultImageSelect] = useState(false);
   const [emotion, setEmotion] = useState("😊");
-  const [voiceRecord, setVoiceRecord] = useState<Blob | null>(null);
-  const [selectedMusic, setSelectedMusic] = useState<any>(null); // TODO: 필요시 타입 활용
+  const [voiceRecord, setVoiceRecord] = useState<VoiceRecordPayload | null>(null);
+  const [selectedMusic, setSelectedMusic] = useState<SpotifyTrack | null>(null);
+  const [initialMusic, setInitialMusic] = useState<SpotifyTrack | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [questionId, setQuestionId] = useState(""); // 기존 작성 로직과 동일 구조 유지
@@ -119,6 +126,15 @@ function EditDiaryInner() {
         }
         if (d.lat && d.lng) {
           setLat(d.lat); setLng(d.lng); // 표시/편집 UI 제거: 단순 보존
+        }
+        if (d.music) {
+          try {
+            const parsedMusic = typeof d.music === 'string' ? JSON.parse(d.music) : d.music;
+            setSelectedMusic(parsedMusic);
+            setInitialMusic(parsedMusic);
+          } catch (musicError) {
+            console.warn('음악 정보 파싱 실패:', musicError);
+          }
         }
         if (d.question) {
           setOriginalQuestion(d.question);
@@ -190,7 +206,18 @@ function EditDiaryInner() {
         formData.append('selectedQuestionDomains', JSON.stringify(initialQuestions.map(q => q.domain)));
         formData.append('selectedQuestionTexts', JSON.stringify(initialQuestions.map(q => q.text)));
       }
-      // TODO: music, voiceRecord 처리 로직 (작성 페이지에 있는 경우 동일하게 확장 필요)
+      if (voiceRecord) {
+        const voiceFile = new File([voiceRecord.blob], `voice-${Date.now()}.mp3`, {
+          type: voiceRecord.blob.type || 'audio/mpeg',
+        });
+        formData.append('voice', voiceFile);
+        formData.append('voiceDuration', Math.round(voiceRecord.duration).toString());
+      }
+      if (selectedMusic) {
+        formData.append('music', JSON.stringify(selectedMusic));
+      } else if (!selectedMusic && initialMusic) {
+        formData.append('removeMusic', 'true');
+      }
 
       const response = await api.put(`/diaries/${id}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       if (response.status === 200 || response.status === 201) {

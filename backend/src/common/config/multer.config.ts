@@ -32,7 +32,7 @@ export const diaryMediaUploadOptions: MulterOptions = {
     fileSize: 10 * 1024 * 1024, // 10MB
   },
   fileFilter: (req, file, callback) => {
-    // 이미지 및 동영상 파일 허용
+    // 이미지, 동영상, 오디오 파일 허용 (음성 메시지는 MP3 업로드)
     const allowedMimeTypes = [
       'image/jpeg',
       'image/jpg',
@@ -42,12 +42,18 @@ export const diaryMediaUploadOptions: MulterOptions = {
       'video/mp4',
       'video/webm',
       'video/quicktime',
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/webm',
+      'audio/ogg',
+      'audio/wav',
+      'audio/x-wav',
     ];
 
     if (!allowedMimeTypes.includes(file.mimetype)) {
       return callback(
         new BadRequestException(
-          '지원되지 않는 파일 형식입니다. 이미지 또는 동영상 파일만 업로드 가능합니다.',
+          '지원되지 않는 파일 형식입니다. 이미지, 동영상 또는 음성 파일만 업로드 가능합니다.',
         ),
         false,
       );

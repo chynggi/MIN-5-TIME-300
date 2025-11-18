@@ -59,32 +59,32 @@ export default function AdviceBar({ variant = 'fixed', title, fullWidth = false 
   };
 
   const content = (
-    <div className="w-full bg-white shadow-md border rounded-xl px-3 py-2 flex items-center gap-2">
+    <div className="w-full bg-white shadow-md border rounded-xl px-3 py-3 flex flex-wrap items-center gap-2 sm:gap-3">
       {/* 아이콘 */}
       <div className="text-yellow-600" aria-hidden>💡</div>
       {/* 제목 배지 - 바 내부에 배치 */}
       {title && (
         <span
-          className="whitespace-nowrap text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200"
+          className="whitespace-nowrap text-[11px] font-semibold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 shrink-0"
           aria-label={title}
         >
           {title}
         </span>
       )}
       {/* 본문 텍스트 */}
-      <div className="flex-1 text-sm text-gray-800 truncate" title={text}>
+      <div className="flex-1 min-w-[200px] text-sm text-gray-800 leading-5 break-words" title={text}>
         {text}
       </div>
       {/* 액션 버튼들 */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 w-full sm:w-auto justify-end sm:justify-start">
         <button onClick={() => sendFeedback(true)} disabled={!adviceId} className="text-green-600 text-xs" aria-label="도움이 되었어요">👍</button>
         <button onClick={() => sendFeedback(false)} disabled={!adviceId} className="text-gray-500 text-xs" aria-label="별로였어요">👎</button>
+        <button onClick={() => load(true)} disabled={loading} className="text-gray-600 hover:text-gray-800" aria-label="새로고침">⟲</button>
       </div>
-      <button onClick={() => load(true)} disabled={loading} className="text-gray-600 hover:text-gray-800" aria-label="새로고침">⟲</button>
       {risk === 'severe' && (
         <button
           onClick={() => alert('도움 받기: 가까운 사람/전문기관과 연결할 수 있는 안내 페이지로 이동합니다.')}
-          className="ml-1 text-red-600 text-xs border border-red-200 rounded px-2 py-1"
+          className="ml-auto sm:ml-1 text-red-600 text-xs border border-red-200 rounded px-2 py-1"
         >
           도움 받기
         </button>

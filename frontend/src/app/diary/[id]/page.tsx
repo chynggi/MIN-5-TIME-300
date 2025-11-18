@@ -47,6 +47,8 @@ export default function DiaryDetailPage() {
   const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   // Voice audio
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const [voicePlaying, setVoicePlaying] = useState(false);
@@ -241,16 +243,16 @@ export default function DiaryDetailPage() {
   // };
 
   const handleDelete = async () => {
-    if (!diary) return;
-    
-    if (!confirm("정말 삭제하시겠습니까?")) return;
-    
+    if (!diary || deleteLoading) return;
+    setDeleteLoading(true);
     try {
       await api.delete(`/diaries/${diary.id}`);
-  // 목록 페이지(/diary) 제거됨: 대시보드로 이동
-  router.push("/dashboard");
+      router.push("/dashboard");
     } catch {
       setError("삭제에 실패했습니다.");
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteModal(false);
     }
   };
 
@@ -509,7 +511,7 @@ export default function DiaryDetailPage() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5h2m-1 0v14m9-7H4" /></svg>
                     수정하기
                   </button>
-                  <button onClick={handleDelete} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-sm font-semibold shadow hover:from-rose-600 hover:to-rose-700 transition">
+                  <button onClick={() => setShowDeleteModal(true)} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-rose-500 to-rose-600 text-white text-sm font-semibold shadow hover:from-rose-600 hover:to-rose-700 transition">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M10 11v6m4-6v6M9 7l1-2h4l1 2m-7 0h8l-1 12H10L9 7z" /></svg>
                     삭제하기
                   </button>
@@ -609,5 +611,39 @@ export default function DiaryDetailPage() {
         </div>
       </div>
     </div>
+    {showDeleteModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div
+          className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+          aria-hidden="true"
+          onClick={() => !deleteLoading && setShowDeleteModal(false)}
+        />
+        <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-200 p-6">
+          <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M5.64 5.64l12.72 12.72M6 19h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z" /></svg>
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 text-center">일기를 삭제할까요?</h3>
+          <p className="text-sm text-slate-600 text-center mt-2">삭제된 일기는 되돌릴 수 없습니다. 정말로 삭제하시겠어요?</p>
+          <div className="mt-6 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => handleDelete()}
+              disabled={deleteLoading}
+              className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow transition ${deleteLoading ? 'bg-rose-400 cursor-not-allowed' : 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700'}`}
+            >
+              {deleteLoading && <span className="w-4 h-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" aria-hidden="true" />}
+              삭제하기
+            </button>
+            <button
+              type="button"
+              onClick={() => !deleteLoading && setShowDeleteModal(false)}
+              className="w-full inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50 transition"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
   );
 }

@@ -8,7 +8,7 @@ const defaultImages = [
 import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/axios";
 import Link from "next/link";
-import { SpotifyTrack as SpotifyTrackType, DiarySettings as DiarySettingsType } from "@/types/diary";
+import { SpotifyTrack as SpotifyTrackType, VoiceRecordPayload } from "@/types/diary";
 
 // Import new components
 import ImageUpload from "@/components/diary/ImageUpload";
@@ -23,16 +23,7 @@ import CheckinForm from "@/components/checkin/CheckinForm";
 import { checkinApi } from "@/services/checkin-api";
 
 
-interface SpotifyTrack {
-  id: string;
-  name: string;
-  artists: { name: string }[];
-  preview_url: string | null;
-  external_urls: { spotify: string };
-  album: {
-    images: { url: string }[];
-  };
-}
+type SpotifyTrack = SpotifyTrackType;
 
 function NewDiaryContent() {
   const router = useRouter();
@@ -46,7 +37,7 @@ function NewDiaryContent() {
   const [presetKey, setPresetKey] = useState<string | null>(null); // 프리셋 기본 이미지 키
   const [showDefaultImageSelect, setShowDefaultImageSelect] = useState(false);
   const [emotion, setEmotion] = useState("😊");
-  const [voiceRecord, setVoiceRecord] = useState<Blob | null>(null);
+  const [voiceRecord, setVoiceRecord] = useState<VoiceRecordPayload | null>(null);
   const [selectedMusic, setSelectedMusic] = useState<SpotifyTrack | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -204,6 +195,16 @@ function NewDiaryContent() {
         const texts = selectedQuestions.map(q => q.text);
         formData.append('selectedQuestionDomains', JSON.stringify(domains));
         formData.append('selectedQuestionTexts', JSON.stringify(texts));
+      }
+      if (voiceRecord) {
+        const voiceFile = new File([voiceRecord.blob], `voice-${Date.now()}.mp3`, {
+          type: voiceRecord.blob.type || 'audio/mpeg',
+        });
+        formData.append('voice', voiceFile);
+        formData.append('voiceDuration', Math.round(voiceRecord.duration).toString());
+      }
+      if (selectedMusic) {
+        formData.append('music', JSON.stringify(selectedMusic));
       }
       const response = await api.post("/diaries", formData, { headers: { "Content-Type": "multipart/form-data" } });
       if (response.status === 200 || response.status === 201) { 

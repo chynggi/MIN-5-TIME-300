@@ -78,6 +78,17 @@ function normalizeStringArray(v: any): string[] | undefined {
   return undefined;
 }
 
+function safeParseJson<T = any>(value?: unknown): T | undefined {
+  if (value == null || value === '') return undefined;
+  if (typeof value === 'object') return value as T;
+  if (typeof value !== 'string') return undefined;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
+}
+
 const VALID_POST_VISIBILITY = new Set(['public', 'private', 'friends']);
 const VALID_CONTENT_VISIBILITY = new Set(['public', 'private']);
 const VALID_WEATHER = new Set([
@@ -360,6 +371,10 @@ export class DiaryService {
           emotion: p.emotion ?? undefined,
           mediaUrl: p.mediaUrl ?? undefined,
           mediaType: p.mediaType ?? undefined,
+          voiceUrl: (p as any).voiceUrl ?? undefined,
+          voiceMime: (p as any).voiceMime ?? undefined,
+          voiceDuration: (p as any).voiceDuration ?? undefined,
+          music: (p as any).music ?? undefined,
           question: '', // deprecated
           lat: (p as any).lat,
           lng: (p as any).lng,
@@ -413,6 +428,10 @@ export class DiaryService {
         emotion: d.emotion ?? undefined, // 감정 이모지 포함
         mediaUrl: d.mediaUrl ?? undefined,
         mediaType: d.mediaType ?? undefined,
+        voiceUrl: (d as any).voiceUrl ?? undefined,
+        voiceMime: (d as any).voiceMime ?? undefined,
+        voiceDuration: (d as any).voiceDuration ?? undefined,
+        music: (d as any).music ?? undefined,
         question: '', // deprecated
       })),
       totalCount,
@@ -498,6 +517,10 @@ export class DiaryService {
           username: (r as any).user?.username,
           profileImageUrl: (r as any).user?.profileImageUrl || null,
           profileColor: (r as any).user?.profileColor || null,
+          voiceUrl: (r as any).voiceUrl ?? undefined,
+          voiceMime: (r as any).voiceMime ?? undefined,
+          voiceDuration: (r as any).voiceDuration ?? undefined,
+          music: (r as any).music ?? undefined,
         })),
         totalCount: rows.length,
         page: 1,
@@ -556,6 +579,10 @@ export class DiaryService {
         username: (r as any).user?.username,
         profileImageUrl: (r as any).user?.profileImageUrl || null,
         profileColor: (r as any).user?.profileColor || null,
+        voiceUrl: (r as any).voiceUrl ?? undefined,
+        voiceMime: (r as any).voiceMime ?? undefined,
+        voiceDuration: (r as any).voiceDuration ?? undefined,
+        music: (r as any).music ?? undefined,
       })),
       totalCount,
       page,
@@ -613,6 +640,10 @@ export class DiaryService {
       emotion: diary.emotion ?? undefined, // 감정 이모지 포함
       mediaUrl: diary.mediaUrl ?? undefined,
       mediaType: diary.mediaType ?? undefined,
+      voiceUrl: (diary as any).voiceUrl ?? undefined,
+      voiceMime: (diary as any).voiceMime ?? undefined,
+      voiceDuration: (diary as any).voiceDuration ?? undefined,
+      music: (diary as any).music ?? undefined,
       question: '', // 추후 질문 연동
       selectedQuestions:
         Array.isArray((diary as any).selectedQuestionTexts) &&
@@ -699,7 +730,10 @@ export class DiaryService {
   async createDiary(
     req: any,
     dto: CreateDiaryDto,
-    file?: Multer.File,
+    files?: {
+      file?: Multer.File[];
+      voice?: Multer.File[];
+    },
   ): Promise<{
     id: string;
     content: string;
@@ -715,21 +749,34 @@ export class DiaryService {
     lng?: number | null;
   }> {
     const userId = req.user.userId;
-    let mediaUrl: string | undefined = undefined;
-    let mediaType: string | undefined = undefined;
-    // 파일이 있으면 저장 (공통 파일 업로드 서비스 사용)
-    if (file) {
+    let mediaUrl: string | undefined;
+    let mediaType: string | undefined;
+    let voiceUrl: string | undefined;
+    let voiceMime: string | undefined;
+    let voiceDuration: number | undefined;
+
+    const imageFileCandidate = files?.file?.[0];
+    const voiceFileCandidate = files?.voice?.[0];
+    let imageFile = imageFileCandidate;
+    let voiceFile = voiceFileCandidate;
+
+    if (!voiceFile && imageFile?.mimetype?.startsWith('audio/')) {
+      voiceFile = imageFile;
+      imageFile = undefined;
+    }
+
+    if (imageFile) {
       try {
         const config = this.fileUploadService.getUploadConfig('diary');
         const uploadResult = await this.fileUploadService.uploadFile(
-          file,
+          imageFile,
           config.uploadPath,
           config.allowedTypes,
           config.maxSize,
         );
 
         mediaUrl = uploadResult.fileUrl;
-        mediaType = file.mimetype;
+        mediaType = imageFile.mimetype;
       } catch (error) {
         console.error('파일 업로드 오류:', error);
         if (error instanceof BadRequestException) {
@@ -755,6 +802,32 @@ export class DiaryService {
         mediaType = 'image/jpeg';
       }
     }
+
+    if (voiceFile) {
+      try {
+        const config = this.fileUploadService.getUploadConfig('diary');
+        const uploadResult = await this.fileUploadService.uploadFile(
+          voiceFile,
+          config.uploadPath,
+          config.allowedTypes,
+          config.maxSize,
+        );
+        voiceUrl = uploadResult.fileUrl;
+        voiceMime = voiceFile.mimetype;
+        const parsedDuration = parseInt(dto.voiceDuration as any, 10);
+        if (!Number.isNaN(parsedDuration) && parsedDuration > 0) {
+          voiceDuration = parsedDuration;
+        }
+      } catch (error) {
+        console.error('음성 업로드 오류:', error);
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+        throw new BadRequestException('음성 파일 업로드 중 오류가 발생했습니다.');
+      }
+    }
+
+    const musicPayload = safeParseJson(dto.music);
 
     // FormData로 전달된 문자열 값들을 올바른 타입으로 변환
     const legacyIsPublicTrue =
@@ -867,6 +940,14 @@ export class DiaryService {
           // 날짜는 유지(dayStart)
           mediaUrl,
           mediaType,
+          ...(voiceUrl !== undefined
+            ? {
+                voiceUrl,
+                voiceMime,
+                voiceDuration,
+              }
+            : {}),
+          ...(musicPayload !== undefined ? { music: musicPayload } : {}),
           writingDuration: writingDurationParsed,
           lat,
           lng,
@@ -898,6 +979,14 @@ export class DiaryService {
           ...(useCustomCreatedAt ? { createdAt: dayStart } : {}),
           mediaUrl,
           mediaType,
+          ...(voiceUrl !== undefined
+            ? {
+                voiceUrl,
+                voiceMime,
+                voiceDuration,
+              }
+            : {}),
+          ...(musicPayload !== undefined ? { music: musicPayload } : {}),
           writingDuration: writingDurationParsed,
           emotionScore: 0,
           lat,
@@ -959,6 +1048,11 @@ export class DiaryService {
       question: '', // deprecated
       mediaUrl,
       mediaType,
+      voiceUrl: voiceUrl ?? (diary as any).voiceUrl ?? undefined,
+      voiceMime: voiceMime ?? (diary as any).voiceMime ?? undefined,
+      voiceDuration:
+        voiceDuration ?? (diary as any).voiceDuration ?? undefined,
+      music: musicPayload ?? (diary as any).music ?? undefined,
       lat: (diary as any).lat ?? null,
       lng: (diary as any).lng ?? null,
     };
@@ -1155,6 +1249,9 @@ export class DiaryService {
     if (diary.mediaUrl && diary.mediaUrl.startsWith('/uploads/')) {
       await this.fileUploadService.deleteFile(diary.mediaUrl);
     }
+    if (diary.voiceUrl && diary.voiceUrl.startsWith('/uploads/')) {
+      await this.fileUploadService.deleteFile(diary.voiceUrl);
+    }
 
     this.vectorDbService.delete([id]).catch((err) => {
       console.warn('일기 삭제 후 벡터 삭제 실패:', err?.message || err);
@@ -1182,7 +1279,10 @@ export class DiaryService {
     req: any,
     id: string,
     dto: CreateDiaryDto,
-    file?: Multer.File,
+    files?: {
+      file?: Multer.File[];
+      voice?: Multer.File[];
+    },
   ) {
     const userId = req.user.userId;
     const diary = await this.prisma.journal.findUnique({ where: { id } });
@@ -1193,17 +1293,33 @@ export class DiaryService {
     // 파일 업로드 처리 (선택)
     let mediaUrl: string | undefined = diary.mediaUrl ?? undefined;
     let mediaType: string | undefined = diary.mediaType ?? undefined;
-    if (file) {
+    let voiceFileToDelete: string | undefined;
+    let voicePatch:
+      | {
+          voiceUrl: string | null;
+          voiceMime: string | null;
+          voiceDuration: number | null;
+        }
+      | undefined;
+
+    let imageFile = files?.file?.[0];
+    let voiceFile = files?.voice?.[0];
+    if (!voiceFile && imageFile?.mimetype?.startsWith('audio/')) {
+      voiceFile = imageFile;
+      imageFile = undefined;
+    }
+
+    if (imageFile) {
       try {
         const config = this.fileUploadService.getUploadConfig('diary');
         const uploadResult = await this.fileUploadService.uploadFile(
-          file,
+          imageFile,
           config.uploadPath,
           config.allowedTypes,
           config.maxSize,
         );
         mediaUrl = uploadResult.fileUrl;
-        mediaType = file.mimetype;
+        mediaType = imageFile.mimetype;
       } catch (error) {
         console.error('파일 업로드 오류:', error);
         if (error instanceof BadRequestException) {
@@ -1228,6 +1344,53 @@ export class DiaryService {
         mediaType = 'image/jpeg';
       }
     }
+
+    const shouldRemoveVoice =
+      (dto as any).removeVoice === 'true' || (dto as any).removeVoice === true;
+    if (voiceFile) {
+      try {
+        const config = this.fileUploadService.getUploadConfig('diary');
+        const uploadResult = await this.fileUploadService.uploadFile(
+          voiceFile,
+          config.uploadPath,
+          config.allowedTypes,
+          config.maxSize,
+        );
+        const parsedDuration = parseInt(dto.voiceDuration as any, 10);
+        voicePatch = {
+          voiceUrl: uploadResult.fileUrl,
+          voiceMime: voiceFile.mimetype,
+          voiceDuration: Number.isNaN(parsedDuration) ? null : parsedDuration,
+        };
+        if (diary.voiceUrl?.startsWith('/uploads/')) {
+          voiceFileToDelete = diary.voiceUrl;
+        }
+      } catch (error) {
+        console.error('음성 업로드 오류:', error);
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+        throw new BadRequestException('음성 파일 업로드 중 오류가 발생했습니다.');
+      }
+    } else if (shouldRemoveVoice) {
+      voicePatch = {
+        voiceUrl: null,
+        voiceMime: null,
+        voiceDuration: null,
+      };
+      if (diary.voiceUrl?.startsWith('/uploads/')) {
+        voiceFileToDelete = diary.voiceUrl;
+      }
+    }
+
+    const musicPayload = safeParseJson(dto.music);
+    const removeMusic =
+      (dto as any).removeMusic === 'true' || (dto as any).removeMusic === true;
+    const musicPatch = removeMusic
+      ? { music: null }
+      : musicPayload !== undefined
+        ? { music: musicPayload }
+        : undefined;
 
     // 타입 변환
     const legacyIsPublicTrue =
@@ -1307,6 +1470,8 @@ export class DiaryService {
         emotion: dto.emotion,
         mediaUrl,
         mediaType,
+        ...(voicePatch ?? {}),
+        ...(musicPatch ?? {}),
         writingDuration: writingDurationParsed,
         lat,
         lng,
@@ -1330,6 +1495,12 @@ export class DiaryService {
           : {}),
       },
     });
+
+    if (voiceFileToDelete) {
+      await this.fileUploadService.deleteFile(voiceFileToDelete).catch(() => {
+        /* ignore */
+      });
+    }
 
     // 임베딩 갱신(베스트 에포치: 내용 변경 시)
     try {
@@ -1371,6 +1542,14 @@ export class DiaryService {
       question: '',
       mediaUrl,
       mediaType,
+      voiceUrl: (updated as any).voiceUrl ?? voicePatch?.voiceUrl ?? undefined,
+      voiceMime: (updated as any).voiceMime ?? voicePatch?.voiceMime ?? undefined,
+      voiceDuration:
+        (updated as any).voiceDuration ?? voicePatch?.voiceDuration ?? undefined,
+      music:
+        (musicPatch?.music !== undefined
+          ? musicPatch.music
+          : (updated as any).music) ?? undefined,
       lat: (updated as any).lat ?? null,
       lng: (updated as any).lng ?? null,
     };
