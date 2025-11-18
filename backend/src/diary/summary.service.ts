@@ -127,7 +127,12 @@ export class DiarySummaryService {
         truncated: res.truncated,
         fallbackUsed: res.fallbackUsed,
       };
-      this.logger.log(`value=${JSON.stringify(res.rawOutput).slice(0, 200)}`);
+      try {
+        const rawOutputStr = res.rawOutput 
+          ? JSON.stringify(res.rawOutput).slice(0, 200) 
+          : 'null';
+        this.logger.log(`value=${rawOutputStr}`);
+      } catch {}
       this.cache.set(cacheKey, { value, ts: Date.now() });
       try {
         this.logger.log(
