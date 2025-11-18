@@ -78,49 +78,6 @@ function normalizeStringArray(v: any): string[] | undefined {
   return undefined;
 }
 
-function buildQaText(
-  domains?: string[],
-  texts?: string[],
-  answers?: string[],
-): string | undefined {
-  if (!texts || texts.length === 0) return undefined;
-  const len = texts.length;
-  const blocks: string[] = [];
-  for (let i = 0; i < len; i++) {
-    const question = texts[i]?.trim();
-    const answer = answers?.[i]?.trim();
-    if (!question && !answer) continue;
-    const domainLabel = domains?.[i]?.trim();
-    const prefix = domainLabel ? `[${domainLabel}] ` : '';
-    const qLine = question ? `${prefix}${question}` : prefix.trim();
-    const aLine = answer ? `A: ${answer}` : '';
-    const block = [qLine, aLine].filter(Boolean).join('\n').trim();
-    if (block) blocks.push(block);
-  }
-  return blocks.length ? blocks.join('\n\n') : undefined;
-}
-
-function looksLikeQuestionAnswerContent(
-  content?: string,
-  questionTexts?: string[],
-): boolean {
-  if (!content) return false;
-  if (/Q\d+|A:|질문/.test(content)) return true;
-  if (!questionTexts?.length) return false;
-  let hits = 0;
-  const threshold = Math.min(2, questionTexts.length);
-  for (const rawText of questionTexts) {
-    const snippet = rawText?.trim();
-    if (!snippet) continue;
-    const needle = snippet.length > 18 ? snippet.slice(0, 18) : snippet;
-    if (needle && content.includes(needle)) {
-      hits += 1;
-      if (hits >= threshold) return true;
-    }
-  }
-  return false;
-}
-
 function safeParseJson<T = any>(value?: unknown): T | undefined {
   if (value == null || value === '') return undefined;
   if (typeof value === 'object') return value as T;
@@ -918,47 +875,19 @@ export class DiaryService {
         ? parseFloat(dto.lng)
         : undefined;
 
-    const selectedQuestionDomains = normalizeStringArray(
-      (dto as any).selectedQuestionDomains,
-    );
-    const selectedQuestionTexts = normalizeStringArray(
-      (dto as any).selectedQuestionTexts,
-    );
-    const selectedQuestionAnswers = normalizeStringArray(
-      (dto as any).selectedQuestionAnswers,
-    );
-
-    // finalize=true일 때 최종 요약 실행, 그 외에는 Q&A 원문일 경우 자동 요약
+    // finalize=true일 때 최종 요약 실행, 그 외에는 원문 저장
     let finalContent = dto.content;
     const isFinalize =
       (dto as any).finalize === 'true' || (dto as any).finalize === true;
-    const qaSource = buildQaText(
-      selectedQuestionDomains,
-      selectedQuestionTexts,
-      selectedQuestionAnswers,
-    );
-    const looksLikeQa = looksLikeQuestionAnswerContent(
-      finalContent,
-      selectedQuestionTexts,
-    );
-    const shouldForceSummary =
-      !isFinalize && !!qaSource && (!finalContent?.trim() || looksLikeQa);
-    const summaryPayload = isFinalize
-      ? finalContent
-      : shouldForceSummary && qaSource
-        ? qaSource
-        : finalContent;
-    const summaryTitleHint =
-      extractTitle(finalContent) || selectedQuestionTexts?.[0]?.slice(0, 50);
     let summaryMeta: {
       modelUsed: string;
       truncated: boolean;
       fallbackUsed: boolean;
     } | null = null;
-    if ((isFinalize || shouldForceSummary) && summaryPayload) {
+    if (isFinalize) {
       try {
-        const sum = await this.diarySummaryService.summarize(summaryPayload, {
-          title: summaryTitleHint,
+        const sum = await this.diarySummaryService.summarize(finalContent, {
+          title: extractTitle(finalContent),
           modelId: dto.questionModel,
           userId,
         });
@@ -975,6 +904,15 @@ export class DiaryService {
     // 제목 저장: 프론트가 별도 title을 보낼 수 없으므로 [제목] 패턴/첫 줄에서 추출
     const { title: resolvedTitle, body: cleanedContent } =
       splitTitleAndBody(finalContent);
+    const selectedQuestionDomains = normalizeStringArray(
+      (dto as any).selectedQuestionDomains,
+    );
+    const selectedQuestionTexts = normalizeStringArray(
+      (dto as any).selectedQuestionTexts,
+    );
+    const selectedQuestionAnswers = normalizeStringArray(
+      (dto as any).selectedQuestionAnswers,
+    );
     const postVisibility = resolvePostVisibility(
       (dto as any).postVisibility,
       legacyIsPublicValue,
@@ -1504,56 +1442,19 @@ export class DiaryService {
     );
     const weather = resolveWeather((dto as any).weather, (diary as any).weather);
 
-    const selectedQuestionDomains = normalizeStringArray(
-      (dto as any).selectedQuestionDomains,
-    );
-    const selectedQuestionTexts = normalizeStringArray(
-      (dto as any).selectedQuestionTexts,
-    );
-    const selectedQuestionAnswers = normalizeStringArray(
-      (dto as any).selectedQuestionAnswers,
-    );
-    const fallbackQuestionDomains =
-      selectedQuestionDomains ??
-      ((diary as any).selectedQuestionDomains as string[] | undefined);
-    const fallbackQuestionTexts =
-      selectedQuestionTexts ??
-      ((diary as any).selectedQuestionTexts as string[] | undefined);
-    const fallbackQuestionAnswers =
-      selectedQuestionAnswers ??
-      ((diary as any).selectedQuestionAnswers as string[] | undefined);
-
-    // finalize=true일 때만 요약 적용, 아니더라도 Q&A 원문이면 자동 요약
+    // finalize=true일 때만 요약 적용
     let finalContent = dto.content;
     const isFinalize =
       (dto as any).finalize === 'true' || (dto as any).finalize === true;
-    const qaSource = buildQaText(
-      fallbackQuestionDomains,
-      fallbackQuestionTexts,
-      fallbackQuestionAnswers,
-    );
-    const looksLikeQa = looksLikeQuestionAnswerContent(
-      finalContent,
-      fallbackQuestionTexts,
-    );
-    const shouldForceSummary =
-      !isFinalize && !!qaSource && (!finalContent?.trim() || looksLikeQa);
-    const summaryPayload = isFinalize
-      ? finalContent
-      : shouldForceSummary && qaSource
-        ? qaSource
-        : finalContent;
-    const summaryTitleHint =
-      extractTitle(finalContent) || fallbackQuestionTexts?.[0]?.slice(0, 50);
     let summaryMeta: {
       modelUsed: string;
       truncated: boolean;
       fallbackUsed: boolean;
     } | null = null;
-    if ((isFinalize || shouldForceSummary) && summaryPayload) {
+    if (isFinalize) {
       try {
-        const sum = await this.diarySummaryService.summarize(summaryPayload, {
-          title: summaryTitleHint,
+        const sum = await this.diarySummaryService.summarize(finalContent, {
+          title: extractTitle(finalContent),
           modelId: dto.questionModel,
           userId,
         });
@@ -1587,11 +1488,16 @@ export class DiaryService {
         lng,
         title: resolvedTitle,
         // 선택 질문 업데이트 허용
-        ...(selectedQuestionDomains
-          ? { selectedQuestionDomains }
-          : {}),
-        ...(selectedQuestionTexts ? { selectedQuestionTexts } : {}),
-        ...(selectedQuestionAnswers ? { selectedQuestionAnswers } : {}),
+        ...(() => {
+          const d = normalizeStringArray((dto as any).selectedQuestionDomains);
+          const t = normalizeStringArray((dto as any).selectedQuestionTexts);
+          const a = normalizeStringArray((dto as any).selectedQuestionAnswers);
+          return {
+            ...(d ? { selectedQuestionDomains: d } : {}),
+            ...(t ? { selectedQuestionTexts: t } : {}),
+            ...(a ? { selectedQuestionAnswers: a } : {}),
+          };
+        })(),
         // finalize=true인 경우에만 summary* 메타 갱신
         ...(summaryMeta
           ? {

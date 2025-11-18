@@ -68,7 +68,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
   const [answerType, setAnswerType] = useState<"text" | "emoji">("text");
   const [selectedEmoji, setSelectedEmoji] = useState("");
   const [startTime, setStartTime] = useState<number>(Date.now());
-  const [selectedModel, setSelectedModel] = useState<string>("claude-sonnet-4"); // 기본값은 Claude
+  const [selectedModel, setSelectedModel] = useState<string>("gemini-2.5-flash"); // 기본값은 Gemini 2.5 Flash
   // 실제 질문 생성에 사용된 모델을 저장해 요약 시에도 동일 모델을 사용
   const [generationModel, setGenerationModel] = useState<string | null>(null);
   const [showModelSelector, setShowModelSelector] = useState(false);
@@ -266,7 +266,8 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
     }
 
     const finalizeRequested = mode === 'final';
-    if (finalizeRequested && !isAllAnswered) {
+    const allAnsweredNow = questions.length > 0 && questions.every(q => isAnswered(q.answer));
+    if (finalizeRequested && !allAnsweredNow) {
       alert('모든 질문에 답변을 완료하면 일기 완성하기를 사용할 수 있어요.');
       return;
     }
@@ -314,9 +315,10 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
     }
   };
 
-  const answeredCount = questions.filter(q => q.answered).length;
+  const isAnswered = (value?: string) => (value?.trim().length ?? 0) > 0;
+  const answeredCount = questions.filter(q => isAnswered(q.answer)).length;
   const totalCount = questions.length;
-  const isAllAnswered = answeredCount === totalCount && totalCount > 0;
+  const isAllAnswered = totalCount > 0 && answeredCount === totalCount;
 
   // 공통 버튼 스타일 (간단 유틸) - 추후 별도 컴포넌트화 가능
   const btn = {
@@ -480,13 +482,14 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {questions.map((question, index) => {
               const active = currentQuestionIndex === index && showAnswerInput;
+              const completed = isAnswered(question.answer);
               return (
                 <button
                   type="button"
                   key={question.id}
                   onClick={() => selectQuestion(index)}
                   className={`w-full text-left p-3 rounded-lg border transition group ${
-                    question.answered
+                    completed
                       ? 'bg-green-50 border-green-200 hover:border-green-300'
                       : active
                         ? 'bg-blue-50 border-blue-300'
@@ -495,7 +498,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
                 >
                   <div className="flex items-start gap-3">
                     <span className={`mt-0.5 w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                      question.answered ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'
+                      completed ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700'
                     }`}>
                       {index + 1}
                     </span>
@@ -504,13 +507,13 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
                         <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold tracking-wide uppercase">{question.domain}</span>
                       </div>
                       <p className="text-xs md:text-sm font-medium text-gray-700 line-clamp-3 md:line-clamp-2">{question.text}</p>
-                      {question.answered && (
+                      {completed && (
                         <p className="mt-1 text-[11px] text-gray-500 bg-white/60 rounded px-2 py-1 line-clamp-1">
                           {question.answer}
                         </p>
                       )}
                     </div>
-                    {question.answered && <span className="text-green-600 text-[10px] font-semibold">완료</span>}
+                    {completed && <span className="text-green-600 text-[10px] font-semibold">완료</span>}
                   </div>
                 </button>
               );
