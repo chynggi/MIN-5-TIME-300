@@ -29,8 +29,8 @@ export class SummaryGeneratorFactory {
       case AIModel.CLAUDE_SONNET_4:
         return new ClaudeSummaryGenerator();
       default:
-        // 기본 Gemini 사용
-        return new GeminiSummaryGenerator();
+        // 기본 Claude 사용
+        return new ClaudeSummaryGenerator();
     }
   }
 
