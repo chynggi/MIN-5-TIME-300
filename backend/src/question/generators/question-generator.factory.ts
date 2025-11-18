@@ -73,7 +73,11 @@ export class QuestionGeneratorFactory {
   static getDefaultModel(): AIModel {
     const enabledModels = this.getEnabledModels();
 
-    // Gemini를 1순위로 (가장 안정적)
+    // 안정성 기준으로 우선순위 설정
+    if (enabledModels.includes(AIModel.CLAUDE_SONNET_4)) {
+      return AIModel.CLAUDE_SONNET_4;
+    }
+    
     if (enabledModels.includes(AIModel.GEMINI_2_5_FLASH)) {
       return AIModel.GEMINI_2_5_FLASH;
     }
@@ -82,9 +86,7 @@ export class QuestionGeneratorFactory {
       return AIModel.GPT_5;
     }
 
-    if (enabledModels.includes(AIModel.CLAUDE_SONNET_4)) {
-      return AIModel.CLAUDE_SONNET_4;
-    }
+    
 
     // 모든 API 키가 없는 경우 기본값으로 Claude 사용 (폴백 질문 제공)
     return AIModel.CLAUDE_SONNET_4;
