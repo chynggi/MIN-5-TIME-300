@@ -236,7 +236,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
     setAnswerType("text");
   };
 
-  const generateDiary = async () => {
+  const generateDiary = async (mode: "final" | "draft") => {
     // 사용자가 아무 답변도 저장하지 않은 경우: 현재 선택된 질문을 기반으로 빈 답변 템플릿 생성
     const anyAnswered = questions.some(q => q.answered);
     let working = questions;
@@ -265,8 +265,12 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
       finalTitle = working[0].text.slice(0, 18) + '...';
     }
 
-    // 모든 답변 완료 시에만 최종 요약 실행
-    const shouldSummarize = working.length > 0 && working.every(q => q.answered) && questions.length > 0 && questions.every(q => q.answered);
+    const finalizeRequested = mode === 'final';
+    if (finalizeRequested && !isAllAnswered) {
+      alert('모든 질문에 답변을 완료하면 일기 완성하기를 사용할 수 있어요.');
+      return;
+    }
+    const shouldSummarize = finalizeRequested;
     const rawContent = contentLines.join('\n\n').trim();
 
     if (shouldSummarize) {
@@ -425,7 +429,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
           <div className="ml-auto flex items-center gap-2">
             {answeredCount > 0 && (
               <button
-                onClick={generateDiary}
+                onClick={() => generateDiary(isAllAnswered ? 'final' : 'draft')}
                 disabled={!title.trim()}
                 className={`${btn.base} ${btn.primary} ${btn.sm} hidden md:inline-flex`}
               >
@@ -572,7 +576,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
                 </p>
                 {answeredCount > 0 && (
                   <button
-                    onClick={generateDiary}
+                    onClick={() => generateDiary(isAllAnswered ? 'final' : 'draft')}
                     disabled={!title.trim()}
                     className={`${btn.base} ${btn.success} ${btn.md}`}
                   >
@@ -587,7 +591,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
             <div className="text-[11px] text-gray-500">{answeredCount}개 답변 완료</div>
             {answeredCount > 0 && (
               <button
-                onClick={generateDiary}
+                onClick={() => generateDiary(isAllAnswered ? 'final' : 'draft')}
                 disabled={!title.trim()}
                 className={`${btn.base} ${isAllAnswered ? btn.success : btn.primary} ${btn.sm}`}
               >
