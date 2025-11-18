@@ -146,7 +146,7 @@ export class DiarySummaryService {
         text: rawContent,
         modelUsed: modelId,
         truncated: false,
-        fallbackUsed: true,
+        fallbackUsed: false,
       };
     }
   }
