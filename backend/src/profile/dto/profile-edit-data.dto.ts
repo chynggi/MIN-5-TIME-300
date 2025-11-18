@@ -100,5 +100,8 @@ export class LifestyleOptionsDto {
   socialActivityOptions: string[];
 
   // 현재 사용자가 선택한 값들
-  currentSelections: LifestyleInfoDto;
+  currentSelections: Record<string, string>;
+
+  // 구버전 필드 기반 선택값(백워드 호환용)
+  legacySelections?: LifestyleInfoDto;
 }

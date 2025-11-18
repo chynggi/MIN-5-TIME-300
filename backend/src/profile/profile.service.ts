@@ -1628,20 +1628,35 @@ export class ProfileService {
   async getLifestyleEditData(req: any): Promise<LifestyleOptionsDto> {
     const userId = req.user.userId;
 
-    // 현재 사용자의 라이프스타일 정보 조회
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        workStyle: true,
-        exerciseFrequency: true,
-        sleepPattern: true,
-        socialActivity: true,
-      },
-    });
+    const [user, lifestyleAnswers] = await this.prisma.$transaction([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          workStyle: true,
+          exerciseFrequency: true,
+          sleepPattern: true,
+          socialActivity: true,
+        },
+      }),
+      this.prisma.lifestyleAnswer.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
 
     if (!user) {
       throw new NotFoundException('사용자를 찾을 수 없습니다.');
     }
+
+    const currentSelections = lifestyleAnswers.reduce<Record<string, string>>(
+      (acc, entry) => {
+        if (entry.question && entry.answer) {
+          acc[entry.question] = entry.answer;
+        }
+        return acc;
+      },
+      {},
+    );
 
     // 선택 가능한 옵션들 (프론트엔드와 동일한 목록)
     const workStyleOptions = [
@@ -1680,7 +1695,8 @@ export class ProfileService {
       exerciseFrequencyOptions,
       sleepPatternOptions,
       socialActivityOptions,
-      currentSelections: {
+      currentSelections,
+      legacySelections: {
         workStyle: user.workStyle || undefined,
         exerciseFrequency: user.exerciseFrequency || undefined,
         sleepPattern: user.sleepPattern || undefined,
