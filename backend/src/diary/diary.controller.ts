@@ -9,11 +9,11 @@ import {
   Query,
   Req,
   UseGuards,
-  UploadedFile,
+  UploadedFiles,
   UseInterceptors,
   UseFilters,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { Multer } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { DiaryService } from './diary.service';
@@ -80,12 +80,24 @@ export class DiaryController {
   }
 
   @Post()
-  @UseInterceptors(FileInterceptor('file', diaryMediaUploadOptions))
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'file', maxCount: 1 },
+        { name: 'voice', maxCount: 1 },
+      ],
+      diaryMediaUploadOptions,
+    ),
+  )
   @UseFilters(FileUploadExceptionFilter)
   async createDiary(
     @Req() req,
     @Body() dto: CreateDiaryDto,
-    @UploadedFile() file?: Multer.File,
+    @UploadedFiles()
+    files?: {
+      file?: Multer.File[];
+      voice?: Multer.File[];
+    },
   ): Promise<{
     id: string;
     content: string;
@@ -103,17 +115,30 @@ export class DiaryController {
     // 디버깅: 들어온 FormData 필드 로그
     try {
       console.log('[CreateDiary] raw body dto:', dto);
-      if (file) {
+      const file = files?.file?.[0];
+      const voice = files?.voice?.[0];
+      if (file || voice) {
         console.log('[CreateDiary] uploaded file:', {
-          originalname: file.originalname,
-          mimetype: file.mimetype,
-          size: file.size,
+          image: file
+            ? {
+                originalname: file.originalname,
+                mimetype: file.mimetype,
+                size: file.size,
+              }
+            : null,
+          voice: voice
+            ? {
+                originalname: voice.originalname,
+                mimetype: voice.mimetype,
+                size: voice.size,
+              }
+            : null,
         });
       }
     } catch (e) {
       /* ignore */
     }
-    return this.diaryService.createDiary(req, dto, file);
+    return this.diaryService.createDiary(req, dto, files);
   }
 
   @Post(':id/rate')
@@ -139,26 +164,51 @@ export class DiaryController {
    * - 편집 시에도 요약 로직을 재적용하여 내용 업데이트를 반영
    */
   @Put(':id')
-  @UseInterceptors(FileInterceptor('file', diaryMediaUploadOptions))
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'file', maxCount: 1 },
+        { name: 'voice', maxCount: 1 },
+      ],
+      diaryMediaUploadOptions,
+    ),
+  )
   @UseFilters(FileUploadExceptionFilter)
   async updateDiary(
     @Req() req,
     @Param('id') id: string,
     @Body() dto: CreateDiaryDto,
-    @UploadedFile() file?: Multer.File,
+    @UploadedFiles()
+    files?: {
+      file?: Multer.File[];
+      voice?: Multer.File[];
+    },
   ) {
     // 디버깅: 들어온 FormData 필드 로그
     try {
       console.log('[UpdateDiary] id:', id, 'dto:', dto);
-      if (file) {
+      const file = files?.file?.[0];
+      const voice = files?.voice?.[0];
+      if (file || voice) {
         console.log('[UpdateDiary] uploaded file:', {
-          originalname: file.originalname,
-          mimetype: file.mimetype,
-          size: file.size,
+          image: file
+            ? {
+                originalname: file.originalname,
+                mimetype: file.mimetype,
+                size: file.size,
+              }
+            : null,
+          voice: voice
+            ? {
+                originalname: voice.originalname,
+                mimetype: voice.mimetype,
+                size: voice.size,
+              }
+            : null,
         });
       }
     } catch {}
-    return this.diaryService.updateDiary(req, id, dto, file);
+    return this.diaryService.updateDiary(req, id, dto, files);
   }
 
   @Delete(':id')

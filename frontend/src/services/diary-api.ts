@@ -1,4 +1,5 @@
 import apiRequest from '../lib/api';
+import type { DiarySelectedQuestion } from '@/types/diary';
 
 export interface DiaryItem {
   id: string;
@@ -31,6 +32,7 @@ export interface DiaryDetailResponse {
   mediaType?: string;
   question?: string;
   feedbacks?: any[];
+  selectedQuestions?: DiarySelectedQuestion[];
 }
 
 // 신규 다중 질문 응답 스키마
@@ -61,7 +63,7 @@ export interface SaveAnswersResponse {
   diaryDate: string;
   isPublic: boolean;
   summary?: { modelUsed?: string; truncated?: boolean; fallbackUsed?: boolean };
-  selectedQuestions: { domain?: string; text: string }[];
+  selectedQuestions: DiarySelectedQuestion[];
 }
 
 export const diaryApi = {

@@ -28,6 +28,9 @@ export class CreateDiaryDto {
   selectedQuestionTexts?: string[] | string; // multipart: 반복 키 배열 or JSON 문자열
 
   @IsOptional()
+  selectedQuestionAnswers?: string[] | string; // 질문형 작성 시 사용자의 답변 텍스트 배열
+
+  @IsOptional()
   @IsBooleanString()
   isPublic?: string; // 'true' | 'false'
 
@@ -46,6 +49,10 @@ export class CreateDiaryDto {
   @IsOptional()
   @IsString()
   mediaType?: string;
+
+  @IsOptional()
+  @IsString()
+  music?: string; // Spotify track payload(JSON 문자열)
 
   // 기본 프리셋 이미지 키 (spring, summer, autumn, winter, sunny, night, rain, snow)
   @IsOptional()
@@ -74,6 +81,18 @@ export class CreateDiaryDto {
   @IsOptional()
   @IsNumberString()
   lng?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  voiceDuration?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  removeVoice?: string;
+
+  @IsOptional()
+  @IsBooleanString()
+  removeMusic?: string;
 
   // 일기 완성하기 버튼 여부: 'true'일 때 최종 요약 실행
   @IsOptional()

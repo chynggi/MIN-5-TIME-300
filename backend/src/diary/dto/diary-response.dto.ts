@@ -14,6 +14,10 @@ export class DiaryListItemDto {
   emotion?: string; // 감정 이모지 필드 추가
   mediaUrl?: string;
   mediaType?: string;
+  voiceUrl?: string;
+  voiceMime?: string;
+  voiceDuration?: number;
+  music?: any;
   /**
    * @deprecated JournalQuestion 모델 제거로 항상 빈 문자열.
    *  - 프론트에서 더 이상 사용하지 않는다면 추후 제거 예정.
@@ -55,6 +59,10 @@ export class DiaryDetailResponseDto {
   emotion?: string; // 감정 이모지 필드 추가
   mediaUrl?: string;
   mediaType?: string;
+  voiceUrl?: string;
+  voiceMime?: string;
+  voiceDuration?: number;
+  music?: any;
   /**
    * @deprecated JournalQuestion 모델 제거로 항상 빈 문자열.
    *  - 향후 제거 시 프론트 응답 타입에서 삭제 필요.
@@ -64,7 +72,7 @@ export class DiaryDetailResponseDto {
    * 사용자가 당시 선택했던 질문 세트(질문형 작성 재편집 시 재활용)
    * - save-answers로 최초 저장 시 Journal.selectedQuestion* 배열에 보관됨
    */
-  selectedQuestions?: Array<{ domain: string; text: string }>;
+  selectedQuestions?: Array<{ domain: string; text: string; answer?: string }>;
   writingDuration: number;
   reactions: DiaryDetailReactionDto[];
   lat?: number;

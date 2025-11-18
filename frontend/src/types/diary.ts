@@ -17,6 +17,14 @@ export interface DiarySettings {
   weather: "sunny" | "cloudy" | "rainy" | "snowy";
 }
 
+export type DiaryQuestionDomain = 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal';
+
+export interface DiarySelectedQuestion {
+  domain: DiaryQuestionDomain;
+  text: string;
+  answer?: string;
+}
+
 export interface DiaryEntry {
   id: string;
   title: string;
@@ -43,6 +51,11 @@ export interface DiaryEntry {
   reactions?: any[];
 }
 
+export interface VoiceRecordPayload {
+  blob: Blob;
+  duration: number;
+}
+
 // Component props types
 export interface ImageUploadProps {
   onImageSelect: (file: File | null) => void;
@@ -52,7 +65,7 @@ export interface ImageUploadProps {
 export interface EmotionVoiceProps {
   emotion: string;
   onEmotionChange: (emotion: string) => void;
-  onVoiceRecord: (audioBlob: Blob | null) => void;
+  onVoiceRecord: (payload: VoiceRecordPayload | null) => void;
 }
 
 export interface MusicSettingProps {
@@ -75,10 +88,10 @@ export interface AIQuestionWriterProps {
     content: string;
     questionId: string;
     questionModel?: string;
-    selectedQuestions: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>;
+    selectedQuestions: DiarySelectedQuestion[];
   }) => void;
   onBack: () => void;
-  initialQuestions?: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>;
+  initialQuestions?: DiarySelectedQuestion[];
 }
 
 export interface FreeWriterProps {

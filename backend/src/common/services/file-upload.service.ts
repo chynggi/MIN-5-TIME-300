@@ -1,10 +1,18 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { extname, join } from 'path';
-import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
 
 @Injectable()
 export class FileUploadService {
+  private readonly uploadRootPath = join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'uploads',
+  );
+
   /**
    * 안전한 파일 업로드
    * @param file 업로드할 파일
@@ -40,7 +48,7 @@ export class FileUploadService {
 
     try {
       // 업로드 디렉토리 생성
-      const uploadDir = join(process.cwd(), 'uploads', uploadPath);
+      const uploadDir = join(this.uploadRootPath, uploadPath);
       if (!existsSync(uploadDir)) {
         mkdirSync(uploadDir, { recursive: true });
       }
@@ -50,8 +58,18 @@ export class FileUploadService {
       const safeFileName = `${randomUUID()}${fileExtension}`;
       const filePath = join(uploadDir, safeFileName);
 
-      // 파일 저장
-      writeFileSync(filePath, file.buffer);
+      // 파일 저장 (메모리/디스크 스토리지 모두 지원)
+      const fileContent = file.buffer
+        ? file.buffer
+        : file.path && existsSync(file.path)
+          ? readFileSync(file.path)
+          : null;
+
+      if (!fileContent) {
+        throw new BadRequestException('파일 데이터를 읽을 수 없습니다.');
+      }
+
+      writeFileSync(filePath, fileContent);
 
       // 파일 URL 생성
       const fileUrl = `/uploads/${uploadPath}/${safeFileName}`;
@@ -75,9 +93,18 @@ export class FileUploadService {
     try {
       if (!fileUrl) return;
 
-      // URL에서 파일 경로 추출 (/uploads/path/filename.ext -> uploads/path/filename.ext)
-      const relativePath = fileUrl.replace(/^\//, '');
-      const filePath = join(process.cwd(), relativePath);
+      // 절대 URL인 경우 origin 제거 후 상대 경로만 사용 (쿼리/해시 제외)
+      const normalizedUrl = fileUrl
+        .replace(/^https?:\/\/[^/]+/i, '')
+        .split(/[?#]/)[0];
+
+      if (!normalizedUrl.startsWith('/uploads/')) {
+        return;
+      }
+
+      const relativePath = normalizedUrl.replace('/uploads/', '');
+      const safeRelativePath = relativePath.replace(/\.\.(?:\/?|\\?)/g, '');
+      const filePath = join(this.uploadRootPath, safeRelativePath);
 
       // 파일이 존재하면 삭제
       if (existsSync(filePath)) {
@@ -115,6 +142,12 @@ export class FileUploadService {
             'video/mp4',
             'video/webm',
             'video/quicktime',
+            'audio/mpeg',
+            'audio/mp3',
+            'audio/webm',
+            'audio/ogg',
+            'audio/wav',
+            'audio/x-wav',
           ],
           maxSize: 10 * 1024 * 1024, // 10MB
           uploadPath: 'diary',

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from "react";
+import lamejs from "lamejs";
+import type { VoiceRecordPayload } from "@/types/diary";
 
 // 간단한 로컬 SVG 아이콘 (외부 패키지 없이 사용)
 const MicIcon = ({ className = "w-6 h-6" }) => (
@@ -91,7 +93,7 @@ const CircularProgress = ({
 interface EmotionVoiceProps {
   emotion: string;
   onEmotionChange: (emotion: string) => void;
-  onVoiceRecord?: (audioBlob: Blob | null) => void;
+  onVoiceRecord?: ((payload: VoiceRecordPayload | null) => void);
 }
 
 const emotions = [
@@ -242,54 +244,53 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
     return trimmedBuffer;
   };
 
-  // AudioBuffer를 WAV Blob으로 변환
-  const audioBufferToWav = (buffer: AudioBuffer): Blob => {
-    const numberOfChannels = buffer.numberOfChannels;
-    const sampleRate = buffer.sampleRate;
-    const format = 1; // PCM
-    const bitDepth = 16;
-    
-    const bytesPerSample = bitDepth / 8;
-    const blockAlign = numberOfChannels * bytesPerSample;
-    const byteRate = sampleRate * blockAlign;
-    const dataSize = buffer.length * blockAlign;
-    const bufferSize = 44 + dataSize;
-    
-    const arrayBuffer = new ArrayBuffer(bufferSize);
-    const view = new DataView(arrayBuffer);
-    
-    // WAV 헤더 작성
-    const writeString = (offset: number, string: string) => {
-      for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-      }
-    };
-    
-    writeString(0, 'RIFF');
-    view.setUint32(4, bufferSize - 8, true);
-    writeString(8, 'WAVE');
-    writeString(12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, format, true);
-    view.setUint16(22, numberOfChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, byteRate, true);
-    view.setUint16(32, blockAlign, true);
-    view.setUint16(34, bitDepth, true);
-    writeString(36, 'data');
-    view.setUint32(40, dataSize, true);
-    
-    // 오디오 데이터 작성
-    let offset = 44;
-    for (let i = 0; i < buffer.length; i++) {
-      for (let channel = 0; channel < numberOfChannels; channel++) {
-        const sample = Math.max(-1, Math.min(1, buffer.getChannelData(channel)[i]));
-        view.setInt16(offset, sample * 0x7FFF, true);
-        offset += 2;
+  const mixToMono = (buffer: AudioBuffer): Float32Array => {
+    if (buffer.numberOfChannels === 1) {
+      return buffer.getChannelData(0);
+    }
+    const length = buffer.length;
+    const mixed = new Float32Array(length);
+    for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+      const channelData = buffer.getChannelData(channel);
+      for (let i = 0; i < length; i++) {
+        mixed[i] += channelData[i];
       }
     }
-    
-    return new Blob([arrayBuffer], { type: 'audio/wav' });
+    for (let i = 0; i < length; i++) {
+      mixed[i] /= buffer.numberOfChannels;
+    }
+    return mixed;
+  };
+
+  const floatTo16BitPCM = (samples: Float32Array): Int16Array => {
+    const buffer = new Int16Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return buffer;
+  };
+
+  const audioBufferToMp3 = (buffer: AudioBuffer): Blob => {
+    const samples = mixToMono(buffer);
+    const mp3encoder = new lamejs.Mp3Encoder(1, buffer.sampleRate, 128);
+    const sampleBlockSize = 1152;
+    const mp3Data: Int8Array[] = [];
+
+    for (let i = 0; i < samples.length; i += sampleBlockSize) {
+      const sampleChunk = samples.subarray(i, i + sampleBlockSize);
+      const mp3buf = mp3encoder.encodeBuffer(floatTo16BitPCM(sampleChunk));
+      if (mp3buf.length > 0) {
+        mp3Data.push(mp3buf);
+      }
+    }
+
+    const mp3buf = mp3encoder.flush();
+    if (mp3buf.length > 0) {
+      mp3Data.push(mp3buf);
+    }
+
+    return new Blob(mp3Data, { type: 'audio/mpeg' });
   };
 
   const startRecording = async () => {
@@ -339,27 +340,43 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
           
           // Web Audio API로 처리 (침묵 트림)
           const arrayBuffer = await audioBlob.arrayBuffer();
-          const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
+          if (!audioContextRef.current) {
+            throw new Error('AudioContext unavailable');
+          }
+          const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
           const trimmedBuffer = await trimSilence(audioBuffer);
-          const finalBlob = audioBufferToWav(trimmedBuffer);
+          const finalBlob = audioBufferToMp3(trimmedBuffer);
           
           const audioUrl = URL.createObjectURL(finalBlob);
           setRecordedAudio(audioUrl);
 
           // 부모 컴포넌트에 최종 처리된 음성 데이터 전달
-          if (onVoiceRecord) {
-            onVoiceRecord(finalBlob);
-          }
+          onVoiceRecord?.({
+            blob: finalBlob,
+            duration: trimmedBuffer.duration,
+          });
         } catch (error) {
           console.error('오디오 처리 오류:', error);
           // 처리 실패 시 원본 사용
-          const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-          const audioUrl = URL.createObjectURL(audioBlob);
+          const fallbackBlob = new Blob(chunks, { type: 'audio/webm' });
+          const audioUrl = URL.createObjectURL(fallbackBlob);
+          let fallbackDuration = recordingDuration;
+          try {
+            if (audioContextRef.current) {
+              const buffer = await audioContextRef.current.decodeAudioData(
+                await fallbackBlob.arrayBuffer(),
+              );
+              fallbackDuration = buffer.duration;
+            }
+          } catch (decodeError) {
+            console.warn('Fallback duration decode failed:', decodeError);
+          }
           setRecordedAudio(audioUrl);
           
-          if (onVoiceRecord) {
-            onVoiceRecord(audioBlob);
-          }
+          onVoiceRecord?.({
+            blob: fallbackBlob,
+            duration: fallbackDuration,
+          });
         } finally {
           setIsProcessing(false);
         }
@@ -462,9 +479,7 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
     }
     setRecordedAudio(null);
     setIsPlaying(false);
-    if (onVoiceRecord) {
-      onVoiceRecord(null);
-    }
+    onVoiceRecord?.(null);
   };
 
   // 오디오 재생 완료 시 처리
