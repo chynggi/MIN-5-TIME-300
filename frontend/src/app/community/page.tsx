@@ -122,7 +122,7 @@ export default function CommunityListPage() {
   return (
     <div className="flex flex-col min-h-[100dvh]">
       {/* 상단 바: 자체 반투명 카드 스타일 */}
-      <div className="mx-auto w-full md:w-2/3 xl:max-w-5xl bg-white/80 dark:bg-neutral-900/70 backdrop-blur border border-white/40 dark:border-neutral-700/40 rounded-xl shadow-sm p-4 mt-4 shrink-0">
+      <div className="relative z-30 mx-auto w-full md:w-2/3 xl:max-w-5xl bg-white/80 dark:bg-neutral-900/70 backdrop-blur border border-white/40 dark:border-neutral-700/40 rounded-xl shadow-sm p-4 mt-4 shrink-0">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
