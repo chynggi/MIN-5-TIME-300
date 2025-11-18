@@ -245,7 +245,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
     } else if (!anyAnswered) {
       working = questions.slice(0,1); // 안전 폴백
     }
-
+    console.log('[GenerateDiary] mode:', mode, 'questions:', working);
     let contentLines: string[] = [];
     let ids: string[] = [];
     working.forEach(q => {
