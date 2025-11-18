@@ -838,15 +838,39 @@ export class ProfileService {
   ): Promise<{ success: boolean; message: string }> {
     const userId = req.user.userId;
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        workStyle: dto.workStyle,
-        exerciseFrequency: dto.exerciseFrequency,
-        sleepPattern: dto.sleepPattern,
-        socialActivity: dto.socialActivity,
-      },
-    });
+    const hasAnswerPayload = Array.isArray(dto.answers) && dto.answers.length > 0;
+    const hasStructuredFields =
+      dto.workStyle !== undefined ||
+      dto.exerciseFrequency !== undefined ||
+      dto.sleepPattern !== undefined ||
+      dto.socialActivity !== undefined;
+
+    if (hasAnswerPayload) {
+      await this.prisma.lifestyleAnswer.deleteMany({ where: { userId } });
+      await this.prisma.lifestyleAnswer.createMany({
+        data: dto.answers!.map((answer) => ({ ...answer, userId })),
+        skipDuplicates: true,
+      });
+    }
+
+    if (hasStructuredFields) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          workStyle: dto.workStyle,
+          exerciseFrequency: dto.exerciseFrequency,
+          sleepPattern: dto.sleepPattern,
+          socialActivity: dto.socialActivity,
+        },
+      });
+    }
+
+    if (!hasAnswerPayload && !hasStructuredFields) {
+      return {
+        success: true,
+        message: '변경된 라이프스타일 데이터가 없어 기존 정보를 유지했습니다.',
+      };
+    }
 
     return {
       success: true,

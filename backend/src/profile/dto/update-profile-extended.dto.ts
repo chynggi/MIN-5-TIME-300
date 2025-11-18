@@ -9,6 +9,7 @@ import {
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { LifestyleAnswerInputDto } from './lifestyle-answer.dto';
 
 export class UpdateBasicInfoDto {
   @IsOptional()
@@ -62,6 +63,12 @@ export class UpdatePrivacyDto {
 }
 
 export class UpdateLifestyleDto {
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LifestyleAnswerInputDto)
+  answers?: LifestyleAnswerInputDto[];
+
   @IsOptional()
   @IsString()
   workStyle?: string; // '재택근무', '출근', '프리랜서' 등

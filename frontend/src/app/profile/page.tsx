@@ -423,8 +423,12 @@ export default function ProfilePage() {
     router.push('/profile/edit');
   };
 
-  const handleStatsClick = (type: 'followers' | 'following') => {
-    router.push(`/profile/follow-list?tab=${type}`);
+  const handleStatsClick = (type: 'followers' | 'following' | 'diary') => {
+    if (type === 'diary') {
+      router.push(`/diary`);
+    } else {
+      router.push(`/profile/follow-list?tab=${type}`);
+    }
   };
 
   const goToUserProfile = (userId: string) => {
@@ -515,7 +519,7 @@ export default function ProfilePage() {
             <p className={styles.bioModern}>{profile.message}</p>
             {/* 1행: 다이어리/팔로워/팔로잉 */}
             <div className={styles.statsModern}>
-              <button className={styles.statCard} onClick={() => handleStatsClick('followers')} aria-label={`일기 ${profile.diaryCount}개`}>
+              <button className={styles.statCard} onClick={() => handleStatsClick('diary')} aria-label={`일기 ${profile.diaryCount}개`}>
                 <span className={styles.statValue}>{profile.diaryCount}</span>
                 <span className={styles.statLabelModern}>DIARIES</span>
               </button>

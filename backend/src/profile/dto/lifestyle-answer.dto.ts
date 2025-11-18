@@ -1,7 +1,7 @@
 import { IsArray, ValidateNested, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
-class LifestyleAnswerInputDto {
+export class LifestyleAnswerInputDto {
   @IsString()
   question: string;
 
