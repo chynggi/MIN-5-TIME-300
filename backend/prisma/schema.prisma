@@ -150,6 +150,7 @@ model Journal {
   // 질문 기반 작성 시, 사용자가 선택한 질문들의 도메인/텍스트(옵션)
   selectedQuestionDomains String[]
   selectedQuestionTexts   String[]
+  selectedQuestionAnswers String[]
   // 체크인 연결 (옵션)
   checkin       DailyCheckin?
 }

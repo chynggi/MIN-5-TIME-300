@@ -48,6 +48,7 @@ export default function DiaryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showFinalConfirmModal, setShowFinalConfirmModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   // Voice audio
   const voiceAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -253,7 +254,14 @@ export default function DiaryDetailPage() {
     } finally {
       setDeleteLoading(false);
       setShowDeleteModal(false);
+      setShowFinalConfirmModal(false);
     }
+  };
+
+  const handleFirstDeleteConfirmation = () => {
+    if (deleteLoading) return;
+    setShowDeleteModal(false);
+    setShowFinalConfirmModal(true);
   };
 
   const toggleLike = async () => {
@@ -627,12 +635,11 @@ export default function DiaryDetailPage() {
           <div className="mt-6 flex flex-col gap-2">
             <button
               type="button"
-              onClick={() => handleDelete()}
+              onClick={handleFirstDeleteConfirmation}
               disabled={deleteLoading}
               className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow transition ${deleteLoading ? 'bg-rose-400 cursor-not-allowed' : 'bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700'}`}
             >
-              {deleteLoading && <span className="w-4 h-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" aria-hidden="true" />}
-              삭제하기
+              계속 삭제하기
             </button>
             <button
               type="button"
@@ -640,6 +647,40 @@ export default function DiaryDetailPage() {
               className="w-full inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50 transition"
             >
               취소
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    {showFinalConfirmModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        <div
+          className="absolute inset-0 bg-slate-900/70 backdrop-blur"
+          aria-hidden="true"
+          onClick={() => !deleteLoading && setShowFinalConfirmModal(false)}
+        />
+        <div className="relative z-10 w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-200 p-6">
+          <div className="w-12 h-12 rounded-full bg-slate-900 text-white flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M5 4h14l-1.2 14.4a2 2 0 0 1-1.99 1.8H8.19a2 2 0 0 1-1.99-1.8L5 4Z"/></svg>
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 text-center">정말 삭제하시겠어요?</h3>
+          <p className="text-sm text-slate-600 text-center mt-2">이 작업은 되돌릴 수 없습니다. 모든 기록이 즉시 삭제됩니다.</p>
+          <div className="mt-6 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => handleDelete()}
+              disabled={deleteLoading}
+              className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-white shadow transition ${deleteLoading ? 'bg-rose-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}
+            >
+              {deleteLoading && <span className="w-4 h-4 border-2 border-white/60 border-t-transparent rounded-full animate-spin" aria-hidden="true" />}
+              영구적으로 삭제
+            </button>
+            <button
+              type="button"
+              onClick={() => !deleteLoading && setShowFinalConfirmModal(false)}
+              className="w-full inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50 transition"
+            >
+              돌아가기
             </button>
           </div>
         </div>

@@ -72,7 +72,7 @@ export class DiaryDetailResponseDto {
    * 사용자가 당시 선택했던 질문 세트(질문형 작성 재편집 시 재활용)
    * - save-answers로 최초 저장 시 Journal.selectedQuestion* 배열에 보관됨
    */
-  selectedQuestions?: Array<{ domain: string; text: string }>;
+  selectedQuestions?: Array<{ domain: string; text: string; answer?: string }>;
   writingDuration: number;
   reactions: DiaryDetailReactionDto[];
   lat?: number;

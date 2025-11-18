@@ -36,5 +36,5 @@ export interface DiaryDetailResponseDto {
   question: string;
   writingDuration: number;
   reactions: DiaryDetailReactionDto[];
-  selectedQuestions?: { domain?: string; text: string }[];
+  selectedQuestions?: { domain?: string; text: string; answer?: string }[];
 }

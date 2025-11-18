@@ -8,7 +8,7 @@ const defaultImages = [
 import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/axios";
 import Link from "next/link";
-import { SpotifyTrack as SpotifyTrackType, VoiceRecordPayload } from "@/types/diary";
+import { SpotifyTrack as SpotifyTrackType, VoiceRecordPayload, DiarySelectedQuestion } from "@/types/diary";
 
 // Import new components
 import ImageUpload from "@/components/diary/ImageUpload";
@@ -118,7 +118,7 @@ function NewDiaryContent() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   // 질문형 작성 선택 질문 보관
-  const [selectedQuestions, setSelectedQuestions] = useState<Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>>([]);
+  const [selectedQuestions, setSelectedQuestions] = useState<DiarySelectedQuestion[]>([]);
 
   // Handlers
   const handleImageSelect = (file: File | null) => {
@@ -128,7 +128,7 @@ function NewDiaryContent() {
   };
   const handleDefaultImageSelect = (url: string) => { setImage(null); setPreview(url); setShowDefaultImageSelect(false); };
   const handleWritingModeSelect = (mode: "question" | "free") => { setCurrentView(mode === 'question' ? 'ai-question' : 'free-write'); };
-  const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string; questionModel?: string; selectedQuestions: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }> }) => { 
+  const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string; questionModel?: string; selectedQuestions: DiarySelectedQuestion[] }) => { 
     setTitle(data.title); 
     setContent(data.content); 
     setQuestionId(data.questionId); 
@@ -193,8 +193,10 @@ function NewDiaryContent() {
       if (selectedQuestions && selectedQuestions.length > 0) {
         const domains = selectedQuestions.map(q => q.domain);
         const texts = selectedQuestions.map(q => q.text);
+        const answers = selectedQuestions.map(q => q.answer ?? '');
         formData.append('selectedQuestionDomains', JSON.stringify(domains));
         formData.append('selectedQuestionTexts', JSON.stringify(texts));
+        formData.append('selectedQuestionAnswers', JSON.stringify(answers));
       }
       if (voiceRecord) {
         const voiceFile = new File([voiceRecord.blob], `voice-${Date.now()}.mp3`, {

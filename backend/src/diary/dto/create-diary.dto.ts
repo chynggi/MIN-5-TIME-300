@@ -28,6 +28,9 @@ export class CreateDiaryDto {
   selectedQuestionTexts?: string[] | string; // multipart: 반복 키 배열 or JSON 문자열
 
   @IsOptional()
+  selectedQuestionAnswers?: string[] | string; // 질문형 작성 시 사용자의 답변 텍스트 배열
+
+  @IsOptional()
   @IsBooleanString()
   isPublic?: string; // 'true' | 'false'
 

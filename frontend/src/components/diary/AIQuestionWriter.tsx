@@ -1,10 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
 import api from "@/lib/axios";
+import type { DiarySelectedQuestion, DiaryQuestionDomain } from "@/types/diary";
 
 interface Question {
   id: string; // 내부 UI 식별자
-  domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal';
+  domain: DiaryQuestionDomain;
   text: string;
   answered: boolean;
   answer: string;
@@ -13,13 +14,13 @@ interface Question {
 }
 
 interface AIQuestionWriterProps {
-  onComplete: (data: { title: string; content: string; questionId: string; questionModel?: string; selectedQuestions: Array<{ domain: Question['domain']; text: string }> }) => void;
+  onComplete: (data: { title: string; content: string; questionId: string; questionModel?: string; selectedQuestions: DiarySelectedQuestion[] }) => void;
   onBack: () => void;
   /**
    * 편집 모드: 기존에 저장된 질문들을 그대로 불러와 답변만 작성하도록 전달
    * 전달되면 질문 재생성(fetch/generate) 없이 이 배열을 사용
    */
-  initialQuestions?: Array<{ domain: Question['domain']; text: string }>;
+  initialQuestions?: DiarySelectedQuestion[];
 }
 
 interface AIModel {
@@ -83,15 +84,18 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
   // 초기 질문 준비: initialQuestions가 있으면 그것을 사용, 없으면 생성
   useEffect(() => {
     if (initialQuestions && initialQuestions.length > 0) {
-      const mapped: Question[] = initialQuestions.map((q, idx) => ({
-        id: `saved-${idx}`,
-        domain: q.domain,
-        text: q.text,
-        answered: false,
-        answer: '',
-        answerType: 'text',
-        emoji: ''
-      }));
+      const mapped: Question[] = initialQuestions.map((q, idx) => {
+        const savedAnswer = q.answer?.trim() ?? '';
+        return {
+          id: `saved-${idx}`,
+          domain: q.domain,
+          text: q.text,
+          answered: savedAnswer.length > 0,
+          answer: savedAnswer,
+          answerType: 'text',
+          emoji: ''
+        };
+      });
       setQuestions(mapped);
       setIsGenerating(false);
     } else if (enabledModels.length > 0 && !autoGenAttempted) {
@@ -280,7 +284,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
           content: summarized,
           questionId: ids.join(','),
              questionModel: generationModel && generationModel !== 'fallback' ? generationModel : selectedModel,
-          selectedQuestions: working.map(q => ({ domain: q.domain, text: q.text })),
+          selectedQuestions: working.map(q => ({ domain: q.domain, text: q.text, answer: q.answer })),
         });
       } catch (e) {
         console.error('요약 실패, 원문으로 대체합니다:', e);
@@ -289,7 +293,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
           content: rawContent,
           questionId: ids.join(','),
              questionModel: generationModel && generationModel !== 'fallback' ? generationModel : selectedModel,
-          selectedQuestions: working.map(q => ({ domain: q.domain, text: q.text })),
+          selectedQuestions: working.map(q => ({ domain: q.domain, text: q.text, answer: q.answer })),
         });
       } finally {
         setIsSummarizing(false);
@@ -301,7 +305,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
         content: rawContent,
         questionId: ids.join(','),
            questionModel: generationModel && generationModel !== 'fallback' ? generationModel : selectedModel,
-        selectedQuestions: working.map(q => ({ domain: q.domain, text: q.text })),
+        selectedQuestions: working.map(q => ({ domain: q.domain, text: q.text, answer: q.answer })),
       });
     }
   };

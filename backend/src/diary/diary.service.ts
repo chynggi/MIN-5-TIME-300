@@ -653,6 +653,7 @@ export class DiaryService {
                 text,
                 domain:
                   (diary as any).selectedQuestionDomains?.[i] ?? 'emotion',
+                answer: (diary as any).selectedQuestionAnswers?.[i],
               }),
             )
           : undefined,
@@ -909,6 +910,9 @@ export class DiaryService {
     const selectedQuestionTexts = normalizeStringArray(
       (dto as any).selectedQuestionTexts,
     );
+    const selectedQuestionAnswers = normalizeStringArray(
+      (dto as any).selectedQuestionAnswers,
+    );
     const postVisibility = resolvePostVisibility(
       (dto as any).postVisibility,
       legacyIsPublicValue,
@@ -955,6 +959,7 @@ export class DiaryService {
           // 선택 질문은 생성 시 또는 이후에도 업데이트 허용 (있을 때만 덮어쓰기)
           ...(selectedQuestionDomains ? { selectedQuestionDomains } : {}),
           ...(selectedQuestionTexts ? { selectedQuestionTexts } : {}),
+          ...(selectedQuestionAnswers ? { selectedQuestionAnswers } : {}),
           // finalize=true인 경우에만 summary* 메타 저장
           ...(summaryMeta
             ? {
@@ -994,6 +999,7 @@ export class DiaryService {
           title: resolvedTitle,
           selectedQuestionDomains: selectedQuestionDomains ?? [],
           selectedQuestionTexts: selectedQuestionTexts ?? [],
+          selectedQuestionAnswers: selectedQuestionAnswers ?? [],
           ...(summaryMeta
             ? {
                 summaryModel: summaryMeta.modelUsed,
@@ -1142,6 +1148,7 @@ export class DiaryService {
           summaryFallbackUsed: sum.fallbackUsed,
           selectedQuestionDomains: dto.qa.map((q) => q.domain),
           selectedQuestionTexts: dto.qa.map((q) => q.question),
+          selectedQuestionAnswers: dto.qa.map((q) => q.answer),
         },
       });
     } else {
@@ -1153,6 +1160,9 @@ export class DiaryService {
           summaryModel: sum.modelUsed,
           summaryTruncated: sum.truncated,
           summaryFallbackUsed: sum.fallbackUsed,
+          selectedQuestionDomains: dto.qa.map((q) => q.domain),
+          selectedQuestionTexts: dto.qa.map((q) => q.question),
+          selectedQuestionAnswers: dto.qa.map((q) => q.answer),
         },
       });
     }
@@ -1185,6 +1195,7 @@ export class DiaryService {
         journal.selectedQuestionTexts?.map((t, i) => ({
           domain: journal.selectedQuestionDomains?.[i],
           text: t,
+          answer: journal.selectedQuestionAnswers?.[i],
         })) || [],
     };
   }
@@ -1480,9 +1491,11 @@ export class DiaryService {
         ...(() => {
           const d = normalizeStringArray((dto as any).selectedQuestionDomains);
           const t = normalizeStringArray((dto as any).selectedQuestionTexts);
+          const a = normalizeStringArray((dto as any).selectedQuestionAnswers);
           return {
             ...(d ? { selectedQuestionDomains: d } : {}),
             ...(t ? { selectedQuestionTexts: t } : {}),
+            ...(a ? { selectedQuestionAnswers: a } : {}),
           };
         })(),
         // finalize=true인 경우에만 summary* 메타 갱신

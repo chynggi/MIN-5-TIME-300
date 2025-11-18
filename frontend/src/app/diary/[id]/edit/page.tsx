@@ -10,7 +10,11 @@ import DiarySettings from "@/components/diary/DiarySettings";
 import AIQuestionWriter from "@/components/diary/AIQuestionWriter";
 import FreeWriter from "@/components/diary/FreeWriter";
 import Link from "next/link";
-import type { VoiceRecordPayload, SpotifyTrack as SpotifyTrackType } from "@/types/diary";
+import type {
+  VoiceRecordPayload,
+  SpotifyTrack as SpotifyTrackType,
+  DiarySelectedQuestion,
+} from "@/types/diary";
 
 // 기본 제공 이미지들 (작성 페이지와 동일)
 const defaultImages = [
@@ -27,7 +31,7 @@ interface DiaryDataResponse {
   isPublic?: boolean;
   contentVisibility?: string;
   question?: string;
-  selectedQuestions?: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>; // 기존 선택 질문들
+  selectedQuestions?: DiarySelectedQuestion[]; // 기존 선택 질문들
   writingDuration?: number;
   mediaUrl?: string;
   mediaType?: string;
@@ -63,9 +67,7 @@ function EditDiaryInner() {
   const [questionId, setQuestionId] = useState(""); // 기존 작성 로직과 동일 구조 유지
   const [questionModel, setQuestionModel] = useState<string | undefined>(undefined);
   const [originalQuestion, setOriginalQuestion] = useState<string | null>(null);
-  const [initialQuestions, setInitialQuestions] = useState<
-    Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>
-  >([]);
+  const [initialQuestions, setInitialQuestions] = useState<DiarySelectedQuestion[]>([]);
   const [startTime] = useState<number>(Date.now());
 
   // Date (기존 일기 날짜 유지 - 수정시 변경 허용 안한다고 가정)
@@ -161,7 +163,7 @@ function EditDiaryInner() {
   };
   const handleDefaultImageSelect = (url: string) => { setImage(null); setPreview(url); setShowDefaultImageSelect(false); };
   const handleWritingModeSelect = (mode: "question" | "free") => { setCurrentView(mode === 'question' ? 'ai-question' : 'free-write'); };
-  const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string; questionModel?: string; selectedQuestions: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }> }) => {
+  const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string; questionModel?: string; selectedQuestions: DiarySelectedQuestion[] }) => {
     setTitle(data.title);
     setContent(data.content);
     setQuestionId(data.questionId);
@@ -205,6 +207,7 @@ function EditDiaryInner() {
       if (initialQuestions && initialQuestions.length > 0) {
         formData.append('selectedQuestionDomains', JSON.stringify(initialQuestions.map(q => q.domain)));
         formData.append('selectedQuestionTexts', JSON.stringify(initialQuestions.map(q => q.text)));
+        formData.append('selectedQuestionAnswers', JSON.stringify(initialQuestions.map(q => q.answer ?? '')));
       }
       if (voiceRecord) {
         const voiceFile = new File([voiceRecord.blob], `voice-${Date.now()}.mp3`, {
@@ -289,11 +292,31 @@ function EditDiaryInner() {
                   <div className="text-sm text-gray-700 line-clamp-3">{content}</div>
                 </div>
               )}
+              {initialQuestions.length > 0 && (
+                <div className="mt-3 border-t border-gray-200 pt-3">
+                  <div className="text-xs font-semibold text-gray-600 mb-2">질문형 작성 요약</div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {initialQuestions.map((q, idx) => (
+                      <div key={`${q.domain}-${idx}`} className="rounded-lg border border-white bg-white px-3 py-2 shadow-sm">
+                        <div className="flex items-center justify-between text-[11px] text-gray-500 uppercase tracking-wide">
+                          <span>{q.domain}</span>
+                          <span>Q{idx + 1}</span>
+                        </div>
+                        <p className="mt-1 text-xs font-medium text-gray-700 line-clamp-2">{q.text}</p>
+                        {q.answer && (
+                          <p className="mt-1 text-xs text-gray-500 line-clamp-2">{q.answer}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <button
                 onClick={() => { setCurrentView((initialQuestions && initialQuestions.length > 0) ? 'ai-question' : (questionId || originalQuestion ? 'ai-question' : 'free-write')); }}
-                className="text-xs text-blue-600 underline mt-2"
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
               >
-                수정하기
+                <span aria-hidden="true">✏️</span>
+                질문형 답변 이어쓰기
               </button>
             </div>
           )}

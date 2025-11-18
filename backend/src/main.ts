@@ -37,13 +37,15 @@ async function bootstrap() {
     credentials: true, // 필요시
   });
 
+  const uploadsPath = join(__dirname, '..', 'uploads');
+
   // 정적 파일 서빙 설정 (업로드된 파일들을 접근할 수 있도록)
-  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+  app.useStaticAssets(uploadsPath, {
     prefix: '/uploads/',
   });
 
   // Express static 미들웨어 추가 (추가 보장)
-  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+  app.use('/uploads', express.static(uploadsPath));
 
   await app.listen(3001, '0.0.0.0');
 }

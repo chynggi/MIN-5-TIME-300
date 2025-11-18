@@ -17,6 +17,14 @@ export interface DiarySettings {
   weather: "sunny" | "cloudy" | "rainy" | "snowy";
 }
 
+export type DiaryQuestionDomain = 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal';
+
+export interface DiarySelectedQuestion {
+  domain: DiaryQuestionDomain;
+  text: string;
+  answer?: string;
+}
+
 export interface DiaryEntry {
   id: string;
   title: string;
@@ -80,10 +88,10 @@ export interface AIQuestionWriterProps {
     content: string;
     questionId: string;
     questionModel?: string;
-    selectedQuestions: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>;
+    selectedQuestions: DiarySelectedQuestion[];
   }) => void;
   onBack: () => void;
-  initialQuestions?: Array<{ domain: 'emotion' | 'action' | 'relationship' | 'recovery' | 'goal'; text: string }>;
+  initialQuestions?: DiarySelectedQuestion[];
 }
 
 export interface FreeWriterProps {
