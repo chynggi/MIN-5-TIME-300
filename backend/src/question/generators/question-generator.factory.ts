@@ -52,12 +52,12 @@ export class QuestionGeneratorFactory {
       enabledModels.push(AIModel.GPT_5);
     }
 
-    // 최소 하나는 활성화되어야 함 (Gemini를 기본으로)
+    // 최소 하나는 활성화되어야 함 (GPT-5를 기본으로)
     if (enabledModels.length === 0) {
       console.log(
-        '경고: 활성화된 AI 모델이 없습니다. Gemini를 기본으로 설정합니다.',
+        '경고: 활성화된 AI 모델이 없습니다. Claude를 기본으로 설정합니다.',
       );
-      enabledModels.push(AIModel.GEMINI_2_5_FLASH);
+      enabledModels.push(AIModel.CLAUDE_SONNET_4);
     }
 
     return enabledModels;
@@ -86,8 +86,8 @@ export class QuestionGeneratorFactory {
       return AIModel.CLAUDE_SONNET_4;
     }
 
-    // 모든 API 키가 없는 경우 기본값으로 Gemini 사용 (폴백 질문 제공)
-    return AIModel.GEMINI_2_5_FLASH;
+    // 모든 API 키가 없는 경우 기본값으로 Claude 사용 (폴백 질문 제공)
+    return AIModel.CLAUDE_SONNET_4;
   }
 
   // 모델별 안정성 점수 (1-10, 높을수록 안정적)
