@@ -127,6 +127,7 @@ export class DiarySummaryService {
         truncated: res.truncated,
         fallbackUsed: res.fallbackUsed,
       };
+      this.logger.log(`value=${JSON.stringify(value).slice(0, 200)}`);
       this.cache.set(cacheKey, { value, ts: Date.now() });
       try {
         this.logger.log(
