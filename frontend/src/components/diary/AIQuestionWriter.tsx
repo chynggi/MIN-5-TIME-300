@@ -68,7 +68,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
   const [answerType, setAnswerType] = useState<"text" | "emoji">("text");
   const [selectedEmoji, setSelectedEmoji] = useState("");
   const [startTime, setStartTime] = useState<number>(Date.now());
-  const [selectedModel, setSelectedModel] = useState<string>("gpt-5"); // 기본값은 GPT-5
+  const [selectedModel, setSelectedModel] = useState<string>("claude-sonnet-4"); // 기본값은 Claude
   // 실제 질문 생성에 사용된 모델을 저장해 요약 시에도 동일 모델을 사용
   const [generationModel, setGenerationModel] = useState<string | null>(null);
   const [showModelSelector, setShowModelSelector] = useState(false);
