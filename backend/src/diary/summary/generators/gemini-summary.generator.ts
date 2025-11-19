@@ -93,7 +93,8 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
       const json = match ? JSON.parse(match[0]) : JSON.parse(cleaned);
       const d = json?.diary;
       return typeof d === 'string' && d.trim() ? d.trim() : null;
-    } catch {
+    } catch (e: any) {
+      this.logger.error(`[Summary] Failed to parse diary JSON error=${e?.message}`);
       return null;
     }
   }
