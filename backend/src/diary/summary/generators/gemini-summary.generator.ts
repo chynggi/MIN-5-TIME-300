@@ -88,9 +88,19 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
   }
   private extractDiary(raw: string): string | null {
     try {
-      const cleaned = (raw || '').replace(/```[\s\S]*?```/g, '').trim();
+      // 마크다운 코드 블록 마커 제거 (내용 유지)
+      let cleaned = (raw || '').trim();
+      // ```json ... ``` 또는 ``` ... ``` 패턴에서 내용만 추출 시도
+      const codeBlockMatch = cleaned.match(/```(?:json)?([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        cleaned = codeBlockMatch[1].trim();
+      }
+
+      // JSON 객체 부분만 추출 ({ ... })
       const match = cleaned.match(/\{[\s\S]*\}/);
-      const json = match ? JSON.parse(match[0]) : JSON.parse(cleaned);
+      const jsonStr = match ? match[0] : cleaned;
+
+      const json = JSON.parse(jsonStr);
       const d = json?.diary;
       return typeof d === 'string' && d.trim() ? d.trim() : null;
     } catch (e: any) {
