@@ -42,7 +42,7 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
       });
        try {
         this.logger.log(
-          `[Summary] requested=${modelToUse} used=${modelToUse} result=${result.responseId}`,
+          `[Summary] requested=${modelToUse} used=${modelToUse} result=${result.candidates?.[0].finishMessage}`,
         );
       } catch {}
       const raw: string = (result as any)?.text || '';
