@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { SummaryGeneratorFactory } from './summary/summary-generator.factory';
+import { BaseService } from '../common/logger/base.service';
 
 /**
  * DiarySummaryService (리팩터링 버전)
@@ -8,13 +9,12 @@ import { SummaryGeneratorFactory } from './summary/summary-generator.factory';
  * - 실패/미설정 시 원문 반환 (기능 저하 graceful degradation)
  */
 @Injectable()
-export class DiarySummaryService {
+export class DiarySummaryService extends BaseService {
   private readonly DEFAULT_MODEL =
     process.env.DIARY_SUMMARY_MODEL || 'gemini-2.5-flash';
   private readonly DEBUG =
     process.env.DIARY_SUMMARY_DEBUG === '1' ||
     process.env.DIARY_SUMMARY_DEBUG === 'true';
-  private readonly logger = new Logger(DiarySummaryService.name);
   // 간단한 메모리 캐시: key = SHA256(content + modelId + maxChars)
   private cache = new Map<
     string,
@@ -36,6 +36,10 @@ export class DiarySummaryService {
     { count: number; windowStart: number }
   >();
   private readonly RATE_LIMIT_PER_MIN = 5;
+
+  constructor() {
+    super(DiarySummaryService.name);
+  }
 
   private hash(input: string) {
     const crypto = require('crypto');

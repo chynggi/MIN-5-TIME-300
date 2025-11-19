@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { BaseService } from '../logger/base.service';
 
 @Injectable()
-export class RateCacheService {
+export class RateCacheService extends BaseService {
   private buckets = new Map<string, { count: number; windowStart: number }>();
   private cache = new Map<string, { value: any; ts: number }>();
+
+  constructor() {
+    super(RateCacheService.name);
+  }
 
   isAllowed(key: string, perMin: number): boolean {
     const now = Date.now();
@@ -17,7 +22,10 @@ export class RateCacheService {
       b.windowStart = now;
       return true;
     }
-    if (b.count >= perMin) return false;
+    if (b.count >= perMin) {
+      this.logger.debug(`rate limit exceeded key=${key}`);
+      return false;
+    }
     b.count += 1;
     return true;
   }

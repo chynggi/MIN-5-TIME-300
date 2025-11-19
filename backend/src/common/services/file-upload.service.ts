@@ -2,9 +2,10 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, readFileSync } from 'fs';
+import { BaseService } from '../logger/base.service';
 
 @Injectable()
-export class FileUploadService {
+export class FileUploadService extends BaseService {
   private readonly uploadRootPath = join(
     __dirname,
     '..',
@@ -12,6 +13,10 @@ export class FileUploadService {
     '..',
     'uploads',
   );
+
+  constructor() {
+    super(FileUploadService.name);
+  }
 
   /**
    * 안전한 파일 업로드
@@ -79,8 +84,8 @@ export class FileUploadService {
         fileName: safeFileName,
         fileSize: file.size,
       };
-    } catch (error) {
-      console.error('파일 업로드 오류:', error);
+    } catch (error: any) {
+      this.logger.error(`파일 업로드 오류: ${error?.message}`);
       throw new BadRequestException('파일 업로드 중 오류가 발생했습니다.');
     }
   }
@@ -110,8 +115,8 @@ export class FileUploadService {
       if (existsSync(filePath)) {
         unlinkSync(filePath);
       }
-    } catch (error) {
-      console.error('파일 삭제 오류:', error);
+    } catch (error: any) {
+      this.logger.warn(`파일 삭제 오류: ${error?.message}`);
       // 파일 삭제 실패는 중요하지 않으므로 에러를 던지지 않음
     }
   }

@@ -15,10 +15,13 @@ import {
   FollowResponseDto,
 } from './dto/friend.dto';
 import { PrismaService } from '../prisma.service';
+import { BaseService } from '../common/logger/base.service';
 
 @Injectable()
-export class FriendService {
-  constructor(private readonly prisma: PrismaService) {}
+export class FriendService extends BaseService {
+  constructor(private readonly prisma: PrismaService) {
+    super(FriendService.name);
+  }
 
   async getFriends(
     req: any,
@@ -63,6 +66,7 @@ export class FriendService {
     dto: FriendRequestDto,
   ): Promise<FriendRequestResponseDto> {
     const userId = req.user.userId;
+    this.logger.debug(`friend request from=${userId} to=${dto.userId}`);
     if (userId === dto.userId)
       throw new ForbiddenException('자기 자신에게 친구 요청 불가');
     const exists = await this.prisma.friend.findFirst({
@@ -93,6 +97,9 @@ export class FriendService {
     dto: FriendRespondDto,
   ): Promise<FriendRespondResponseDto> {
     const userId = req.user.userId;
+    this.logger.debug(
+      `friend respond user=${userId} target=${id} accept=${dto.accept}`,
+    );
 
     // ID가 실제 친구 관계 ID인지 확인하고, 그렇지 않다면 사용자 ID로 처리
     let friend = await this.prisma.friend.findUnique({ where: { id } });
@@ -145,6 +152,7 @@ export class FriendService {
    */
   async recommendUsers(req: any): Promise<RecommendFriendsResponseDto> {
     const userId = req.user.userId;
+    this.logger.debug(`recommend users for=${userId}`);
 
     // 이미 친구인 사용자들 가져오기
     const existingFriends = await this.prisma.friend.findMany({
@@ -223,6 +231,7 @@ export class FriendService {
   async followUser(req: any, dto: FollowDto): Promise<FollowResponseDto> {
     const userId = req.user.userId;
     const { targetUserId } = dto;
+    this.logger.debug(`followUser user=${userId} target=${targetUserId}`);
 
     if (userId === targetUserId) {
       throw new ForbiddenException('자기 자신을 팔로우할 수 없습니다.');
@@ -285,6 +294,7 @@ export class FriendService {
     targetUserId: string,
   ): Promise<FollowResponseDto> {
     const userId = req.user.userId;
+    this.logger.debug(`unfollowUser user=${userId} target=${targetUserId}`);
 
     if (userId === targetUserId) {
       throw new ForbiddenException('자기 자신을 언팔로우할 수 없습니다.');

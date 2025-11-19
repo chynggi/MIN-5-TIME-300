@@ -21,6 +21,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { DiarySummaryService } from './summary.service';
 import { AdviceService } from '../advice/advice.service';
 import { StreakBadgeService } from '../activity/streak-badge.service';
+import { BaseService } from '../common/logger/base.service';
 
 // 간단한 제목 추출: [제목] 패턴 혹은 첫 줄 30자
 function extractTitle(content: string): string | undefined {
@@ -145,7 +146,7 @@ function resolveWeather(raw: any, current?: string): string {
 }
 
 @Injectable()
-export class DiaryService {
+export class DiaryService extends BaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly vectorDbService: VectorDbService,
@@ -155,7 +156,9 @@ export class DiaryService {
     private readonly diarySummaryService: DiarySummaryService,
     private readonly adviceService: AdviceService,
     private readonly streakBadgeService: StreakBadgeService,
-  ) {}
+  ) {
+    super(DiaryService.name);
+  }
 
   /**
    * 오늘 날짜에 작성된 '맞팔(서로 팔로우)' 친구들의 일기 목록을 반환
@@ -706,7 +709,9 @@ export class DiaryService {
     }
     // 신규 좋아요 성공 시 활동지수 증가
     this.activityService.addLikeScore(userId).catch((err) => {
-      console.warn('활동지수 좋아요 가점 실패:', err.message);
+      this.logger.warn(
+        `활동지수 좋아요 가점 실패 user=${userId} err=${err.message}`,
+      );
     });
     const likeCount = await this.prisma.journalReaction.count({
       where: { journalId: id, reactionType: 'like' },
@@ -779,7 +784,7 @@ export class DiaryService {
         mediaUrl = uploadResult.fileUrl;
         mediaType = imageFile.mimetype;
       } catch (error) {
-        console.error('파일 업로드 오류:', error);
+        this.logger.error(`파일 업로드 오류: ${(error as Error)?.message}`);
         if (error instanceof BadRequestException) {
           throw error;
         }
@@ -820,7 +825,7 @@ export class DiaryService {
           voiceDuration = parsedDuration;
         }
       } catch (error) {
-        console.error('음성 업로드 오류:', error);
+        this.logger.error(`음성 업로드 오류: ${(error as Error)?.message}`);
         if (error instanceof BadRequestException) {
           throw error;
         }
@@ -1021,7 +1026,7 @@ export class DiaryService {
         (this.prisma as any).journal
           .update({ where: { id: diary.id }, data: { embedding } })
           .catch((err: any) =>
-            console.warn('임베딩 DB 저장 실패:', err.message),
+            this.logger.warn(`임베딩 DB 저장 실패 diary=${diary.id} err=${err.message}`),
           );
         await this.vectorDbService.upsert([
           {
@@ -1064,7 +1069,13 @@ export class DiaryService {
     };
 
     // 스트릭/배지 업데이트
-    this.streakBadgeService.onDiaryOrCheckin(userId, diaryDate).catch(() => {});
+    this.streakBadgeService
+      .onDiaryOrCheckin(userId, diaryDate)
+      .catch((err) =>
+        this.logger.warn(
+          `스트릭 업데이트 실패 user=${userId} date=${diaryDate.toISOString()} err=${err?.message}`,
+        ),
+      );
 
     // 일기 작성 후 최신 일기 수 카운트 및 실시간 전송 (비동기, 실패해도 throw 아님)
     this.prisma.journal
@@ -1076,19 +1087,23 @@ export class DiaryService {
         });
       })
       .catch((err) => {
-        console.error('실시간 diaryCount 전송 실패', err.message);
+        this.logger.error(
+          `실시간 diaryCount 전송 실패 user=${userId} err=${err.message}`,
+        );
       });
 
     // 활동지수 반영 (질문 사용 여부: dto.questionId 존재 시 질문 기반 작성으로 간주)
     this.activityService
       .addDiaryScore(userId, !!dto.questionId)
       .catch((err) => {
-        console.warn('활동지수 일기 가점 실패:', err.message);
+        this.logger.warn(
+          `활동지수 일기 가점 실패 user=${userId} err=${err.message}`,
+        );
       });
 
     // 일기 저장 직후 오늘의 한마디 갱신 시도 (비동기, 오류는 무시)
     this.adviceService.generateWithCache(userId, true).catch((err) => {
-      console.warn('조언 갱신 실패 (무시):', err.message);
+      this.logger.warn(`조언 갱신 실패 user=${userId} err=${err.message}`);
     });
 
     return result;
@@ -1168,10 +1183,16 @@ export class DiaryService {
     }
 
     // 활동지수 가점(질문 기반 작성)
-    this.activityService.addDiaryScore(userId, true).catch(() => {});
+    this.activityService.addDiaryScore(userId, true).catch((err) =>
+      this.logger.warn(
+        `활동지수 Q&A 가점 실패 user=${userId} err=${err?.message}`,
+      ),
+    );
 
     // 조언 갱신 트리거
-    this.adviceService.generateWithCache(userId, true).catch(() => {});
+    this.adviceService.generateWithCache(userId, true).catch((err) =>
+      this.logger.warn(`Q&A 후 조언 갱신 실패 user=${userId} err=${err?.message}`),
+    );
 
     return {
       id: journal.id,
@@ -1265,7 +1286,9 @@ export class DiaryService {
     }
 
     this.vectorDbService.delete([id]).catch((err) => {
-      console.warn('일기 삭제 후 벡터 삭제 실패:', err?.message || err);
+      this.logger.warn(
+        `일기 삭제 후 벡터 삭제 실패 diary=${id} err=${err?.message || err}`,
+      );
     });
 
     this.prisma.journal
@@ -1277,7 +1300,9 @@ export class DiaryService {
         });
       })
       .catch((err) => {
-        console.warn('일기 삭제 후 실시간 카운터 전송 실패:', err?.message);
+        this.logger.warn(
+          `일기 삭제 후 실시간 카운터 전송 실패 user=${userId} err=${err?.message}`,
+        );
       });
 
     return { id, deleted: true };
@@ -1332,7 +1357,7 @@ export class DiaryService {
         mediaUrl = uploadResult.fileUrl;
         mediaType = imageFile.mimetype;
       } catch (error) {
-        console.error('파일 업로드 오류:', error);
+        this.logger.error(`파일 업로드 오류: ${(error as Error)?.message}`);
         if (error instanceof BadRequestException) {
           throw error;
         }
@@ -1377,7 +1402,7 @@ export class DiaryService {
           voiceFileToDelete = diary.voiceUrl;
         }
       } catch (error) {
-        console.error('음성 업로드 오류:', error);
+        this.logger.error(`음성 업로드 오류: ${(error as Error)?.message}`);
         if (error instanceof BadRequestException) {
           throw error;
         }
@@ -1510,9 +1535,11 @@ export class DiaryService {
     });
 
     if (voiceFileToDelete) {
-      await this.fileUploadService.deleteFile(voiceFileToDelete).catch(() => {
-        /* ignore */
-      });
+      await this.fileUploadService.deleteFile(voiceFileToDelete).catch((err) =>
+        this.logger.warn(
+          `기존 음성 파일 삭제 실패 diary=${diary.id} err=${err?.message}`,
+        ),
+      );
     }
 
     // 임베딩 갱신(베스트 에포치: 내용 변경 시)
@@ -1524,7 +1551,7 @@ export class DiaryService {
         (this.prisma as any).journal
           .update({ where: { id: updated.id }, data: { embedding } })
           .catch((err: any) =>
-            console.warn('임베딩 DB 저장 실패:', err.message),
+            this.logger.warn(`임베딩 DB 저장 실패 diary=${updated.id} err=${err.message}`),
           );
         await this.vectorDbService.upsert([
           {

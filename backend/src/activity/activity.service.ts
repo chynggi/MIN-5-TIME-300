@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { BaseService } from '../common/logger/base.service';
 
 // 활동지수 비즈니스 규칙 상수
 // 요구사항: 가입 기본값을 100%로 설정하면서 상한도 100으로 상향
@@ -31,12 +32,13 @@ const LEVEL_THRESHOLDS: number[] = [
 ];
 
 @Injectable()
-export class ActivityService {
-  private readonly logger = new Logger(ActivityService.name);
+export class ActivityService extends BaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly realtime: RealtimeGateway,
-  ) {}
+  ) {
+    super(ActivityService.name);
+  }
 
   private clampScore(score: number) {
     if (score < 0) return 0;

@@ -11,14 +11,17 @@ import { LogoutResponseDto } from './dto/logout-response.dto';
 import { PrismaService } from '../prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { BaseService } from '../common/logger/base.service';
 
 @Injectable()
-export class AuthService {
+export class AuthService extends BaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly activityService: ActivityService,
-  ) {}
+  ) {
+    super(AuthService.name);
+  }
 
   async signup(dto: SignupDto): Promise<AuthResponseDto> {
     const exists = await this.prisma.user.findUnique({
@@ -54,7 +57,7 @@ export class AuthService {
 
     // 초기 활동지수 AI(heuristic) 할당 (실패해도 회원가입은 진행)
     this.activityService.assignInitialScore(user.id).catch((err) => {
-      console.warn('초기 활동지수 설정 실패:', err.message);
+      this.logger.warn(`초기 활동지수 설정 실패 user=${user.id} err=${err.message}`);
     });
 
     // 관심사 저장
@@ -110,30 +113,34 @@ export class AuthService {
     }
 
     const token = this.jwtService.sign({ sub: user.id, email: user.email });
-    return {
+    const response = {
       id: user.id,
       email: user.email,
       username: user.username,
       token,
     };
+    this.logger.log(`signup success user=${user.id}`);
+    return response;
   }
 
   async login(dto: LoginDto): Promise<AuthResponseDto> {
+    this.logger.debug(`login attempt email=${dto.email}`);
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
-    if (!user)
+    if (!user) {
+      this.logger.warn(`login failed: user not found email=${dto.email}`);
       throw new UnauthorizedException(
         '이메일 또는 비밀번호가 올바르지 않습니다.',
       );
-    console.log('로그인 시도:', dto.email); // 디버깅용 로그
-    console.log('DB에서 조회된 사용자:', user); // 디버깅용 로그
+    }
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    console.log('비밀번호 검증 결과:', valid); // 디버깅용 로그
-    if (!valid)
+    if (!valid) {
+      this.logger.warn(`login failed: invalid password user=${user.id}`);
       throw new UnauthorizedException(
         '이메일 또는 비밀번호가 올바르지 않습니다.',
       );
+    }
     const token = this.jwtService.sign({ sub: user.id, email: user.email });
     const result = {
       id: user.id,
@@ -141,7 +148,7 @@ export class AuthService {
       username: user.username,
       token,
     };
-    console.log('로그인 반환값:', result);
+    this.logger.log(`login success user=${user.id}`);
     return result;
   }
 

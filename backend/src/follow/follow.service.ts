@@ -14,14 +14,17 @@ import {
   FollowListResponseDto,
   FollowCountersDto,
 } from './dto';
+import { BaseService } from '../common/logger/base.service';
 
 @Injectable()
-export class FollowService {
+export class FollowService extends BaseService {
   constructor(
     private prisma: PrismaService,
     private notificationService: NotificationService,
     private realtimeGateway: RealtimeGateway,
-  ) {}
+  ) {
+    super(FollowService.name);
+  }
 
   /**
    * 사용자를 팔로우하거나 팔로우 요청을 보냅니다.
@@ -30,6 +33,7 @@ export class FollowService {
     followerId: string,
     followeeId: string,
   ): Promise<FollowResponseDto> {
+    this.logger.debug(`follow user follower=${followerId} followee=${followeeId}`);
     // 자기 자신을 팔로우할 수 없음
     if (followerId === followeeId) {
       throw new BadRequestException('자기 자신을 팔로우할 수 없습니다.');
@@ -167,6 +171,9 @@ export class FollowService {
    * 팔로우를 해제합니다.
    */
   async unfollowUser(followerId: string, followeeId: string): Promise<void> {
+    this.logger.debug(
+      `unfollow user follower=${followerId} followee=${followeeId}`,
+    );
     const existingFollow = await this.prisma.follow.findUnique({
       where: {
         followerId_followeeId: {
@@ -210,6 +217,9 @@ export class FollowService {
     followeeId: string,
     followerId: string,
   ): Promise<FollowResponseDto> {
+    this.logger.debug(
+      `approve follow request followee=${followeeId} follower=${followerId}`,
+    );
     const followRequest = await this.prisma.follow.findUnique({
       where: {
         followerId_followeeId: {
@@ -280,6 +290,9 @@ export class FollowService {
     followeeId: string,
     followerId: string,
   ): Promise<void> {
+    this.logger.debug(
+      `reject follow request followee=${followeeId} follower=${followerId}`,
+    );
     const followRequest = await this.prisma.follow.findUnique({
       where: {
         followerId_followeeId: {
@@ -748,6 +761,7 @@ export class FollowService {
     blockedId: string;
     createdAt: Date;
   }> {
+    this.logger.debug(`block user blocker=${blockerId} blocked=${blockedId}`);
     if (blockerId === blockedId) {
       throw new Error('자신을 차단할 수 없습니다.');
     }
@@ -805,6 +819,7 @@ export class FollowService {
     blockerId: string,
     blockedId: string,
   ): Promise<{ success: boolean }> {
+    this.logger.debug(`unblock user blocker=${blockerId} blocked=${blockedId}`);
     const deletedBlock = await this.prisma.userBlock.delete({
       where: {
         blockerId_blockedId: {

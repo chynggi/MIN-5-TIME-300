@@ -6,13 +6,16 @@ import {
   computeGaugePercent,
   normalizeToStartOfDay,
 } from './dto/create-checkin.dto';
+import { BaseService } from '../common/logger/base.service';
 
 @Injectable()
-export class CheckinService {
+export class CheckinService extends BaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly streaks: StreakBadgeService,
-  ) {}
+  ) {
+    super(CheckinService.name);
+  }
 
   async create(userId: string, dto: CreateCheckinDto) {
     // 퍼센트 계산 및 100% 검증
@@ -66,8 +69,18 @@ export class CheckinService {
       },
     });
 
+    this.logger.log(
+      `checkin stored user=${userId} date=${dayStart.toISOString()} overwrite=${!!existing}`,
+    );
+
     // 스트릭 업데이트
-    this.streaks.onDiaryOrCheckin(userId, dayStart).catch(() => {});
+    this.streaks
+      .onDiaryOrCheckin(userId, dayStart)
+      .catch((err) =>
+        this.logger.warn(
+          `streak update failed user=${userId} err=${err?.message}`,
+        ),
+      );
     return {
       id: created.id,
       percent: 100,

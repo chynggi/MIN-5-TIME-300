@@ -41,15 +41,18 @@ import { PrismaService } from '../prisma.service';
 import { PersonaService } from './persona.service';
 import { StatisticsService } from '../statistics/statistics.service';
 import { FileUploadService } from '../common/services/file-upload.service';
+import { BaseService } from '../common/logger/base.service';
 
 @Injectable()
-export class ProfileService {
+export class ProfileService extends BaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly personaService: PersonaService,
     private readonly statisticsService: StatisticsService,
     private readonly fileUploadService: FileUploadService,
-  ) {}
+  ) {
+    super(ProfileService.name);
+  }
 
   async getProfile(req: any): Promise<ProfileResponseDto> {
     const userId = req.user.userId;
@@ -575,7 +578,11 @@ export class ProfileService {
           goals: JSON.stringify(personaAndGoals.goals || []),
         },
       });
-    } catch (e) {}
+    } catch (e) {
+      this.logger.warn(
+        `페르소나 생성 실패(프로필 업데이트) user=${userId} err=${(e as Error)?.message}`,
+      );
+    }
     return {
       id: user.id,
       email: user.email,
@@ -623,7 +630,11 @@ export class ProfileService {
           goals: JSON.stringify(personaAndGoals.goals || []),
         },
       });
-    } catch (e) {}
+    } catch (e) {
+      this.logger.warn(
+        `페르소나 생성 실패(관심사 업데이트) user=${userId} err=${(e as Error)?.message}`,
+      );
+    }
     return {
       success: true,
       interests: interests.map((i) => ({
@@ -762,7 +773,9 @@ export class ProfileService {
         message: '프로필 이미지가 성공적으로 업로드되었습니다.',
       };
     } catch (error) {
-      console.error('프로필 이미지 업로드 오류:', error);
+      this.logger.error(
+        `프로필 이미지 업로드 오류 user=${userId} err=${(error as Error)?.message}`,
+      );
       if (error instanceof BadRequestException) {
         throw error;
       }
@@ -800,7 +813,9 @@ export class ProfileService {
         message: '프로필 이미지가 삭제되었습니다.',
       };
     } catch (error) {
-      console.error('프로필 이미지 삭제 오류:', error);
+      this.logger.error(
+        `프로필 이미지 삭제 오류 user=${userId} err=${(error as Error)?.message}`,
+      );
       throw new BadRequestException(
         '프로필 이미지 삭제 중 오류가 발생했습니다.',
       );
@@ -942,7 +957,9 @@ export class ProfileService {
         },
       });
     } catch (e) {
-      console.error('페르소나 생성 오류:', e);
+      this.logger.error(
+        `페르소나 생성 오류 user=${userId} err=${(e as Error)?.message}`,
+      );
     }
 
     return {

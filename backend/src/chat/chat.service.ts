@@ -15,14 +15,17 @@ import {
   ReadMessagesDto,
 } from './dto';
 import { ChatGateway } from './chat.gateway';
+import { BaseService } from '../common/logger/base.service';
 
 @Injectable()
-export class ChatService {
+export class ChatService extends BaseService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => ChatGateway))
     private readonly chatGateway: ChatGateway,
-  ) {}
+  ) {
+    super(ChatService.name);
+  }
 
   /**
    * 1:1 대화 생성 또는 기존 대화 반환
@@ -31,6 +34,9 @@ export class ChatService {
     userId: string,
     dto: CreateConversationDto,
   ): Promise<ConversationDto> {
+    this.logger.debug(
+      `createOrGetConversation user=${userId} recipient=${dto.recipientId}`,
+    );
     const { recipientId } = dto;
 
     if (userId === recipientId) {
@@ -209,6 +215,9 @@ export class ChatService {
     conversationId: string,
     dto: SendMessageDto,
   ): Promise<MessageDto> {
+    this.logger.debug(
+      `sendMessage user=${userId} conversation=${conversationId} type=${dto.type || 'text'}`,
+    );
     // 대화 참여자 권한 확인
     await this.verifyConversationAccess(userId, conversationId);
 
@@ -306,6 +315,9 @@ export class ChatService {
     conversationId: string,
     dto: ReadMessagesDto,
   ): Promise<void> {
+    this.logger.debug(
+      `markMessagesAsRead user=${userId} conversation=${conversationId} upTo=${dto.upToMessageId}`,
+    );
     await this.verifyConversationAccess(userId, conversationId);
 
     await this.prisma.$transaction(async (tx) => {

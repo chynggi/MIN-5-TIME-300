@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import {
   CreateNotificationDto,
@@ -10,12 +10,13 @@ import {
   NotificationPrefsDto,
   DeviceTokenDto,
 } from './dto';
+import { BaseService } from '../common/logger/base.service';
 
 @Injectable()
-export class NotificationService {
-  private readonly logger = new Logger(NotificationService.name);
-
-  constructor(private prisma: PrismaService) {}
+export class NotificationService extends BaseService {
+  constructor(private prisma: PrismaService) {
+    super(NotificationService.name);
+  }
 
   // 알림 생성 (집계 로직 포함)
   async createNotification(

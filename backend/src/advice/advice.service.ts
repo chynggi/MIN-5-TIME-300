@@ -1,9 +1,10 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
 import OpenAI from 'openai';
 import { z } from 'zod';
+import { BaseService } from '../common/logger/base.service';
 
 type RiskFlag = 'none' | 'mild' | 'moderate' | 'severe';
 type AdviceCategory = 'recovery' | 'shift' | 'reflect' | 'general';
@@ -143,14 +144,14 @@ const AdviceResponseSchema = z.object({
 });
 
 @Injectable()
-export class AdviceService {
-  private readonly logger = new Logger(AdviceService.name);
+export class AdviceService extends BaseService {
   private readonly openai?: OpenAI;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationService,
   ) {
+    super(AdviceService.name);
     if (process.env.OPENAI_API_KEY) {
       this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     }

@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { BaseService } from '../common/logger/base.service';
 
 @Injectable()
-export class PersonaService {
-  constructor(private readonly prisma: PrismaService) {}
+export class PersonaService extends BaseService {
+  constructor(private readonly prisma: PrismaService) {
+    super(PersonaService.name);
+  }
 
   /**
    * 사용자 프로필, 일기, 피드백 등 기반 페르소나 요약 및 목표 추출 (Gemini 활용)
@@ -11,6 +14,7 @@ export class PersonaService {
   async generatePersonaAndGoals(
     userId: string,
   ): Promise<{ persona: string; goals: string[] }> {
+    this.logger.debug(`generatePersonaAndGoals user=${userId}`);
     // 1. 프로필, 관심사, 라이프스타일, 최근 일기/피드백 등 데이터 수집
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -31,23 +35,30 @@ export class PersonaService {
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-pro:generateContent?key=${apiKey}`;
     const payload = { contents: [{ role: 'user', parts: [{ text: prompt }] }] };
     const fetch = (await import('node-fetch')).default;
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const result = await response.json();
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    // 4. 결과 파싱 (예시: ---페르소나---, ---목표--- 구분)
-    const persona =
-      /---페르소나---([\s\S]*?)---/g.exec(text)?.[1]?.trim() || '';
-    const goals =
-      /---목표---([\s\S]*)/g
-        .exec(text)?.[1]
-        ?.split(/\n|,|-/)
-        .map((s) => s.trim())
-        .filter(Boolean) || [];
-    return { persona, goals };
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      // 4. 결과 파싱 (예시: ---페르소나---, ---목표--- 구분)
+      const persona =
+        /---페르소나---([\s\S]*?)---/g.exec(text)?.[1]?.trim() || '';
+      const goals =
+        /---목표---([\s\S]*)/g
+          .exec(text)?.[1]
+          ?.split(/\n|,|-/)
+          .map((s) => s.trim())
+          .filter(Boolean) || [];
+      return { persona, goals };
+    } catch (error) {
+      this.logger.error(
+        `generatePersonaAndGoals failed user=${userId} err=${(error as Error)?.message}`,
+      );
+      throw error;
+    }
   }
 
   private buildPersonaPrompt(

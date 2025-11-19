@@ -1,15 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/dto/notification.dto';
+import { BaseService } from '../common/logger/base.service';
 
 @Injectable()
-export class StreakBadgeService {
-  private readonly logger = new Logger(StreakBadgeService.name);
+export class StreakBadgeService extends BaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationService,
-  ) {}
+  ) {
+    super(StreakBadgeService.name);
+  }
 
   private dayStart(d: Date) {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
