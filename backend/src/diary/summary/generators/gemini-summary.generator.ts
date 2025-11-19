@@ -48,6 +48,11 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
       const raw: string = (result as any)?.text || '';
       const diary = this.extractDiary(raw);
       if (!diary) {
+        this.logger.fatal(
+          `[Summary] Failed to extract diary from Gemini output. model=${modelToUse} raw=${raw.slice(
+            0, 1000,
+          )}`,
+        );
         return {
           text: this.enforceRange(this.maskPII(req.rawContent)),
           modelUsed: modelToUse,
@@ -65,6 +70,9 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
         rawOutput: process.env.NODE_ENV === 'development' ? raw : undefined,
       };
     } catch (error: any) {
+      this.logger.error(
+        `[Summary] Gemini summarization failed model=${modelToUse} error=${error?.message}`,
+      );
       return {
         text: this.enforceRange(this.maskPII(req.rawContent)),
         modelUsed: modelToUse,
