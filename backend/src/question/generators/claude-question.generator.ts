@@ -126,7 +126,7 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
           type: "enabled",
           budget_tokens: 10000
         },
-        temperature: 0.7,
+        temperature: 1,
         system: systemPrompt || this.createSystemPrompt(),
         messages: [
           {
