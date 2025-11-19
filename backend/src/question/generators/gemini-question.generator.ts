@@ -131,7 +131,7 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
         contents: fullPrompt,
         config: {
           thinkingConfig: {
-            thinkingBudget: 0, // Disables thinking
+            thinkingBudget: -1, // 동적 사고
           },
         },
       });

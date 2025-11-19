@@ -120,8 +120,12 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
       }
 
       const response = await this.anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514', // 현재 사용 가능한 최신 모델
-        max_tokens: 500,
+        model: "claude-sonnet-4-5-20250929", // 현재 사용 가능한 최신 모델
+        max_tokens: 16000,
+         thinking: {
+          type: "enabled",
+          budget_tokens: 500
+        },
         temperature: 0.7,
         system: systemPrompt || this.createSystemPrompt(),
         messages: [
@@ -131,18 +135,25 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
           },
         ],
       });
-
+      if (response.stop_reason === 'refusal') {
+        throw new Error('Claude가 요청을 거부했습니다.');
+      }
       // 응답에서 텍스트 추출
       if (response.content && response.content.length > 0) {
-        const firstContent = response.content[0];
-        if (firstContent.type === 'text') {
-          const output = firstContent.text;
-          if (!output || output.trim().length === 0) {
-            throw new Error('Claude API에서 빈 응답을 받았습니다');
+        for (const block of response.content) {
+          if (block.type == "thinking"){
+            continue; // 생각 블록은 건너뜁니다.
           }
-          return output.trim();
-        }
+          else if (block.type == "text"){            
+            const output = block.text;
+            if (!output || output.trim().length === 0) {
+              throw new Error('Claude API에서 빈 응답을 받았습니다');
+            }
+            return output.trim();        
+          }
+        
       }
+    }   
 
       throw new Error('Claude API에서 유효한 텍스트 응답을 받지 못했습니다.');
     } catch (error) {
