@@ -128,10 +128,11 @@ export class DiarySummaryService {
         fallbackUsed: res.fallbackUsed,
       };
       try {
+        this.logger.log(`value=${value}`);
         const rawOutputStr = res.rawOutput 
           ? JSON.stringify(res.rawOutput).slice(0, 200) 
           : 'null';
-        this.logger.log(`value=${rawOutputStr}`);
+        this.logger.log(`rawOutput=${rawOutputStr}`);
       } catch {}
       this.cache.set(cacheKey, { value, ts: Date.now() });
       try {

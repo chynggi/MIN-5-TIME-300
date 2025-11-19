@@ -3,10 +3,12 @@ import {
   DiarySummaryRequest,
   DiarySummaryResponse,
 } from '../interfaces/summary-generator.interface';
+import { Injectable, Logger } from '@nestjs/common';
 import { GoogleGenAI } from '@google/genai';
 
 export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
   private readonly genai: GoogleGenAI;
+  private readonly logger = new Logger(GeminiSummaryGenerator.name);
   constructor() {
     super('gemini-2.5-flash'); // 기본 요약 모델 (질문 생성과 동기화 가능)
     const apiKey = process.env.GEMINI_API_KEY;
@@ -38,6 +40,11 @@ export class GeminiSummaryGenerator extends SummaryGeneratorInterface {
           thinkingConfig: { thinkingBudget: 0 },
         },
       });
+       try {
+        this.logger.log(
+          `[Summary] requested=${modelToUse} used=${modelToUse} result=${JSON.stringify(result).slice(0, 500)}`,
+        );
+      } catch {}
       const raw: string = (result as any)?.text || '';
       const diary = this.extractDiary(raw);
       if (!diary) {

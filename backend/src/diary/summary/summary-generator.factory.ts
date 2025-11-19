@@ -40,7 +40,7 @@ export class SummaryGeneratorFactory {
   }
 
   static async summarizeWithMeta(req: DiarySummaryRequest) {
-    const model = (req.modelId as AIModel) || AIModel.GEMINI_2_5_FLASH;
+    const model = (req.modelId as AIModel) || AIModel.CLAUDE_SONNET_4;
     const generator = this.getGenerator(model);
     return generator.summarize(req);
   }
