@@ -6,13 +6,7 @@ import { BaseService } from '../logger/base.service';
 
 @Injectable()
 export class FileUploadService extends BaseService {
-  private readonly uploadRootPath = join(
-    __dirname,
-    '..',
-    '..',
-    '..',
-    'uploads',
-  );
+  private readonly uploadRootPath = join(process.cwd(), 'uploads');
 
   constructor() {
     super(FileUploadService.name);

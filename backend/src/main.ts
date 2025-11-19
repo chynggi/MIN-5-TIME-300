@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, BadRequestException } from '@nestjs/common';
 import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 import * as express from 'express';
 
 async function bootstrap() {
@@ -37,7 +38,10 @@ async function bootstrap() {
     credentials: true, // 필요시
   });
 
-  const uploadsPath = join(__dirname, '..', 'uploads');
+  const uploadsPath = join(process.cwd(), 'uploads');
+  if (!existsSync(uploadsPath)) {
+    mkdirSync(uploadsPath, { recursive: true });
+  }
 
   // 정적 파일 서빙 설정 (업로드된 파일들을 접근할 수 있도록)
   app.useStaticAssets(uploadsPath, {
