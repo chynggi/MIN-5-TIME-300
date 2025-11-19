@@ -124,7 +124,7 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
         max_tokens: 16000,
          thinking: {
           type: "enabled",
-          budget_tokens: 500
+          budget_tokens: 10000
         },
         temperature: 0.7,
         system: systemPrompt || this.createSystemPrompt(),
