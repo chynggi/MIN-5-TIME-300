@@ -69,7 +69,10 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
   const [answerType, setAnswerType] = useState<"text" | "emoji">("text");
   const [selectedEmoji, setSelectedEmoji] = useState("");
   const [startTime, setStartTime] = useState<number>(Date.now());
-  const [selectedModel, setSelectedModel] = useState<string>("claude-sonnet-4"); // 기본값은 Claude
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    const random = availableModels[Math.floor(Math.random() * availableModels.length)];
+    return random.id;
+  });
   // 실제 질문 생성에 사용된 모델을 저장해 요약 시에도 동일 모델을 사용
   const [generationModel, setGenerationModel] = useState<string | null>(null);
   const [showModelSelector, setShowModelSelector] = useState(false);
@@ -132,17 +135,19 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
   const fetchAvailableModels = async () => {
     try {
       const response = await api.get("/questions/models");
-      const { enabledModels: enabled, defaultModel } = response.data;
+      const { enabledModels: enabled } = response.data;
       setEnabledModels(enabled);
-      if (enabled.includes(defaultModel)) {
-        setSelectedModel(defaultModel);
-      } else if (enabled.length > 0) {
-        setSelectedModel(enabled[0]);
+      
+      if (enabled && enabled.length > 0) {
+        const randomModel = enabled[Math.floor(Math.random() * enabled.length)];
+        setSelectedModel(randomModel);
       }
     } catch (error) {
       console.error("모델 정보 조회 실패:", error);
-      // 폴백: 모든 모델 활성화
-      setEnabledModels(["gemini-2.5-flash", "claude-sonnet-4", "gpt-5"]);
+      // 폴백: 모든 모델 활성화 및 랜덤 선택
+      const fallback = ["gemini-2.5-flash", "claude-sonnet-4", "gpt-5"];
+      setEnabledModels(fallback);
+      setSelectedModel(fallback[Math.floor(Math.random() * fallback.length)]);
     }
   };
 
