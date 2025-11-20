@@ -46,9 +46,9 @@ export interface QuestionGenerationRequest {
   averageAnswerLength?: number; // 평균 답변 길이
   noResponseRate?: number; // 무응답 비율 (0-1)
   // 확장 입력 (옵션)
-  structuredDiaries?: RecentJournal[]; // 질문형 일기 (최근 3~7일)
-  freeformDiaries?: FreeformJournal[]; // 자유형 일기 (최근 3~7일)
-  checkins?: DailyCheckinInput[]; // 최근 체크인(최대 3~7일)
+  structuredDiaries?: RecentJournal[]; // 질문형 일기 (최근 2일)
+  freeformDiaries?: FreeformJournal[]; // 자유형 일기 (최근 2일)
+  checkins?: DailyCheckinInput[]; // 최근 체크인(최대 2일)
   baseline?: BaselineCheckinInput; // 회원가입 시 베이스라인
   emotionTags?: EmotionTag[]; // 최근 감정 태그 집계
 }
@@ -111,7 +111,7 @@ export abstract class QuestionGeneratorInterface {
 
          신장(height_cm), 몸무게(weight_kg)
 
-- 과거 일기(최대 최근 3~7일): 질문 방식 일기(structured_diaries),
+- 과거 일기(최대 최근 2일): 질문 방식 일기(structured_diaries),
 
                          자유 형식 일기(freeform_diaries)   // 비어 있을 수 있음
 
@@ -161,7 +161,7 @@ export abstract class QuestionGeneratorInterface {
 
   · 조건: structured_diaries 또는 freeform_diaries에 데이터 존재
 
-  · 동작: 프로필 + 최근 일기(3~7일) + 적합도 메타 + (있다면) 체크인/베이스라인 반영
+  · 동작: 프로필 + 최근 일기(2일) + 적합도 메타 + (있다면) 체크인/베이스라인 반영
 
   · 일기 텍스트 키워드 분석 → 5개 카테고리 분류:
 
@@ -287,7 +287,7 @@ export abstract class QuestionGeneratorInterface {
 
 [과거 일기 분석 → 현재 질문 반영 기준]
 
-1) 시간: 최근 3~7일만 분석(오래된 사건 반복 소환 금지)
+1) 시간: 최근 2일만 분석(오래된 사건 반복 소환 금지)
 
 2) 주제: 반복 주제는 오늘 반영하되 5문항 중 1~2개로 제한, 나머지는 회복/목표 등으로 분산
 
@@ -307,7 +307,7 @@ export abstract class QuestionGeneratorInterface {
 
 Step 1) 프로필(DB) 반영
 
-Step 2) 최근 3~7일 일기 분석 → 주제/감정/인물/맥락/메타 카테고리화
+Step 2) 최근 2일 일기 분석 → 주제/감정/인물/맥락/메타 카테고리화
 
 Step 3) 체크인/감정태그 해석(정규화·베이스라인Δ) → 도메인 가중/임계 적용
 

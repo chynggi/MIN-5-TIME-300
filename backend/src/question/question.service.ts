@@ -81,11 +81,11 @@ export class QuestionService {
       age: computedAge,
     };
 
-    // 2. 최근 7일 일기
+    // 2. 최근 2일 일기
     const recentJournalsRaw = await this.prisma.journal.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      take: 7,
+      take: 2,
       select: {
         id: true,
         content: true,
