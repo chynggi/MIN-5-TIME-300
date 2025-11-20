@@ -1,4 +1,4 @@
-import { Injectable, Inject, ForbiddenException } from '@nestjs/common';
+import { Injectable, Inject, ForbiddenException, forwardRef } from '@nestjs/common';
 import { TodayQuestionDto } from './dto/today-question.dto';
 import { VoteQuestionDto } from './dto/vote-question.dto';
 import { PrismaService } from '../prisma.service';
@@ -22,6 +22,7 @@ export class QuestionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly profileService: ProfileService,
+    @Inject(forwardRef(() => DiaryService))
     private readonly diaryService: DiaryService,
     private readonly vectorDbService: VectorDbService,
   ) {}
@@ -45,9 +46,95 @@ export class QuestionService {
     };
   }
 
+  // ...existing code...
   async generate(req: any, preferredModel?: AIModel): Promise<any> {
     const userId = req.user.userId;
+    // 클라이언트가 요청한 날짜 (오늘 일기를 쓰려고 들어왔다면 오늘 날짜)
+    // 만약 req.body.date가 없다면 현재 시각(오늘)
+    const targetDate = req.body?.date ? new Date(req.body.date) : new Date();
 
+    // 1. 미리 생성된 질문이 있는지 확인 (Pre-Generation Check)
+    // 날짜 비교를 위해 시간 정보를 제거하고 날짜만 비교해야 함 (UTC/KST 고려 필요하지만 일단 단순화)
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const preGenerated = await this.prisma.dailyQuestion.findFirst({
+      where: {
+        userId,
+        date: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+    });
+
+    if (preGenerated) {
+      console.log(`[QGen] Pre-generated question found for user ${userId} on ${targetDate.toISOString()}`);
+      return {
+        id: preGenerated.id,
+        createdAt: preGenerated.createdAt.toISOString(),
+        model: preGenerated.modelUsed,
+        fallback: false, // DB에 저장된건 성공한 것으로 간주
+        confidence: 1.0,
+        questions: preGenerated.questions,
+      };
+    }
+
+    // 2. 없으면 즉시 생성 (On-Demand)
+    return this._generateQuestions(userId, targetDate, preferredModel);
+  }
+
+  /**
+   * 다음 날을 위한 질문 미리 생성 및 저장
+   */
+  async generateAndSave(userId: string, date: Date): Promise<void> {
+    try {
+      // 이미 존재하는지 확인
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const existing = await this.prisma.dailyQuestion.findFirst({
+        where: {
+          userId,
+          date: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+      });
+
+      if (existing) {
+        console.log(`[QGen] Question already exists for ${date.toISOString()}`);
+        return;
+      }
+
+      // 질문 생성
+      const result = await this._generateQuestions(userId, date);
+
+      // DB 저장
+      await this.prisma.dailyQuestion.create({
+        data: {
+          userId,
+          date: startOfDay, // 정규화된 날짜 사용
+          questions: result.questions as any, // Json type casting
+          modelUsed: result.model,
+        },
+      });
+      console.log(`[QGen] Pre-generated question saved for ${date.toISOString()}`);
+
+    } catch (error) {
+      console.error('[QGen] Failed to pre-generate question:', error);
+    }
+  }
+
+  /**
+   * 내부 질문 생성 로직 (Refactored)
+   */
+  private async _generateQuestions(userId: string, targetDate: Date, preferredModel?: AIModel): Promise<any> {
     // 1. 사용자 프로필 정보
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -81,8 +168,7 @@ export class QuestionService {
       age: computedAge,
     };
 
-    // 2. 최근 2일 일기
-    const targetDate = req.body?.date ? new Date(req.body.date) : new Date();
+    // 2. 최근 2일 일기 (targetDate 기준 이전)
     const recentJournalsRaw = await this.prisma.journal.findMany({
       where: {
         userId,
@@ -168,7 +254,6 @@ export class QuestionService {
       : undefined;
 
     // 3. 메타 정보(요일/시간대/반응)
-    const now = new Date();
     const days = [
       'sunday',
       'monday',
@@ -178,7 +263,7 @@ export class QuestionService {
       'friday',
       'saturday',
     ];
-    const hours = now.getHours();
+    const hours = targetDate.getHours(); // targetDate 기준 시간 (보통 현재 시간이거나 요청된 시간)
     let timeOfDay = 'morning';
     if (hours >= 6 && hours < 12) timeOfDay = 'morning';
     else if (hours >= 12 && hours < 18) timeOfDay = 'afternoon';
@@ -186,7 +271,7 @@ export class QuestionService {
     else timeOfDay = 'night';
 
     const metaInfo: MetaInfo = {
-      dayOfWeek: days[now.getDay()],
+      dayOfWeek: days[targetDate.getDay()],
       timeOfDay,
       reactionStats: {
         mostReactedQuestionTypes: [],
@@ -280,6 +365,7 @@ export class QuestionService {
       questions: response.questions,
     };
   }
+// ...existing code...
 
   /**
    * 다중 모델 폴백으로 질문 생성

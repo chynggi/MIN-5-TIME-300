@@ -50,6 +50,7 @@ model User {
   recordScores     RecordScore[]
   // 체크인/베이스라인/한마디
   checkins         DailyCheckin[]
+  dailyQuestions   DailyQuestion[] // 미리 생성된 질문들
   baselineCheckin  UserBaselineCheckin?
   advices          Advice[]
   adviceFeedbacks  AdviceFeedback[]
@@ -532,6 +533,21 @@ model DailyCheckin {
   @@unique([userId, diaryDate])
   @@unique([journalId])
   @@index([userId, diaryDate])
+}
+
+// 미리 생성된 일기 질문 저장
+model DailyQuestion {
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  date        DateTime // 질문이 사용될 날짜 (예: 내일)
+  questions   Json     // 생성된 질문 목록 (GeneratedQuestionItem[])
+  modelUsed   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
 }
 
 // 회원가입 시 최초 베이스라인(1:1)

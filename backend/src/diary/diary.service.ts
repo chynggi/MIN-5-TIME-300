@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { generateDailyQuestion } from '../question/gemini-question.service';
 import type { Multer } from 'multer';
@@ -22,6 +24,7 @@ import { DiarySummaryService } from './summary.service';
 import { AdviceService } from '../advice/advice.service';
 import { StreakBadgeService } from '../activity/streak-badge.service';
 import { BaseService } from '../common/logger/base.service';
+import { QuestionService } from '../question/question.service';
 
 // 간단한 제목 추출: [제목] 패턴 혹은 첫 줄 30자
 function extractTitle(content: string): string | undefined {
@@ -156,6 +159,8 @@ export class DiaryService extends BaseService {
     private readonly diarySummaryService: DiarySummaryService,
     private readonly adviceService: AdviceService,
     private readonly streakBadgeService: StreakBadgeService,
+    @Inject(forwardRef(() => QuestionService))
+    private readonly questionService: QuestionService,
   ) {
     super(DiaryService.name);
   }
@@ -1106,6 +1111,13 @@ export class DiaryService extends BaseService {
       this.logger.warn(`조언 갱신 실패 user=${userId} err=${err.message}`);
     });
 
+    // 다음 날 질문 미리 생성 (비동기)
+    const nextDay = new Date(diaryDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+    this.questionService.generateAndSave(userId, nextDay).catch((err) => {
+      this.logger.warn(`다음 날 질문 생성 실패 user=${userId} err=${err.message}`);
+    });
+
     return result;
   }
 
@@ -1568,6 +1580,16 @@ export class DiaryService extends BaseService {
         ]);
       }
     } catch {}
+
+    // 다음 날 질문 미리 생성 (비동기)
+    // 업데이트 시에도 질문을 다시 생성할지 여부는 정책에 따름.
+    // 여기서는 일기 내용이 바뀌면 다음날 질문 컨텍스트도 바뀔 수 있으므로 재생성 시도 (이미 있으면 스킵됨)
+    const diaryDate = updated.diaryDate;
+    const nextDay = new Date(diaryDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+    this.questionService.generateAndSave(userId, nextDay).catch((err) => {
+      this.logger.warn(`다음 날 질문 생성 실패 (Update) user=${userId} err=${err.message}`);
+    });
 
     return {
       id: updated.id,
