@@ -376,6 +376,7 @@ function EditDiaryInner() {
               onBack={() => setCurrentView('main')}
               // 기존 질문 표시만 (컴포넌트가 prop 지원한다면 확장)
               initialQuestions={initialQuestions}
+              targetDate={selectedDate}
             />
           </div>
         </div>

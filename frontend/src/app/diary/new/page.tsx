@@ -377,6 +377,7 @@ function NewDiaryContent() {
             <AIQuestionWriter 
               onComplete={handleAIQuestionComplete}
               onBack={() => setCurrentView("main")}
+              targetDate={selectedDate}
             />
           </div>
         </div>

@@ -21,6 +21,7 @@ interface AIQuestionWriterProps {
    * 전달되면 질문 재생성(fetch/generate) 없이 이 배열을 사용
    */
   initialQuestions?: DiarySelectedQuestion[];
+  targetDate?: string; // 질문 생성 기준 날짜 (YYYY-MM-DD)
 }
 
 interface AIModel {
@@ -57,7 +58,7 @@ const availableModels: AIModel[] = [
 
 const emojiOptions = ["😊", "😢", "😡", "😴", "🤔", "😍", "😎", "🥳", "😅", "🤗", "😰", "🙄"];
 
-export default function AIQuestionWriter({ onComplete, onBack, initialQuestions }: AIQuestionWriterProps) {
+export default function AIQuestionWriter({ onComplete, onBack, initialQuestions, targetDate }: AIQuestionWriterProps) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -151,7 +152,9 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
     setIsGenerating(true);
     try {
       const modelToUse = modelOverride || selectedModel;
-      const res = await api.post(`/questions/generate?model=${encodeURIComponent(modelToUse)}`);
+      const res = await api.post(`/questions/generate?model=${encodeURIComponent(modelToUse)}`, {
+        date: targetDate
+      });
       // 기대 스키마: { questions: [ { domain, text }, ...5 ] }
       const data = res.data;
       if (data && data.ok === false) {

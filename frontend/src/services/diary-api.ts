@@ -97,9 +97,12 @@ export const diaryApi = {
   },
 
   // 질문 세트 생성 (AI 직접 호출용) - 기존 /questions/generate 대체 예상
-  generateQuestions: (model?: string): Promise<GeneratedQuestionsResponse> => {
+  generateQuestions: (model?: string, date?: string): Promise<GeneratedQuestionsResponse> => {
     const url = model ? `/questions/generate?model=${encodeURIComponent(model)}` : '/questions/generate';
-    return apiRequest(url, { method: 'POST' });
+    return apiRequest(url, { 
+      method: 'POST',
+      body: date ? JSON.stringify({ date }) : undefined
+    });
   },
 
   // 오늘 작성된 맞팔 친구들의 공개 일기 목록
