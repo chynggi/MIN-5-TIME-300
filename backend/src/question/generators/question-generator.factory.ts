@@ -69,24 +69,15 @@ export class QuestionGeneratorFactory {
     return !!(apiKey && apiKey.trim().length > 10); // 최소 길이 체크
   }
 
-  // 기본 모델 선택 (우선순위: Gemini > GPT-5 > Claude - 안정성 기준)
+  // 기본 모델 선택 (랜덤 선택으로 부하 분산)
   static getDefaultModel(): AIModel {
     const enabledModels = this.getEnabledModels();
 
-    // 안정성 기준으로 우선순위 설정
-    if (enabledModels.includes(AIModel.CLAUDE_SONNET_4)) {
-      return AIModel.CLAUDE_SONNET_4;
+    // 활성화된 모델 중 랜덤 선택
+    if (enabledModels.length > 0) {
+      const randomIndex = Math.floor(Math.random() * enabledModels.length);
+      return enabledModels[randomIndex];
     }
-    
-    if (enabledModels.includes(AIModel.GEMINI_2_5_FLASH)) {
-      return AIModel.GEMINI_2_5_FLASH;
-    }
-
-    if (enabledModels.includes(AIModel.GPT_5)) {
-      return AIModel.GPT_5;
-    }
-
-    
 
     // 모든 API 키가 없는 경우 기본값으로 Claude 사용 (폴백 질문 제공)
     return AIModel.CLAUDE_SONNET_4;

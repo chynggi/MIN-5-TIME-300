@@ -6,6 +6,7 @@ import {
 import { GeminiSummaryGenerator } from './generators/gemini-summary.generator';
 import { GPTSummaryGenerator } from './generators/gpt-summary.generator';
 import { ClaudeSummaryGenerator } from './generators/claude-summary.generator';
+import { QuestionGeneratorFactory } from '../../question/generators/question-generator.factory';
 
 export class SummaryGeneratorFactory {
   private static generators: Map<string, SummaryGeneratorInterface> = new Map();
@@ -40,7 +41,19 @@ export class SummaryGeneratorFactory {
   }
 
   static async summarizeWithMeta(req: DiarySummaryRequest) {
-    const model = (req.modelId as AIModel) || AIModel.CLAUDE_SONNET_4;
+    let model = req.modelId as AIModel;
+
+    // 모델이 지정되지 않은 경우, 활성화된 모델 중 랜덤 선택하여 부하 분산
+    if (!model) {
+      const enabledModels = QuestionGeneratorFactory.getEnabledModels();
+      if (enabledModels.length > 0) {
+        const randomIndex = Math.floor(Math.random() * enabledModels.length);
+        model = enabledModels[randomIndex];
+      } else {
+        model = AIModel.CLAUDE_SONNET_4;
+      }
+    }
+
     const generator = this.getGenerator(model);
     return generator.summarize(req);
   }
