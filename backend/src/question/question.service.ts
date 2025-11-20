@@ -82,14 +82,19 @@ export class QuestionService {
     };
 
     // 2. 최근 2일 일기
+    const targetDate = req.body?.date ? new Date(req.body.date) : new Date();
     const recentJournalsRaw = await this.prisma.journal.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
+      where: {
+        userId,
+        diaryDate: { lt: targetDate },
+      },
+      orderBy: { diaryDate: 'desc' },
       take: 2,
       select: {
         id: true,
         content: true,
         createdAt: true,
+        diaryDate: true,
         emotionScore: true,
         writingDuration: true,
         selectedQuestionTexts: true,
@@ -98,7 +103,7 @@ export class QuestionService {
     });
 
     const recentJournals: RecentJournal[] = recentJournalsRaw.map((j) => ({
-      date: j.createdAt.toISOString().slice(0, 10),
+      date: j.diaryDate.toISOString().slice(0, 10),
       content: j.content,
       question: (j.selectedQuestionTexts ?? []).join(' / '),
       emotionScore: j.emotionScore,
@@ -107,7 +112,7 @@ export class QuestionService {
     const structuredDiaries = recentJournalsRaw
       .filter((j) => (j.selectedQuestionTexts?.length ?? 0) > 0)
       .map((j) => ({
-        date: j.createdAt.toISOString().slice(0, 10),
+        date: j.diaryDate.toISOString().slice(0, 10),
         content: j.content,
         question: (j.selectedQuestionTexts ?? []).join(' / '),
         emotionScore: j.emotionScore,
@@ -116,7 +121,7 @@ export class QuestionService {
     const freeformDiaries = recentJournalsRaw
       .filter((j) => !j.selectedQuestionTexts?.length)
       .map((j) => ({
-        date: j.createdAt.toISOString().slice(0, 10),
+        date: j.diaryDate.toISOString().slice(0, 10),
         content: j.content,
         emotionScore: j.emotionScore,
       }));

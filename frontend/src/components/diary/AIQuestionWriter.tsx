@@ -346,22 +346,21 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
   const progressPercent = totalCount > 0 ? (answeredCount / totalCount) * 100 : 0;
 
   if (isGenerating || isSummarizing) {
-    const currentModel = availableModels.find(m => m.id === selectedModel);
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <div className="text-7xl mb-6 animate-pulse">{currentModel?.icon || "🤖"}</div>
+        <div className="text-7xl mb-6 animate-pulse">🤖</div>
         {isGenerating ? (
           <>
             <h2 className="text-2xl font-bold mb-2">
-              {currentModel?.name || "AI"}가 개인화된 질문을 생성 중...
+              AI가 개인화된 질문을 생성 중...
             </h2>
             <p className="text-gray-600 mb-6">
-              {currentModel?.description || "잠시만 기다려주세요"}
+              당신의 하루를 위한 질문을 준비하고 있어요.
             </p>
           </>
         ) : (
           <>
-            <h2 className="text-2xl font-bold mb-2">{currentModel?.name || 'AI'}가 일기를 요약 중...</h2>
+            <h2 className="text-2xl font-bold mb-2">AI가 일기를 요약 중...</h2>
             <p className="text-gray-600 mb-6">응답을 정리해 자연스러운 일기 형태로 다듬고 있어요.</p>
           </>
         )}
@@ -371,7 +370,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
           </div>
         </div>
         <div className="text-sm text-gray-500 mt-4">
-          신뢰도: {currentModel?.confidence || "90%"}
+          신뢰도: 90% 이상
         </div>
       </div>
     );
