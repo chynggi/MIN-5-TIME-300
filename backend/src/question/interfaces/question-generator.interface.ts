@@ -611,7 +611,7 @@ ${avgLenInfo}
 ${noRespInfo}
 
 # 생성 규칙 요약(출력 금지)
-- 권장 순서: emotion → relationship/context → recovery → action → goal
+- 권장 순서: emotion → relationship → recovery → action → goal
 - Echo+Ask 한 문장(다정·제안), 120자 이내, 최근 3일 중복 회피, 개인정보/수치 금지
 
 # 최종 출력 ONLY JSON (추가 텍스트 금지)

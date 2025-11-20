@@ -215,18 +215,27 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
   };
 
   const saveAnswer = () => {
-    const updatedQuestions = [...questions];
-    updatedQuestions[currentQuestionIndex] = {
-      ...updatedQuestions[currentQuestionIndex],
-      answered: true,
-      answer: currentAnswer,
-      answerType: "text",
-      emoji: ""
-    };
+    const trimmedAnswer = currentAnswer.trim();
+    if (!trimmedAnswer) return;
+
+    const updatedQuestions = questions.map((question, idx) =>
+      idx === currentQuestionIndex
+        ? { ...question, answered: true, answer: trimmedAnswer, answerType: "text" as const, emoji: "" }
+        : question
+    );
     setQuestions(updatedQuestions);
-    setShowAnswerInput(false);
-    setCurrentAnswer("");
+
+    const nextIndex = currentQuestionIndex + 1;
+    if (nextIndex < updatedQuestions.length) {
+      setCurrentQuestionIndex(nextIndex);
+      setCurrentAnswer(updatedQuestions[nextIndex].answer || "");
+      setShowAnswerInput(true);
+    } else {
+      setShowAnswerInput(false);
+      setCurrentAnswer("");
+    }
     setSelectedEmoji("");
+    setAnswerType("text");
   };
 
   const cancelAnswer = () => {
@@ -434,13 +443,13 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
             <div className="text-xs font-medium text-gray-600 whitespace-nowrap">{answeredCount}/{totalCount}</div>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            {answeredCount > 0 && (
+            {isAllAnswered && (
               <button
-                onClick={() => generateDiary(isAllAnswered ? 'final' : 'draft')}
+                onClick={() => generateDiary('final')}
                 disabled={!title.trim()}
                 className={`${btn.base} ${btn.primary} ${btn.sm} hidden md:inline-flex`}
               >
-                {isAllAnswered ? '일기 완성하기' : `부분 저장 (${answeredCount}/${totalCount})`}
+                일기 완성하기
               </button>
             )}
           </div>
@@ -476,6 +485,23 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
           </div>
         </div>
       )}
+
+      <div className="rounded-xl border border-gray-200 bg-white px-4 py-4">
+        <label className="block text-xs font-semibold text-gray-600 mb-1">
+          일기 제목 <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          maxLength={50}
+          placeholder="일기 제목을 입력하세요"
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        />
+        {isAllAnswered && !title.trim() && (
+          <p className="mt-1 text-[11px] text-red-500">제목을 입력해야 일기를 저장할 수 있습니다.</p>
+        )}
+      </div>
 
       {/* 메인 2컬럼 레이아웃 */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 flex-1 min-h-[520px]">
@@ -529,21 +555,6 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
 
         {/* 답변/작성 패널 */}
         <div className="md:col-span-3 flex flex-col rounded-xl border border-gray-200 bg-white overflow-hidden">
-          {/* 제목 입력 */}
-          {answeredCount > 0 && (
-            <div className="px-4 pt-4">
-              <label className="block text-xs font-semibold text-gray-600 mb-1">일기 제목 <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={50}
-                placeholder="일기 제목을 입력하세요"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-              {!title.trim() && <p className="mt-1 text-[11px] text-red-500">제목을 입력해야 일기를 저장할 수 있습니다.</p>}
-            </div>
-          )}
           <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
             {showAnswerInput ? (
               <div className="flex flex-col flex-1">
@@ -583,13 +594,13 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
                 <p className="text-sm text-gray-500 mb-6 leading-relaxed max-w-sm">
                   왼쪽의 질문 목록에서 답변하고 싶은 항목을 클릭하면 이 영역에서 바로 작성할 수 있습니다. 작성한 답변은 자동으로 임시 저장되지 않으니 꼭 저장 버튼을 눌러주세요.
                 </p>
-                {answeredCount > 0 && (
+                {isAllAnswered && (
                   <button
-                    onClick={() => generateDiary(isAllAnswered ? 'final' : 'draft')}
+                    onClick={() => generateDiary('final')}
                     disabled={!title.trim()}
                     className={`${btn.base} ${btn.success} ${btn.md}`}
                   >
-                    {isAllAnswered ? '모든 답변으로 일기 완성' : '현재까지 답변으로 저장'}
+                    모든 답변으로 일기 완성
                   </button>
                 )}
               </div>
@@ -598,13 +609,13 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions 
           {/* 하단 액션바 (모바일 표시 우선) */}
           <div className="border-t bg-gray-50 px-4 py-3 flex items-center justify-between gap-2">
             <div className="text-[11px] text-gray-500">{answeredCount}개 답변 완료</div>
-            {answeredCount > 0 && (
+            {isAllAnswered && (
               <button
-                onClick={() => generateDiary(isAllAnswered ? 'final' : 'draft')}
+                onClick={() => generateDiary('final')}
                 disabled={!title.trim()}
-                className={`${btn.base} ${isAllAnswered ? btn.success : btn.primary} ${btn.sm}`}
+                className={`${btn.base} ${btn.success} ${btn.sm}`}
               >
-                {isAllAnswered ? '일기 완성하기' : '부분 저장'}
+                일기 완성하기
               </button>
             )}
           </div>
