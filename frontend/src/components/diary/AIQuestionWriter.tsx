@@ -21,6 +21,7 @@ interface AIQuestionWriterProps {
    * 전달되면 질문 재생성(fetch/generate) 없이 이 배열을 사용
    */
   initialQuestions?: DiarySelectedQuestion[];
+  initialTitle?: string;
   targetDate?: string; // 질문 생성 기준 날짜 (YYYY-MM-DD)
 }
 
@@ -58,12 +59,12 @@ const availableModels: AIModel[] = [
 
 const emojiOptions = ["😊", "😢", "😡", "😴", "🤔", "😍", "😎", "🥳", "😅", "🤗", "😰", "🙄"];
 
-export default function AIQuestionWriter({ onComplete, onBack, initialQuestions, targetDate }: AIQuestionWriterProps) {
+export default function AIQuestionWriter({ onComplete, onBack, initialQuestions, initialTitle = "", targetDate }: AIQuestionWriterProps) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(initialTitle);
   const [showAnswerInput, setShowAnswerInput] = useState(false);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [answerType, setAnswerType] = useState<"text" | "emoji">("text");
@@ -84,6 +85,11 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
   useEffect(() => {
     fetchAvailableModels();
   }, []);
+
+  // props 변경 시 제목 동기화 (편집 모드 재진입)
+  useEffect(() => {
+    setTitle(initialTitle || "");
+  }, [initialTitle]);
 
   // 초기 질문 준비: initialQuestions가 있으면 그것을 사용, 없으면 생성
   useEffect(() => {

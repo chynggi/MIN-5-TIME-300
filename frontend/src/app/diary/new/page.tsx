@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 // 기본 제공 이미지들 (예시)
 const defaultImages = [
   "/images/def/default1.jpg",
@@ -8,7 +8,69 @@ const defaultImages = [
 import { useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/axios";
 import Link from "next/link";
-import { SpotifyTrack as SpotifyTrackType, VoiceRecordPayload, DiarySelectedQuestion } from "@/types/diary";
+import { SpotifyTrack as SpotifyTrackType, VoiceRecordPayload, DiarySelectedQuestion, DiarySettings as DiarySettingsType } from "@/types/diary";
+
+const DRAFT_STORAGE_PREFIX = 'diary-draft-v1';
+const DRAFT_VERSION = 1;
+
+type DiaryComposerView = "main" | "ai-question" | "free-write" | "settings";
+
+type DiaryDraftPayload = {
+  version: number;
+  savedAt: string;
+  currentView: DiaryComposerView;
+  title: string;
+  content: string;
+  emotion: string;
+  questionId: string;
+  questionModel: string;
+  presetKey: string | null;
+  preview: string | null;
+  selectedDate: string;
+  diarySettings: DiarySettingsType;
+  selectedQuestions: DiarySelectedQuestion[];
+  selectedMusic: SpotifyTrackType | null;
+  shareLocation: boolean;
+  lat: number | null;
+  lng: number | null;
+  checkinPercent: number;
+};
+
+const ALLOWED_VIEWS: DiaryComposerView[] = ["main", "ai-question", "free-write", "settings"];
+
+const buildDraftKey = (date: string) => `${DRAFT_STORAGE_PREFIX}:${date}`;
+
+const hasMeaningfulDraft = (draft?: DiaryDraftPayload | null) => {
+  if (!draft) return false;
+  return Boolean(
+    draft.title?.trim() ||
+    draft.content?.trim() ||
+    draft.preview ||
+    draft.presetKey ||
+    (draft.selectedQuestions?.length ?? 0) ||
+    draft.selectedMusic ||
+    draft.questionId
+  );
+};
+
+const dataUrlToFile = (dataUrl: string, fileName: string) => {
+  try {
+    const [meta, base64] = dataUrl.split(',');
+    if (!base64) return null;
+    const mimeMatch = meta.match(/data:(.*?);/);
+    const mime = mimeMatch?.[1] || 'image/png';
+    const binary = atob(base64);
+    const len = binary.length;
+    const buffer = new Uint8Array(len);
+    for (let i = 0; i < len; i += 1) {
+      buffer[i] = binary.charCodeAt(i);
+    }
+    return new File([buffer], fileName, { type: mime });
+  } catch (error) {
+    console.error('Failed to convert data URL to file', error);
+    return null;
+  }
+};
 
 // Import new components
 import ImageUpload from "@/components/diary/ImageUpload";
@@ -29,7 +91,8 @@ function NewDiaryContent() {
   const router = useRouter();
 
   // View states
-  const [currentView, setCurrentView] = useState<"main" | "ai-question" | "free-write" | "settings">("main");
+  const [currentView, setCurrentView] = useState<DiaryComposerView>("main");
+  const [draftToastVisible, setDraftToastVisible] = useState(false);
 
   // Core form states
   const [image, setImage] = useState<File | null>(null);
@@ -62,11 +125,56 @@ function NewDiaryContent() {
     if (dt > todayMid) return todayStr;
     return d;
   };
-  const [selectedDate, setSelectedDate] = useState<string>(parseValidDate(initialDateParam));
+  const initialSelectedDate = parseValidDate(initialDateParam);
+  const [selectedDate, setSelectedDate] = useState<string>(initialSelectedDate);
+  const draftKeyRef = useRef(buildDraftKey(initialSelectedDate));
   useEffect(() => {
     const newParam = searchParams?.get('date');
     setSelectedDate(parseValidDate(newParam));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const nextKey = buildDraftKey(selectedDate);
+    draftKeyRef.current = nextKey;
+    try {
+      const raw = window.localStorage.getItem(nextKey);
+      if (!raw) {
+        setDraftToastVisible(false);
+        return;
+      }
+      const parsed = JSON.parse(raw) as DiaryDraftPayload;
+      if (parsed.version !== DRAFT_VERSION || !hasMeaningfulDraft(parsed)) {
+        return;
+      }
+      if (parsed.title !== undefined) setTitle(parsed.title);
+      if (parsed.content !== undefined) setContent(parsed.content);
+      setPreview(parsed.preview ?? null);
+      setImage(null);
+      setShowDefaultImageSelect(false);
+      setPresetKey(parsed.presetKey ?? null);
+      setQuestionId(parsed.questionId ?? '');
+      setQuestionModel(parsed.questionModel ?? '');
+      setSelectedQuestions(parsed.selectedQuestions ?? []);
+      setDiarySettings(prev => parsed.diarySettings ? { ...prev, ...parsed.diarySettings } : prev);
+      setSelectedMusic(parsed.selectedMusic ?? null);
+      setEmotion(parsed.emotion ?? '😊');
+      setShareLocation(parsed.shareLocation ?? true);
+      setLat(parsed.lat ?? null);
+      setLng(parsed.lng ?? null);
+      if (typeof parsed.checkinPercent === 'number') {
+        setCheckinPercent(parsed.checkinPercent);
+      }
+      if (ALLOWED_VIEWS.includes(parsed.currentView as DiaryComposerView)) {
+        setCurrentView(parsed.currentView as DiaryComposerView);
+      } else {
+        setCurrentView('main');
+      }
+      setDraftToastVisible(true);
+    } catch (error) {
+      console.warn('Failed to restore diary draft', error);
+    }
+  }, [selectedDate]);
 
   // 오늘(또는 선택 날짜)의 체크인 퍼센트 조회
   useEffect(() => {
@@ -77,6 +185,62 @@ function NewDiaryContent() {
     }).catch(() => {});
     return () => { mounted = false; };
   }, [selectedDate]);
+
+  useEffect(() => {
+    if (!draftToastVisible) return;
+    const timer = window.setTimeout(() => setDraftToastVisible(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, [draftToastVisible]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const key = draftKeyRef.current || buildDraftKey(selectedDate);
+    const hasMeaningfulContent = Boolean(
+      title.trim() ||
+      content.trim() ||
+      preview ||
+      presetKey ||
+      selectedQuestions.length ||
+      selectedMusic ||
+      questionId
+    );
+    if (!hasMeaningfulContent) {
+      try {
+        window.localStorage.removeItem(key);
+      } catch (error) {
+        console.warn('Failed to clear diary draft', error);
+      }
+      return;
+    }
+    const payload: DiaryDraftPayload = {
+      version: DRAFT_VERSION,
+      savedAt: new Date().toISOString(),
+      currentView,
+      title,
+      content,
+      emotion,
+      questionId,
+      questionModel,
+      presetKey,
+      preview,
+      selectedDate,
+      diarySettings,
+      selectedQuestions,
+      selectedMusic,
+      shareLocation,
+      lat,
+      lng,
+      checkinPercent,
+    };
+    const timer = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(key, JSON.stringify(payload));
+      } catch (error) {
+        console.warn('Failed to persist diary draft', error);
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [selectedDate, currentView, title, content, emotion, questionId, questionModel, presetKey, preview, diarySettings, selectedQuestions, selectedMusic, shareLocation, lat, lng, checkinPercent]);
 
   // Diary settings
   const [diarySettings, setDiarySettings] = useState({
@@ -123,10 +287,22 @@ function NewDiaryContent() {
   // Handlers
   const handleImageSelect = (file: File | null) => {
     setImage(file);
-    if (file) { setPreview(URL.createObjectURL(file)); setShowDefaultImageSelect(false); }
-    else { setPreview(null); }
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setPreview(reader.result);
+        }
+      };
+      reader.onerror = () => setPreview(null);
+      reader.readAsDataURL(file);
+      setPresetKey(null);
+      setShowDefaultImageSelect(false);
+      setError('');
+    } else {
+      setPreview(null);
+    }
   };
-  const handleDefaultImageSelect = (url: string) => { setImage(null); setPreview(url); setShowDefaultImageSelect(false); };
   const handleWritingModeSelect = (mode: "question" | "free") => { setCurrentView(mode === 'question' ? 'ai-question' : 'free-write'); };
   const handleAIQuestionComplete = (data: { title: string; content: string; questionId: string; questionModel?: string; selectedQuestions: DiarySelectedQuestion[] }) => { 
     setTitle(data.title); 
@@ -137,6 +313,21 @@ function NewDiaryContent() {
     setCurrentView('main'); 
   };
   const handleFreeWriteComplete = (data: { title: string; content: string }) => { setTitle(data.title); setContent(data.content); setCurrentView('main'); };
+
+  const draftToast = draftToastVisible ? (
+    <div className="fixed bottom-4 inset-x-0 px-4 z-[70]">
+      <div className="max-w-md mx-auto bg-slate-900 text-white text-sm rounded-full px-4 py-2 flex items-center gap-3 shadow-2xl">
+        <span className="font-medium">작성 중이던 일기를 복원했어요.</span>
+        <button
+          type="button"
+          onClick={() => setDraftToastVisible(false)}
+          className="text-xs uppercase tracking-wider text-slate-200 hover:text-white"
+        >
+          닫기
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   const handleSubmit = async () => {
     if (checkinPercent < 100) {
@@ -169,14 +360,17 @@ function NewDiaryContent() {
       } else if (presetKey) {
         formData.append('preset', presetKey);
       } else if (preview) {
-        // 예외 케이스: presetKey가 없지만 preview 경로만 있는 경우 (레거시/임시)
-        if (preview.startsWith('/images/')) {
+        if (preview.startsWith('data:')) {
+          const inMemoryFile = dataUrlToFile(preview, `diary-${Date.now()}.png`);
+          if (inMemoryFile) {
+            formData.append('file', inMemoryFile);
+          }
+        } else if (preview.startsWith('/images/')) {
           // 경로에서 키 유추 (예: /images/seasons/spring.jpg)
           const match = preview.match(/\/images\/(?:seasons|weather)\/(.+)\.(?:jpg|png|jpeg|webp)$/);
           if (match) {
             formData.append('preset', match[1]);
           } else {
-            // 마지막 fallback: fetch 업로드 (빈번하진 않음)
             try {
               const abs = typeof window !== 'undefined' ? `${window.location.origin}${preview}` : preview;
               const res = await fetch(abs, { cache: 'no-store' });
@@ -187,6 +381,16 @@ function NewDiaryContent() {
               }
             } catch {/* ignore */}
           }
+        } else {
+          try {
+            const abs = typeof window !== 'undefined' && preview.startsWith('http') ? preview : `${window.location.origin}${preview}`;
+            const res = await fetch(abs, { cache: 'no-store' });
+            if (res.ok) {
+              const blob = await res.blob();
+              const fileName = preview.split('/').pop() || 'image.jpg';
+              formData.append('file', new File([blob], fileName, { type: blob.type || 'image/jpeg' }));
+            }
+          } catch {/* ignore */}
         }
       }
       // 선택 질문 배열 동봉(JSON 문자열로 전송 -> 서버에서 정규화)
@@ -211,6 +415,13 @@ function NewDiaryContent() {
       const response = await api.post("/diaries", formData, { headers: { "Content-Type": "multipart/form-data" } });
       if (response.status === 200 || response.status === 201) { 
         alert("일기가 성공적으로 저장되었습니다!\n(질문 기반 작성 내용은 자연스러운 일기 형태로 요약/정리되어 저장되었습니다.)"); 
+        try {
+          if (typeof window !== 'undefined') {
+            window.localStorage.removeItem(draftKeyRef.current || buildDraftKey(selectedDate));
+          }
+        } catch (clearError) {
+          console.warn('Failed to clear diary draft after save', clearError);
+        }
         router.push('/dashboard'); 
       }
       else { throw new Error('저장 실패'); }
@@ -226,8 +437,9 @@ function NewDiaryContent() {
   // Main composition view
   if (currentView === "main") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
-        <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
+          <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
           {/* 상단 날짜 설정 섹션 제거됨 (요청사항) */}
           <div className="mb-4">
             <h1 className="text-xl font-bold text-gray-800">오늘의 일기</h1>
@@ -256,7 +468,7 @@ function NewDiaryContent() {
 
           {/* Image Upload Component */}
           <ImageUpload
-            onImageSelect={(file) => { setImage(file); if (file) { setPresetKey(null); } }}
+            onImageSelect={handleImageSelect}
             preview={preview}
             onDefaultImageSelect={(url, key) => {
               setPreview(url);
@@ -362,48 +574,61 @@ function NewDiaryContent() {
           {error && (
             <div className="mt-3 text-red-500 text-sm text-center">{error}</div>
           )}
+          </div>
         </div>
-      </div>
+        {draftToast}
+      </>
     );
   }
 
   // AI Question Writing view
   if (currentView === "ai-question") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
-        {/* 폭 확장: 모바일 padding, 데스크탑 중앙 정렬 + 넓은 컨테이너 */}
-        <div className="mx-auto w-full px-3 md:px-6 max-w-6xl">
-          <div className="bg-white/70 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-4 md:p-6 min-h-[720px] flex flex-col">
-            <AIQuestionWriter 
-              onComplete={handleAIQuestionComplete}
-              onBack={() => setCurrentView("main")}
-              targetDate={selectedDate}
-            />
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
+          {/* 폭 확장: 모바일 padding, 데스크탑 중앙 정렬 + 넓은 컨테이너 */}
+          <div className="mx-auto w-full px-3 md:px-6 max-w-6xl">
+            <div className="bg-white/70 backdrop-blur rounded-2xl shadow-lg border border-gray-200 p-4 md:p-6 min-h-[720px] flex flex-col">
+              <AIQuestionWriter 
+                onComplete={handleAIQuestionComplete}
+                onBack={() => setCurrentView("main")}
+                targetDate={selectedDate}
+                initialQuestions={selectedQuestions}
+                initialTitle={title}
+              />
+            </div>
           </div>
         </div>
-      </div>
+        {draftToast}
+      </>
     );
   }
 
   // Free Writing view
   if (currentView === "free-write") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
-        <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
-          <FreeWriter 
-            onComplete={handleFreeWriteComplete}
-            onBack={() => setCurrentView("main")}
-          />
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
+          <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
+            <FreeWriter 
+              onComplete={handleFreeWriteComplete}
+              onBack={() => setCurrentView("main")}
+              initialTitle={title}
+              initialContent={content}
+            />
+          </div>
         </div>
-      </div>
+        {draftToast}
+      </>
     );
   }
 
   // Settings view
   if (currentView === "settings") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
-        <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-pink-50 py-6">
+          <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg p-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-bold text-gray-800">일기 설정</h1>
             <button
@@ -433,8 +658,10 @@ function NewDiaryContent() {
               설정 완료
             </button>
           </div>
+          </div>
         </div>
-      </div>
+        {draftToast}
+      </>
     );
   }
 
