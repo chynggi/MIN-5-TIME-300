@@ -18,8 +18,20 @@ export class VectorDbService {
   private readonly logger = new Logger(VectorDbService.name);
   private dimension: number | null = null;
   private openai: OpenAI;
+  private indexRef: any = null;
+  private readonly queryCache = new Map<string, { data: any[]; expiresAt: number }>();
+  private readonly queryCacheTTL: number;
+  private readonly queryCacheMaxEntries: number;
 
   constructor(private readonly prisma: PrismaService) {
+    this.queryCacheTTL = this.resolveNumberEnv(
+      process.env.VECTOR_QUERY_CACHE_TTL_MS,
+      4000,
+    );
+    this.queryCacheMaxEntries = this.resolveNumberEnv(
+      process.env.VECTOR_QUERY_CACHE_MAX,
+      32,
+    );
     this.bootstrap();
     const key = process.env.OPENAI_API_KEY ?? '';
     this.openai = new OpenAI({ apiKey: key });
@@ -36,10 +48,12 @@ export class VectorDbService {
     }
     try {
       this.pinecone = new Pinecone({ apiKey });
+      this.indexRef = this.pinecone.index(this.indexName);
       this.logger.log(`Pinecone 초기화 완료 (index=${this.indexName})`);
     } catch (e: any) {
       this.logger.error('Pinecone 초기화 실패', e?.message);
       this.pinecone = null;
+      this.indexRef = null;
     }
   }
 
@@ -48,6 +62,14 @@ export class VectorDbService {
       return false;
     }
     return true;
+  }
+
+  private getIndexInstance(): any | null {
+    if (!this.ensureReady()) return null;
+    if (!this.indexRef && this.pinecone) {
+      this.indexRef = this.pinecone.index(this.indexName);
+    }
+    return this.indexRef;
   }
 
   // ====== Public Vector Operations ======
@@ -66,7 +88,8 @@ export class VectorDbService {
       );
     }
     await this.withRetry(async () => {
-      const index = this.pinecone!.index(this.indexName);
+      const index = this.getIndexInstance();
+      if (!index) return;
       await index.upsert(
         items.map((i) => ({
           id: i.id,
@@ -75,6 +98,7 @@ export class VectorDbService {
         })),
       );
     }, 'upsert');
+    this.queryCache.clear();
   }
 
   async query<TMeta = any>(opts: QueryVectorOptions): Promise<any[]> {
@@ -82,16 +106,24 @@ export class VectorDbService {
       this.logger.debug('query 호출됨 - Pinecone 비활성 상태, 빈 배열 반환');
       return [];
     }
+    const cacheKey = this.makeQueryCacheKey(opts);
+    const cached = this.readQueryCache(cacheKey);
+    if (cached) {
+      return cached;
+    }
+    const index = this.getIndexInstance();
+    if (!index) return [];
     return await this.withRetry(
       async () => {
-        const index = this.pinecone!.index(this.indexName);
         const result = await index.query({
           vector: opts.vector,
           topK: opts.topK,
           includeMetadata: opts.includeMetadata ?? true,
           filter: opts.filter,
         });
-        return result.matches || [];
+        const matches = (result.matches || []).map((match: any) => ({ ...match }));
+        this.writeQueryCache(cacheKey, matches);
+        return matches;
       },
       'query',
       [] as any[],
@@ -102,7 +134,8 @@ export class VectorDbService {
     if (!ids.length) return;
     if (!this.ensureReady()) return;
     await this.withRetry(async () => {
-      const index = this.pinecone!.index(this.indexName);
+      const index = this.getIndexInstance();
+      if (!index) return;
       try {
         await index.deleteMany(ids);
       } catch (e: any) {
@@ -115,6 +148,7 @@ export class VectorDbService {
         }
       }
     }, 'delete');
+    this.queryCache.clear();
   }
 
   // 단순 재시도 유틸 (고정 백오프)
@@ -143,6 +177,72 @@ export class VectorDbService {
     }
     // 논리적으로 도달 불가
     return fallback as T;
+  }
+
+  private readQueryCache(key: string): any[] | null {
+    if (this.queryCacheTTL <= 0) return null;
+    const item = this.queryCache.get(key);
+    if (!item) return null;
+    if (item.expiresAt < Date.now()) {
+      this.queryCache.delete(key);
+      return null;
+    }
+    return item.data.map((match: any) => ({ ...match }));
+  }
+
+  private writeQueryCache(key: string, data: any[]): void {
+    if (this.queryCacheTTL <= 0) return;
+    const expiresAt = Date.now() + this.queryCacheTTL;
+    const cloned = data.map((match) => ({ ...match }));
+    this.queryCache.set(key, { data: cloned, expiresAt });
+    if (this.queryCache.size > this.queryCacheMaxEntries) {
+      const oldestKey = this.queryCache.keys().next().value;
+      if (oldestKey) this.queryCache.delete(oldestKey);
+    }
+  }
+
+  private makeQueryCacheKey(opts: QueryVectorOptions): string {
+    const vectorHash = this.hashVectorForCache(opts.vector);
+    const includeMeta = opts.includeMetadata ?? true;
+    const filterHash = this.normalizeFilterForCache(opts.filter);
+    return `${vectorHash}|${opts.topK}|${includeMeta ? 1 : 0}|${filterHash}`;
+  }
+
+  private hashVectorForCache(vector: number[]): string {
+    if (!vector.length) return 'empty';
+    const sampleSize = Math.min(24, vector.length);
+    const step = Math.max(1, Math.floor(vector.length / sampleSize));
+    const sampled: number[] = [];
+    for (let i = 0; i < vector.length && sampled.length < sampleSize; i += step) {
+      sampled.push(Math.round(vector[i] * 1000));
+    }
+    return sampled.join('.');
+  }
+
+  private normalizeFilterForCache(filter?: Record<string, any>): string {
+    if (!filter) return 'nofilter';
+    const sortKeys = (value: any): any => {
+      if (Array.isArray(value)) {
+        return value.map((v) => sortKeys(v));
+      }
+      if (value && typeof value === 'object') {
+        return Object.keys(value)
+          .sort()
+          .reduce((acc, key) => {
+            acc[key] = sortKeys(value[key]);
+            return acc;
+          }, {} as Record<string, any>);
+      }
+      return value;
+    };
+    return JSON.stringify(sortKeys(filter));
+  }
+
+  private resolveNumberEnv(value: string | undefined, fallback: number): number {
+    if (value === undefined) return fallback;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(0, parsed);
   }
 
   /**
