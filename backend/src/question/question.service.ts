@@ -212,46 +212,7 @@ export class QuestionService {
         emotionScore: j.emotionScore,
       }));
 
-    // 2-b. 최근 체크인 및 베이스라인
-    const [checkinsRaw, baselineRaw] = await Promise.all([
-      this.prisma.dailyCheckin.findMany({
-        where: { userId },
-        orderBy: { diaryDate: 'desc' },
-        take: 7,
-      }),
-      this.prisma.userBaselineCheckin.findUnique({ where: { userId } }),
-    ]);
-
-    const checkins = checkinsRaw.map((c) => ({
-      date: c.diaryDate.toISOString().slice(0, 10),
-      mood_1to10: c.mood_1to10,
-      energy_1to10: c.energy_1to10,
-      stress_1to10: c.stress_1to10,
-      sleep_hours_1to9p: c.sleep_hours_1to9p,
-      sleep_quality_1to10: c.sleep_quality_1to10,
-      activity_types: c.activity_types ?? [],
-      workout_intensity_1to10: c.workout_intensity_1to10,
-      focus_1to10: c.focus_1to10,
-      fatigue_1to10: c.fatigue_1to10,
-      social_count_1to10: c.social_count_1to10,
-      social_satisfaction_1to10: c.social_satisfaction_1to10,
-    }));
-
-    const baseline = baselineRaw
-      ? {
-          mood_1to10: baselineRaw.mood_1to10,
-          energy_1to10: baselineRaw.energy_1to10,
-          stress_1to10: baselineRaw.stress_1to10,
-          sleep_hours_1to9p: baselineRaw.sleep_hours_1to9p,
-          sleep_quality_1to10: baselineRaw.sleep_quality_1to10,
-          activity_types: baselineRaw.activity_types ?? [],
-          workout_intensity_1to10: baselineRaw.workout_intensity_1to10,
-          focus_1to10: baselineRaw.focus_1to10,
-          fatigue_1to10: baselineRaw.fatigue_1to10,
-          social_count_1to10: baselineRaw.social_count_1to10,
-          social_satisfaction_1to10: baselineRaw.social_satisfaction_1to10,
-        }
-      : undefined;
+    // 2-b. 멘탈 체크인은 질문 추천에서 제외 (별도 피드에 사용)
 
     // 3. 메타 정보(요일/시간대/반응)
     const days = [
@@ -327,6 +288,7 @@ export class QuestionService {
 
     const regenerationCount = 0; // TODO: 재생성 로그 테이블 도입 후 실제 값 반영
 
+    // 질문 생성은 사용자 프로필 + 최근 2일 일기만 활용 (멘탈 체크인은 별도 피드에서 사용)
     const questionRequest: QuestionGenerationRequest = {
       userProfile,
       recentJournals,
@@ -340,8 +302,6 @@ export class QuestionService {
       noResponseRate,
       structuredDiaries,
       freeformDiaries,
-      checkins,
-      baseline,
     };
 
     // 8. 다중 모델 폴백으로 질문 생성 시도

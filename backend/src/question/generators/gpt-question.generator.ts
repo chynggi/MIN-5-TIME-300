@@ -311,54 +311,58 @@ export class GPTQuestionGenerator extends QuestionGeneratorInterface {
     if (!raw) return raw;
     let q = raw.trim();
 
-    // 여러 줄일 경우 첫 줄만 사용
+    // 여러 줄이면 의미 있는 문장을 잇는다
     if (q.includes('\n')) {
-      q =
-        q
-          .split('\n')
-          .map((s) => s.trim())
-          .filter(Boolean)[0] || q;
+      q = q
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join(' ')
+        .trim();
     }
 
-    // 따옴표/백틱/괄호 감싸진 경우 제거
+    // 따옴표/괄호 제거 및 공백 정규화
     q = q
-      .replace(/^['"`“”'「『]+/, '')
-      .replace(/['"`“”'」』]+$/, '')
+      .replace(/^[\s'"`“”'「『(\[]+/, '')
+      .replace(/[\s'"`“”'」』)\]]+$/, '')
+      .replace(/\s+/g, ' ')
       .trim();
 
-    // 마침표 등 불필요한 끝 문자 제거 후 ? 유지
-    q = q.replace(/[\.]+$/g, '').trim();
-
-    // 너무 길 경우 30자 초과 → 25~28자로 자연스럽게 축약
-    const maxTarget = 28;
-    if (q.length > maxTarget) {
-      // 자르는 위치: 문장 부호(,·) 또는 공백 기준 뒤쪽 제거
-      const cut = q.slice(0, maxTarget + 2); // 약간 여유
-      // 자연스러운 분절 후보
-      const separators = [/(.*?[?!.])/, /(.*?[,…·])/];
-      let chosen = '';
-      for (const sep of separators) {
-        const m = cut.match(sep);
-        if (m && m[1].length >= 10) {
-          // 너무 짧지 않은 경우
-          chosen = m[1];
+    // 스키마 허용 범위(120자)에 맞춰 부드럽게 자르기
+    const MAX_LENGTH = 110;
+    if (q.length > MAX_LENGTH) {
+      const slice = q.slice(0, MAX_LENGTH + 1);
+      const preferredBreaks = ['?', '!', '.', '…', ',', ' '];
+      let cutIndex = -1;
+      for (const token of preferredBreaks) {
+        const idx = slice.lastIndexOf(token);
+        if (idx >= 60) {
+          cutIndex = idx;
           break;
         }
       }
-      if (!chosen) {
-        // 공백 단위 자르기
-        chosen = cut.split(/\s+/).filter(Boolean).join(' ');
-        if (chosen.length > maxTarget) chosen = chosen.slice(0, maxTarget);
+      if (cutIndex === -1) {
+        cutIndex = slice.lastIndexOf(' ');
       }
-      q = chosen.trim();
+      if (cutIndex <= 0) {
+        cutIndex = MAX_LENGTH;
+      }
+      q = slice.slice(0, cutIndex).trim();
     }
 
-    // 끝에 물음표 없으면 추가 (질문형 유지)
-    if (!/[?？]$/.test(q)) {
-      q = q.replace(/[?？]+/g, '').trim();
-      if (q.length <= 2) return q; // 너무 짧으면 그대로
+    const hadQuestionMark = /[?？]\s*$/.test(q);
+    q = q.replace(/[,.;:\s]+$/g, '').trim();
+
+    if (!hadQuestionMark && q.length <= 2) {
+      return q;
+    }
+
+    if (hadQuestionMark || q.length > 2) {
       q += '?';
     }
+
+    // 물음표 앞에 붙은 잔여 구두점 제거
+    q = q.replace(/[,.;:\s]+([?？])$/g, '$1');
 
     return q;
   }
