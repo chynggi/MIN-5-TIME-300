@@ -157,13 +157,20 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
     }
   };
 
-  const generateQuestions = async (modelOverride?: string) => {
+  const generateQuestions = async (
+    modelOverride?: string,
+    options?: { force?: boolean },
+  ) => {
     // 편집 모드에서는 생성 차단
     if (initialQuestions && initialQuestions.length > 0) return;
     setIsGenerating(true);
     try {
       const modelToUse = modelOverride || selectedModel;
-      const res = await api.post(`/questions/generate?model=${encodeURIComponent(modelToUse)}`, {
+      const params = new URLSearchParams();
+      if (modelToUse) params.set("model", modelToUse);
+      if (options?.force) params.set("force", "true");
+      const query = params.toString();
+      const res = await api.post(`/questions/generate${query ? `?${query}` : ""}`, {
         date: targetDate
       });
       // 기대 스키마: { questions: [ { domain, text }, ...5 ] }
@@ -420,7 +427,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
                         setSelectedModel(model.id); 
                         setShowModelSelector(false); 
                         if (!initialQuestions?.length) {
-                          generateQuestions(model.id);
+                          generateQuestions(model.id, { force: true });
                         }
                       }}
                       className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors border-b last:border-b-0 ${selectedModel === model.id ? 'bg-blue-50/70' : 'hover:bg-gray-50'}`}
@@ -442,7 +449,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
           </div>
           {!initialQuestions?.length && (
             <button
-              onClick={() => generateQuestions()}
+              onClick={() => generateQuestions(undefined, { force: true })}
               disabled={isGenerating}
               className={`${btn.base} ${btn.secondary} ${btn.sm}`}
             >

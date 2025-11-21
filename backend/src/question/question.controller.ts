@@ -36,7 +36,11 @@ export class QuestionController {
   }
 
   @Post('generate')
-  async generate(@Req() req, @Query('model') model?: string): Promise<any> {
+  async generate(
+    @Req() req,
+    @Query('model') model?: string,
+    @Query('force') force?: string,
+  ): Promise<any> {
     // 다중 질문 세트 반환
     const userId = req.user.userId;
     if (!this.rate.isAllowed(`qgen:${userId}`, 20)) {
@@ -49,7 +53,8 @@ export class QuestionController {
       model && Object.values(AIModel).includes(model as AIModel)
         ? (model as AIModel)
         : undefined;
-    return this.questionService.generate(req, aiModel);
+    const forceRegenerate = force === 'true' || force === '1';
+    return this.questionService.generate(req, aiModel, forceRegenerate);
   }
 
   @Get('models')

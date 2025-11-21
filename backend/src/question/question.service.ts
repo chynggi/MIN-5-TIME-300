@@ -47,7 +47,11 @@ export class QuestionService {
   }
 
   // ...existing code...
-  async generate(req: any, preferredModel?: AIModel): Promise<any> {
+  async generate(
+    req: any,
+    preferredModel?: AIModel,
+    forceRegenerate = false,
+  ): Promise<any> {
     const userId = req.user.userId;
     // 클라이언트가 요청한 날짜 (오늘 일기를 쓰려고 들어왔다면 오늘 날짜)
     // 만약 req.body.date가 없다면 현재 시각(오늘)
@@ -70,7 +74,7 @@ export class QuestionService {
       },
     });
 
-    if (preGenerated) {
+    if (preGenerated && !forceRegenerate) {
       console.log(`[QGen] Pre-generated question found for user ${userId} on ${targetDate.toISOString()}`);
       return {
         id: preGenerated.id,
