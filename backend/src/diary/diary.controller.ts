@@ -12,6 +12,7 @@ import {
   UploadedFiles,
   UseInterceptors,
   UseFilters,
+  Logger,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { Multer } from 'multer';
@@ -35,6 +36,8 @@ import { SaveQuestionAnswersDto } from './dto/save-question-answers.dto';
 @UseGuards(AuthGuard('jwt'))
 @Controller('api/v1/diaries')
 export class DiaryController {
+  private readonly logger = new Logger(DiaryController.name);
+
   constructor(
     private readonly diaryService: DiaryService,
     private readonly vectorDbService: VectorDbService,
@@ -114,11 +117,11 @@ export class DiaryController {
   }> {
     // 디버깅: 들어온 FormData 필드 로그
     try {
-      console.log('[CreateDiary] raw body dto:', dto);
+      this.logger.debug('[CreateDiary] raw body dto:', dto);
       const file = files?.file?.[0];
       const voice = files?.voice?.[0];
       if (file || voice) {
-        console.log('[CreateDiary] uploaded file:', {
+        this.logger.debug('[CreateDiary] uploaded file:', {
           image: file
             ? {
                 originalname: file.originalname,
@@ -186,11 +189,11 @@ export class DiaryController {
   ) {
     // 디버깅: 들어온 FormData 필드 로그
     try {
-      console.log('[UpdateDiary] id:', id, 'dto:', dto);
+      this.logger.debug('[UpdateDiary] id:', id, 'dto:', dto);
       const file = files?.file?.[0];
       const voice = files?.voice?.[0];
       if (file || voice) {
-        console.log('[UpdateDiary] uploaded file:', {
+        this.logger.debug('[UpdateDiary] uploaded file:', {
           image: file
             ? {
                 originalname: file.originalname,

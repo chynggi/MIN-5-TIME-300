@@ -1,6 +1,7 @@
 import { writeFileSync, readFileSync } from 'fs';
 import { join } from 'path';
 import Anthropic from '@anthropic-ai/sdk';
+import { Logger } from '@nestjs/common';
 
 const MBTIS = [
   'INTJ','INTP','ENTJ','ENTP',
@@ -32,6 +33,8 @@ type GeneratedDiarySet = Record<
   (typeof MBTIS)[number],
   Record<StyleKey, Record<LengthKey, string>>
 >;
+
+const logger = new Logger('GenerateMbtiTexts');
 
 async function main() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -99,8 +102,7 @@ MBTI 유형: ${mbti}
 
         result[mbti][styleKey][lengthKey] = text;
         // 간단 로그
-        // eslint-disable-next-line no-console
-        console.log(
+        logger.debug(
           `[generated] ${mbti} / ${styleKey} / ${lengthKey} length=${text.length}`,
         );
       }
@@ -109,12 +111,10 @@ MBTI 유형: ${mbti}
 
   const outPath = join(__dirname, '..', 'test-data', 'generated-diaries.json');
   writeFileSync(outPath, JSON.stringify(result, null, 2), 'utf-8');
-  // eslint-disable-next-line no-console
-  console.log('✅ generated-diaries.json 생성 완료:', outPath);
+  logger.log(`✅ generated-diaries.json 생성 완료: ${outPath}`);
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
-  console.error(err);
+  logger.error(err);
   process.exit(1);
 });

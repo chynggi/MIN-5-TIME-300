@@ -1,5 +1,6 @@
 import { writeFileSync } from 'fs';
 import { join } from 'path';
+import { Logger } from '@nestjs/common';
 
 const MBTIS = [
   'INTJ','INTP','ENTJ','ENTP',
@@ -108,8 +109,8 @@ function main() {
   const users = buildUsers();
   const outPath = join(__dirname, '..', 'test-data', 'generated-users.json');
   writeFileSync(outPath, JSON.stringify(users, null, 2), 'utf-8');
-  // eslint-disable-next-line no-console
-  console.log('✅ generated-users.json 생성 완료:', outPath, `총 ${users.length}명`);
+  const logger = new Logger('GenerateFakeUsers');
+  logger.log(`✅ generated-users.json 생성 완료: ${outPath} 총 ${users.length}명`);
 }
 
 main();

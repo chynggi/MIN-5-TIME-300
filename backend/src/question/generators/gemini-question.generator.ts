@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { Logger } from '@nestjs/common';
 import {
   QuestionGeneratorInterface,
   QuestionGenerationRequest,
@@ -10,6 +11,7 @@ import { tryParseQuestionJson } from '../validators/question-schema';
 
 export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
   private readonly genai: GoogleGenAI;
+  private readonly logger = new Logger(GeminiQuestionGenerator.name);
 
   constructor() {
     super(AIModel.GEMINI_2_5_FLASH);
@@ -38,7 +40,7 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
         rawOutput: raw,
       };
     } catch (error) {
-      console.error('Gemini 질문 생성 오류:', error);
+      this.logger.error('Gemini 질문 생성 오류:', error);
       return this.getDefaultQuestionSet(request.metaInfo.dayOfWeek);
     }
   }
@@ -143,7 +145,7 @@ export class GeminiQuestionGenerator extends QuestionGeneratorInterface {
 
       throw new Error('Gemini API에서 유효한 텍스트 응답을 받지 못했습니다.');
     } catch (error) {
-      console.error('Gemini API 호출 오류:', error);
+      this.logger.error('Gemini API 호출 오류:', error);
       throw new Error(`Gemini API 요청 실패: ${error.message || error}`);
     }
   }

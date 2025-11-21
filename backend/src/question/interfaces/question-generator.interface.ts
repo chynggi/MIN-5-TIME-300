@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+
 export interface UserProfile {
   mbti: string;
   interests: string[];
@@ -566,7 +568,7 @@ Step 5) 감정 → 관계/맥락 → 회복 → 행동 → 목표 흐름의 5문
       .join(', ');
 
     const modeLine = hasPast ? '모드: Past-Aware Mode' : '모드: Baseline Mode';
-    console.log(modeLine);
+    Logger.debug(modeLine, QuestionGeneratorInterface.name);
     return `# INPUT (출력 금지 — 분석용)
 ${modeLine}
 

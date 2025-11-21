@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import {
   AIModel,
   QuestionGeneratorInterface,
@@ -9,6 +10,7 @@ import { GPTQuestionGenerator } from './gpt-question.generator';
 export class QuestionGeneratorFactory {
   private static generators: Map<AIModel, QuestionGeneratorInterface> =
     new Map();
+  private static readonly logger = new Logger(QuestionGeneratorFactory.name);
 
   static getGenerator(model: AIModel): QuestionGeneratorInterface {
     if (!this.generators.has(model)) {
@@ -54,7 +56,7 @@ export class QuestionGeneratorFactory {
 
     // 최소 하나는 활성화되어야 함 (GPT-5를 기본으로)
     if (enabledModels.length === 0) {
-      console.log(
+      this.logger.warn(
         '경고: 활성화된 AI 모델이 없습니다. Claude를 기본으로 설정합니다.',
       );
       enabledModels.push(AIModel.CLAUDE_SONNET_4);

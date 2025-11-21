@@ -45,7 +45,7 @@ export class GPTQuestionGenerator extends QuestionGeneratorInterface {
         rawOutput: raw,
       };
     } catch (error) {
-      console.error('GPT-5 질문 생성 오류:', error);
+      this.logger.error('GPT-5 질문 생성 오류:', error);
       return this.getDefaultQuestionSet(request.metaInfo.dayOfWeek);
     }
   }
@@ -143,7 +143,7 @@ export class GPTQuestionGenerator extends QuestionGeneratorInterface {
         // 폴백: 기존 chat completions API 사용
         return await this.callChatCompletionsAPI(userPrompt, systemPrompt);
       } catch (fallbackError) {
-        console.error('모든 GPT API 호출 실패:', fallbackError);
+        this.logger.error('모든 GPT API 호출 실패:', fallbackError);
 
         // API 제한 체크
         if (fallbackError.status === 429) {

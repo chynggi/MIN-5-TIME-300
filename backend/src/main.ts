@@ -1,13 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { ValidationPipe, BadRequestException } from '@nestjs/common';
+import { ValidationPipe, BadRequestException, Logger } from '@nestjs/common';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import * as express from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const logger = new Logger('Bootstrap');
 
   // Validation Pipe 설정
   app.useGlobalPipes(
@@ -23,7 +24,7 @@ async function bootstrap() {
           value: err.value,
           children: err.children?.length ? err.children : undefined,
         }));
-        console.error(
+        logger.error(
           '\n[Validation Error] Incoming request validation failed:',
           JSON.stringify(simplified, null, 2),
         );

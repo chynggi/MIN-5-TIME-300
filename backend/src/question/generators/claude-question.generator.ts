@@ -1,4 +1,5 @@
 import { Anthropic } from '@anthropic-ai/sdk';
+import { Logger } from '@nestjs/common';
 import {
   QuestionGeneratorInterface,
   QuestionGenerationRequest,
@@ -10,6 +11,7 @@ import { tryParseQuestionJson } from '../validators/question-schema';
 
 export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
   private readonly anthropic: Anthropic;
+  private readonly logger = new Logger(ClaudeQuestionGenerator.name);
 
   constructor() {
     super(AIModel.CLAUDE_SONNET_4);
@@ -41,7 +43,7 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
         rawOutput: raw,
       };
     } catch (error) {
-      console.error('Claude 질문 생성 오류:', error);
+      this.logger.error('Claude 질문 생성 오류:', error);
       return this.getDefaultQuestionSet(request.metaInfo.dayOfWeek);
     }
   }
@@ -153,7 +155,7 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
 
       throw new Error('Claude API에서 유효한 텍스트 응답을 받지 못했습니다.');
     } catch (error) {
-      console.error('Claude API 호출 오류:', error);
+      this.logger.error('Claude API 호출 오류:', error);
 
       // API 과부하 체크
       if (error.status === 529 || error.message?.includes('overload')) {

@@ -1,4 +1,4 @@
-import { Injectable, Inject, ForbiddenException, forwardRef } from '@nestjs/common';
+import { Injectable, Inject, ForbiddenException, forwardRef, Logger } from '@nestjs/common';
 import { TodayQuestionDto } from './dto/today-question.dto';
 import { VoteQuestionDto } from './dto/vote-question.dto';
 import { PrismaService } from '../prisma.service';
@@ -19,6 +19,8 @@ import {
 
 @Injectable()
 export class QuestionService {
+  private readonly logger = new Logger(QuestionService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly profileService: ProfileService,
@@ -75,7 +77,9 @@ export class QuestionService {
     });
 
     if (preGenerated && !forceRegenerate) {
-      console.log(`[QGen] Pre-generated question found for user ${userId} on ${targetDate.toISOString()}`);
+      this.logger.log(
+        `[QGen] Pre-generated question found for user ${userId} on ${targetDate.toISOString()}`,
+      );
       return {
         id: preGenerated.id,
         createdAt: preGenerated.createdAt.toISOString(),
@@ -112,7 +116,7 @@ export class QuestionService {
       });
 
       if (existing) {
-        console.log(`[QGen] Question already exists for ${date.toISOString()}`);
+        this.logger.log(`[QGen] Question already exists for ${date.toISOString()}`);
         return;
       }
 
@@ -128,10 +132,10 @@ export class QuestionService {
           modelUsed: result.model,
         },
       });
-      console.log(`[QGen] Pre-generated question saved for ${date.toISOString()}`);
+      this.logger.log(`[QGen] Pre-generated question saved for ${date.toISOString()}`);
 
     } catch (error) {
-      console.error('[QGen] Failed to pre-generate question:', error);
+      this.logger.error('[QGen] Failed to pre-generate question:', error);
     }
   }
 
@@ -249,7 +253,7 @@ export class QuestionService {
     try {
       trendTopics = await this.vectorDbService.getWeeklyTrendTopics(userId, 2);
     } catch (error) {
-      console.log('벡터 DB 트렌드 조회 실패:', error);
+      this.logger.warn('벡터 DB 트렌드 조회 실패:', error);
     }
 
     // 5. 페르소나/목표 정보 (추후 확장)
@@ -261,7 +265,7 @@ export class QuestionService {
         goals: personaData.goals,
       };
     } catch (error) {
-      console.log('페르소나/목표 조회 실패:', error);
+      this.logger.warn('페르소나/목표 조회 실패:', error);
     }
 
     // 6. AI 모델 선택 및 폴백 시스템
@@ -314,7 +318,7 @@ export class QuestionService {
       selectedModel,
     );
     try {
-      console.log(
+      this.logger.log(
         `[QGen] requested=${selectedModel} used=${response.modelUsed} fallback=${response.fallbackUsed ?? false}`,
       );
     } catch {}
@@ -351,16 +355,16 @@ export class QuestionService {
 
     for (const modelId of modelsToTry) {
       try {
-        console.log(`${modelId} 모델로 질문 생성 시도...`);
+        this.logger.log(`${modelId} 모델로 질문 생성 시도...`);
         const generator = QuestionGeneratorFactory.getGenerator(modelId);
         const response = await generator.generateQuestion(request);
 
         if (response.questions && response.questions.length > 0) {
-          console.log(`${modelId} 모델로 질문 생성 성공`);
+          this.logger.log(`${modelId} 모델로 질문 생성 성공`);
           return response;
         }
       } catch (error) {
-        console.log(`${modelId} 모델 실패:`, error.message);
+        this.logger.warn(`${modelId} 모델 실패: ${error.message}`);
         lastError = error;
 
         // 특정 오류는 다른 모델로 재시도하지 않음
@@ -368,14 +372,14 @@ export class QuestionService {
           error.message.includes('API key') ||
           error.message.includes('unauthorized')
         ) {
-          console.log(`${modelId}: API 키 문제로 건너뜀`);
+          this.logger.warn(`${modelId}: API 키 문제로 건너뜀`);
           continue;
         }
       }
     }
 
     // 모든 모델 실패시 기본 질문 반환
-    console.log('모든 AI 모델 실패. 기본 질문 사용');
+    this.logger.warn('모든 AI 모델 실패. 기본 질문 사용');
     return this.getDefaultQuestionSet(request.metaInfo.dayOfWeek);
   }
 

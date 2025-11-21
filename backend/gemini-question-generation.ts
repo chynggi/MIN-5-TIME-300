@@ -11,6 +11,10 @@
  * - 짧고 공감 유도 질문 1개 (10자 내외)
  */
 
+import { Logger } from '@nestjs/common';
+
+const logger = new Logger('GeminiQuestionScript');
+
 interface UserProfile {
   mbti: string;
   interests: string[];
@@ -100,7 +104,7 @@ export async function generateDailyQuestion(
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error('Gemini API 오류 응답:', response.status, errorBody);
+      logger.error('Gemini API 오류 응답:', response.status, errorBody);
       throw new Error(`Gemini API 요청 실패: ${response.status}`);
     }
 
@@ -116,11 +120,11 @@ export async function generateDailyQuestion(
       const text = result.candidates[0].content.parts[0].text;
       return text.trim();
     } else {
-      console.error('Gemini API에서 유효한 응답을 받지 못했습니다:', result);
+      logger.error('Gemini API에서 유효한 응답을 받지 못했습니다:', result);
       throw new Error('Gemini API에서 유효한 응답을 받지 못했습니다.');
     }
   } catch (error) {
-    console.error('질문 생성 중 오류 발생:', error);
+    logger.error('질문 생성 중 오류 발생:', error);
     // 오류 발생 시 기본 질문 반환
     return getDefaultQuestion(metaInfo.dayOfWeek);
   }
@@ -219,10 +223,10 @@ async function main() {
     },
   };
 
-  console.log("Gemini API로 질문 생성 시도...");
+  logger.log('Gemini API로 질문 생성 시도...');
   const question = await generateDailyQuestion(sampleUserProfile, sampleRecentJournals, sampleMetaInfo);
-  console.log('\n생성된 질문:');
-  console.log(question);
+  logger.log('\n생성된 질문:');
+  logger.log(question);
 
   // 오류 시나리오 테스트
   // @ts-ignore : 의도적으로 잘못된 타입 전달하여 오류 유도
@@ -239,5 +243,5 @@ async function main() {
 // 스크립트가 직접 실행될 때 main 함수 호출 (예시 실행을 위해)
 // 실제 모듈로 사용할 때는 이 부분을 제거하거나 조건부로 실행합니다.
 if (typeof require !== 'undefined' && require.main === module) {
-  main().catch(console.error);
+  main().catch((error) => logger.error(error));
 }

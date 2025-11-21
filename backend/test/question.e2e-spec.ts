@@ -1,6 +1,6 @@
 import * as request from 'supertest';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 
 const testUser = {
@@ -11,6 +11,7 @@ const testUser = {
 
 let app: INestApplication;
 let jwtToken: string;
+const logger = new Logger('QuestionE2ETest');
 
 describe('Gemini 질문 생성 API (e2e)', () => {
   beforeAll(async () => {
@@ -44,7 +45,7 @@ describe('Gemini 질문 생성 API (e2e)', () => {
       expect(res.body.question.length).toBeGreaterThan(0);
       // 반환된 질문을 터미널에 출력
 
-      console.log(`Gemini 생성 질문 #${i + 1}:`, res.body.question);
+      logger.log(`Gemini 생성 질문 #${i + 1}: ${res.body.question}`);
     });
   }
 });
