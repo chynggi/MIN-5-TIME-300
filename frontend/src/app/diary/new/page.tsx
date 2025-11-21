@@ -192,6 +192,48 @@ function NewDiaryContent() {
     return () => window.clearTimeout(timer);
   }, [draftToastVisible]);
 
+  // Diary settings
+  const [diarySettings, setDiarySettings] = useState({
+    postVisibility: "public" as "private" | "public" | "friends",
+    contentVisibility: "public" as "public" | "private",
+    weather: "sunny" as "sunny" | "cloudy" | "rainy" | "snowy"
+  });
+
+  // Location related
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'pending' | 'success' | 'denied' | 'error'>('idle');
+  // 전역 개인정보 설정(프로필>설정>개인정보)의 '위치 정보 자동 저장' 토글을 사용
+  const [shareLocation, setShareLocation] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true; // SSR 방어 기본 true
+    try {
+      const stored = localStorage.getItem('shareLocationEnabled');
+      return stored === null ? true : stored === 'true';
+    } catch { return true; }
+  });
+  useEffect(() => {
+    if (!shareLocation) return;
+    if (!('geolocation' in navigator)) { setLocationStatus('error'); return; }
+    setLocationStatus('pending');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLat(pos.coords.latitude);
+        setLng(pos.coords.longitude);
+        setLocationStatus('success');
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) setLocationStatus('denied'); else setLocationStatus('error');
+      },
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60_000 }
+    );
+  }, [shareLocation]);
+
+  // Misc states
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  // 질문형 작성 선택 질문 보관
+  const [selectedQuestions, setSelectedQuestions] = useState<DiarySelectedQuestion[]>([]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const key = draftKeyRef.current || buildDraftKey(selectedDate);
@@ -241,48 +283,6 @@ function NewDiaryContent() {
     }, 250);
     return () => window.clearTimeout(timer);
   }, [selectedDate, currentView, title, content, emotion, questionId, questionModel, presetKey, preview, diarySettings, selectedQuestions, selectedMusic, shareLocation, lat, lng, checkinPercent]);
-
-  // Diary settings
-  const [diarySettings, setDiarySettings] = useState({
-    postVisibility: "public" as "private" | "public" | "friends",
-    contentVisibility: "public" as "public" | "private",
-    weather: "sunny" as "sunny" | "cloudy" | "rainy" | "snowy"
-  });
-
-  // Location related
-  const [lat, setLat] = useState<number | null>(null);
-  const [lng, setLng] = useState<number | null>(null);
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'pending' | 'success' | 'denied' | 'error'>('idle');
-  // 전역 개인정보 설정(프로필>설정>개인정보)의 '위치 정보 자동 저장' 토글을 사용
-  const [shareLocation, setShareLocation] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true; // SSR 방어 기본 true
-    try {
-      const stored = localStorage.getItem('shareLocationEnabled');
-      return stored === null ? true : stored === 'true';
-    } catch { return true; }
-  });
-  useEffect(() => {
-    if (!shareLocation) return;
-    if (!('geolocation' in navigator)) { setLocationStatus('error'); return; }
-    setLocationStatus('pending');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLat(pos.coords.latitude);
-        setLng(pos.coords.longitude);
-        setLocationStatus('success');
-      },
-      (err) => {
-        if (err.code === err.PERMISSION_DENIED) setLocationStatus('denied'); else setLocationStatus('error');
-      },
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60_000 }
-    );
-  }, [shareLocation]);
-
-  // Misc states
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  // 질문형 작성 선택 질문 보관
-  const [selectedQuestions, setSelectedQuestions] = useState<DiarySelectedQuestion[]>([]);
 
   // Handlers
   const handleImageSelect = (file: File | null) => {
