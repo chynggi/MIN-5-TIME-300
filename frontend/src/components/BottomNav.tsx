@@ -45,6 +45,14 @@ const navItems = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const shouldHideNav = pathname
+    ? [/^\/diary\/new(?:\/|$)/, /^\/diary\/[^/]+\/edit(?:\/|$)/].some((pattern) => pattern.test(pathname))
+    : false;
+
+  if (shouldHideNav) {
+    // Avoid showing the nav while composing/editing diaries to reduce accidental navigation.
+    return null;
+  }
   
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 shadow-lg">
