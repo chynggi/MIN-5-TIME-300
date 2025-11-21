@@ -1,3 +1,4 @@
+import { Injectable, Logger } from '@nestjs/common';
 import OpenAI from 'openai';
 import {
   QuestionGeneratorInterface,
@@ -8,8 +9,10 @@ import {
 } from '../interfaces/question-generator.interface';
 import { tryParseQuestionJson } from '../validators/question-schema';
 
+
 export class GPTQuestionGenerator extends QuestionGeneratorInterface {
   private readonly openai: OpenAI;
+  private readonly logger = new Logger(GPTQuestionGenerator.name);
 
   constructor() {
     super(AIModel.GPT_5);
@@ -131,7 +134,7 @@ export class GPTQuestionGenerator extends QuestionGeneratorInterface {
       // GPT-5 새로운 responses API 시도
       return await this.callGPT5ResponsesAPI(userPrompt, systemPrompt);
     } catch (error) {
-      console.log(
+      this.logger.log(
         'GPT-5 responses API 실패, chat completions API로 폴백:',
         error.message,
       );
@@ -214,7 +217,7 @@ export class GPTQuestionGenerator extends QuestionGeneratorInterface {
         usage: (response as any)?.usage,
         hasOutputText: !!(response as any)?.output_text,
       };
-      console.log('[GPT-5][responses] meta:', JSON.stringify(metaLog));
+      this.logger.log('[GPT-5][responses] meta:', JSON.stringify(metaLog));
     } catch {}
 
     // 실제 응답 구조 기반 파싱
