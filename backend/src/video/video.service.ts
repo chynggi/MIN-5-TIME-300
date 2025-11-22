@@ -36,6 +36,8 @@ export class VideoService {
       }
     }
 
+    this.logger.log(`Fetching video recommendation for query: "${query}", selected search term: "${search}"`);
+
     // 2. API 키가 있으면 Pexels API 호출 시도
     if (this.PEXELS_API_KEY) {
       try {
@@ -58,6 +60,7 @@ export class VideoService {
               randomVideo.video_files.find((f: any) => f.width >= 1280 && f.width <= 1920) ||
               randomVideo.video_files[0];
 
+            this.logger.log(`Successfully fetched video from Pexels for tag: "${search}"`);
             return {
               url: videoFile.link,
               source: 'Pexels API',
@@ -73,6 +76,7 @@ export class VideoService {
     }
 
     // 2. 실패하거나 키가 없으면 폴백 목록에서 랜덤 반환
+    this.logger.log(`Using fallback video for query: "${query}"`);
     // 쿼리가 있다면 태그 매칭 시도 (간단한 필터링)
     let candidates = this.FALLBACK_VIDEOS;
     if (query) {
