@@ -1118,10 +1118,14 @@ export class DiaryService extends BaseService {
     
     // 사용자가 이번 일기 작성에 사용한 모델을 다음 날 질문 생성에도 선호 모델로 전달
     const preferredModel = dto.questionModel as AIModel | undefined;
-    
-    this.questionService.generateAndSave(userId, nextDay, preferredModel).catch((err) => {
-      this.logger.warn(`다음 날 질문 생성 실패 user=${userId} err=${err.message}`);
-    });
+
+    this.questionService
+      .generateAndSave(userId, nextDay, preferredModel, true)
+      .catch((err) => {
+        this.logger.warn(
+          `다음 날 질문 생성 실패 user=${userId} err=${err.message}`,
+        );
+      });
 
     return result;
   }
@@ -1588,13 +1592,17 @@ export class DiaryService extends BaseService {
 
     // 다음 날 질문 미리 생성 (비동기)
     // 업데이트 시에도 질문을 다시 생성할지 여부는 정책에 따름.
-    // 여기서는 일기 내용이 바뀌면 다음날 질문 컨텍스트도 바뀔 수 있으므로 재생성 시도 (이미 있으면 스킵됨)
+    // 여기서는 일기 내용이 바뀌면 다음날 질문 컨텍스트도 바뀔 수 있으므로 재생성 시도 (이미 있으면 스킵됨 -> forceUpdate=true로 변경)
     const diaryDate = updated.diaryDate;
     const nextDay = new Date(diaryDate);
     nextDay.setDate(nextDay.getDate() + 1);
-    this.questionService.generateAndSave(userId, nextDay).catch((err) => {
-      this.logger.warn(`다음 날 질문 생성 실패 (Update) user=${userId} err=${err.message}`);
-    });
+    this.questionService
+      .generateAndSave(userId, nextDay, undefined, true)
+      .catch((err) => {
+        this.logger.warn(
+          `다음 날 질문 생성 실패 (Update) user=${userId} err=${err.message}`,
+        );
+      });
 
     return {
       id: updated.id,

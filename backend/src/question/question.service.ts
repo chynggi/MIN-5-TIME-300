@@ -97,7 +97,12 @@ export class QuestionService {
   /**
    * 다음 날을 위한 질문 미리 생성 및 저장
    */
-  async generateAndSave(userId: string, date: Date, preferredModel?: AIModel): Promise<void> {
+  async generateAndSave(
+    userId: string,
+    date: Date,
+    preferredModel?: AIModel,
+    forceUpdate = false,
+  ): Promise<void> {
     try {
       // 이미 존재하는지 확인
       const startOfDay = new Date(date);
@@ -116,12 +121,33 @@ export class QuestionService {
       });
 
       if (existing) {
-        this.logger.log(`[QGen] Question already exists for ${date.toISOString()}`);
-        return;
+        if (!forceUpdate) {
+          this.logger.log(
+            `[QGen] Question already exists for ${date.toISOString()}`,
+          );
+          return;
+        }
+        // 강제 업데이트 시 기존 질문 삭제 후 재생성
+        await this.prisma.dailyQuestion.delete({ where: { id: existing.id } });
+        this.logger.log(
+          `[QGen] Existing question deleted for regeneration: ${date.toISOString()}`,
+        );
       }
 
       // 질문 생성
-      const result = await this._generateQuestions(userId, date, preferredModel);
+      // 날짜가 00:00:00으로 되어있으면 timeOfDay가 'night'로 잡혀서
+      // "밤 늦었습니다" 같은 질문이 나올 수 있음.
+      // 데일리 질문은 보통 하루를 회고하거나 시작하는 질문이므로
+      // 적절한 시간대(예: 저녁 8시 or 아침 9시)로 설정하여 생성하는 것이 좋음.
+      // 여기서는 하루를 마무리하는 회고 성격이 강하다고 가정하고 20:00(evening)로 설정.
+      const generationDate = new Date(startOfDay);
+      generationDate.setHours(20, 0, 0, 0);
+
+      const result = await this._generateQuestions(
+        userId,
+        generationDate,
+        preferredModel,
+      );
 
       // DB 저장
       await this.prisma.dailyQuestion.create({
@@ -132,8 +158,9 @@ export class QuestionService {
           modelUsed: result.model,
         },
       });
-      this.logger.log(`[QGen] Pre-generated question saved for ${date.toISOString()} using ${result.model}`);
-
+      this.logger.log(
+        `[QGen] Pre-generated question saved for ${date.toISOString()} using ${result.model}`,
+      );
     } catch (error) {
       this.logger.error('[QGen] Failed to pre-generate question:', error);
     }
