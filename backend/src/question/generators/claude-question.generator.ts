@@ -124,7 +124,10 @@ export class ClaudeQuestionGenerator extends QuestionGeneratorInterface {
       const response = await this.anthropic.messages.create({
         model: "claude-sonnet-4-5-20250929", // 현재 사용 가능한 최신 모델
         max_tokens: 5000,
-        temperature: 0.25,
+        thinking: {
+          type: "enabled",
+          budget_tokens: 2048
+        },
         system: systemPrompt || this.createSystemPrompt(),
         messages: [
           {

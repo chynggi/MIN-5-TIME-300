@@ -25,6 +25,7 @@ import { AdviceService } from '../advice/advice.service';
 import { StreakBadgeService } from '../activity/streak-badge.service';
 import { BaseService } from '../common/logger/base.service';
 import { QuestionService } from '../question/question.service';
+import { AIModel } from '../question/interfaces/question-generator.interface';
 
 // 간단한 제목 추출: [제목] 패턴 혹은 첫 줄 30자
 function extractTitle(content: string): string | undefined {
@@ -1114,7 +1115,11 @@ export class DiaryService extends BaseService {
     // 다음 날 질문 미리 생성 (비동기)
     const nextDay = new Date(diaryDate);
     nextDay.setDate(nextDay.getDate() + 1);
-    this.questionService.generateAndSave(userId, nextDay).catch((err) => {
+    
+    // 사용자가 이번 일기 작성에 사용한 모델을 다음 날 질문 생성에도 선호 모델로 전달
+    const preferredModel = dto.questionModel as AIModel | undefined;
+    
+    this.questionService.generateAndSave(userId, nextDay, preferredModel).catch((err) => {
       this.logger.warn(`다음 날 질문 생성 실패 user=${userId} err=${err.message}`);
     });
 

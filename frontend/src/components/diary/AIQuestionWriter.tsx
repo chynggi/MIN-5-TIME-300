@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "@/lib/axios";
 import type { DiarySelectedQuestion, DiaryQuestionDomain } from "@/types/diary";
 
@@ -80,6 +80,8 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
   const [enabledModels, setEnabledModels] = useState<string[]>([]);
   // 최초 1회 자동 생성 여부 (mount 당 메모리)
   const [autoGenAttempted, setAutoGenAttempted] = useState(false);
+  // 질문 로드 여부 추적 (race condition 방지)
+  const hasQuestionsLoaded = useRef(false);
 
   // 초기 설정: 사용 가능한 모델 조회 (편집 모드라도 모델 목록은 UI용으로 조회)
   useEffect(() => {
@@ -107,6 +109,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
         };
       });
       setQuestions(mapped);
+      hasQuestionsLoaded.current = true;
       setIsGenerating(false);
     } else if (enabledModels.length > 0 && !autoGenAttempted) {
       setAutoGenAttempted(true);
@@ -145,8 +148,11 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
       setEnabledModels(enabled);
       
       if (enabled && enabled.length > 0) {
-        const randomModel = enabled[Math.floor(Math.random() * enabled.length)];
-        setSelectedModel(randomModel);
+        // 질문이 아직 로드되지 않았을 때만 랜덤 모델 설정 (생성된 질문의 모델이 덮어씌워지는 것 방지)
+        if (!hasQuestionsLoaded.current) {
+          const randomModel = enabled[Math.floor(Math.random() * enabled.length)];
+          setSelectedModel(randomModel);
+        }
       }
     } catch (error) {
       console.error("모델 정보 조회 실패:", error);
@@ -199,9 +205,17 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
       if (!filtered.length) {
         throw new Error('유효한 질문이 없습니다.');
       }
-  setQuestions(filtered);
-  // 실제 사용된 모델 저장 (백엔드 응답 우선, 없으면 요청 모델)
-  setGenerationModel(typeof data?.model === 'string' && data.model ? data.model : modelToUse);
+      setQuestions(filtered);
+      hasQuestionsLoaded.current = true;
+      
+      // 실제 사용된 모델 저장 (백엔드 응답 우선, 없으면 요청 모델)
+      const usedModel = typeof data?.model === 'string' && data.model ? data.model : modelToUse;
+      setGenerationModel(usedModel);
+      
+      // UI 선택 모델도 실제 사용된 모델로 업데이트
+      if (usedModel && availableModels.some(m => m.id === usedModel)) {
+        setSelectedModel(usedModel);
+      }
     } catch (error) {
       console.error('질문 생성 실패:', error);
       // 최소 폴백 (도메인 매핑된 기본 세트)
@@ -426,9 +440,6 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
                       onClick={() => { 
                         setSelectedModel(model.id); 
                         setShowModelSelector(false); 
-                        if (!initialQuestions?.length) {
-                          generateQuestions(model.id, { force: true });
-                        }
                       }}
                       className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors border-b last:border-b-0 ${selectedModel === model.id ? 'bg-blue-50/70' : 'hover:bg-gray-50'}`}
                     >
@@ -644,3 +655,5 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
     </div>
   );
 }
+
+

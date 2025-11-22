@@ -97,7 +97,7 @@ export class QuestionService {
   /**
    * 다음 날을 위한 질문 미리 생성 및 저장
    */
-  async generateAndSave(userId: string, date: Date): Promise<void> {
+  async generateAndSave(userId: string, date: Date, preferredModel?: AIModel): Promise<void> {
     try {
       // 이미 존재하는지 확인
       const startOfDay = new Date(date);
@@ -121,7 +121,7 @@ export class QuestionService {
       }
 
       // 질문 생성
-      const result = await this._generateQuestions(userId, date);
+      const result = await this._generateQuestions(userId, date, preferredModel);
 
       // DB 저장
       await this.prisma.dailyQuestion.create({
@@ -132,7 +132,7 @@ export class QuestionService {
           modelUsed: result.model,
         },
       });
-      this.logger.log(`[QGen] Pre-generated question saved for ${date.toISOString()}`);
+      this.logger.log(`[QGen] Pre-generated question saved for ${date.toISOString()} using ${result.model}`);
 
     } catch (error) {
       this.logger.error('[QGen] Failed to pre-generate question:', error);
