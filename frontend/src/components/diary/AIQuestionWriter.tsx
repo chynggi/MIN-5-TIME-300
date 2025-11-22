@@ -82,6 +82,32 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
   const [autoGenAttempted, setAutoGenAttempted] = useState(false);
   // 질문 로드 여부 추적 (race condition 방지)
   const hasQuestionsLoaded = useRef(false);
+  
+  // 로딩 메시지 상태
+  const [loadingMessage, setLoadingMessage] = useState("AI가 질문을 생성하고 있어요...");
+
+  // 로딩 메시지 순환 효과
+  useEffect(() => {
+    if (isGenerating) {
+      const messages = [
+        "최근 일기를 분석하고 있어요...",
+        "당신의 관심사를 확인하고 있어요...",
+        "AI가 맞춤형 질문을 생성 중입니다...",
+        "거의 다 되었습니다!"
+      ];
+      let step = 0;
+      setLoadingMessage(messages[0]);
+      
+      const interval = setInterval(() => {
+        step++;
+        if (step < messages.length) {
+          setLoadingMessage(messages[step]);
+        }
+      }, 1500); // 1.5초마다 메시지 변경
+      
+      return () => clearInterval(interval);
+    }
+  }, [isGenerating]);
 
   // 초기 설정: 사용 가능한 모델 조회 (편집 모드라도 모델 목록은 UI용으로 조회)
   useEffect(() => {
@@ -382,30 +408,49 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
 
   if (isGenerating || isSummarizing) {
     return (
-      <div className="flex flex-col items-center justify-center py-16">
-        <div className="text-7xl mb-6 animate-pulse">🤖</div>
+      <div className="flex flex-col items-center justify-center py-10 h-full min-h-[500px]">
+        {/* 비디오 재생 영역 */}
+        <div className="relative w-full max-w-md aspect-video bg-black rounded-xl overflow-hidden shadow-2xl mb-8 group">
+          <video
+            src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" // TODO: 실제 광고/추천 영상 URL로 교체 필요
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-500"
+          />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+            <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin backdrop-blur-sm"></div>
+          </div>
+          <div className="absolute bottom-3 right-3 bg-black/60 text-white text-[10px] px-2 py-1 rounded backdrop-blur-md">
+            AD / 추천 영상
+          </div>
+        </div>
+
         {isGenerating ? (
           <>
-            <h2 className="text-2xl font-bold mb-2">
-              AI가 개인화된 질문을 생성 중...
+            <h2 className="text-2xl font-bold mb-2 text-gray-800 animate-pulse">
+              {loadingMessage}
             </h2>
-            <p className="text-gray-600 mb-6">
-              당신의 하루를 위한 질문을 준비하고 있어요.
+            <p className="text-gray-500 mb-6 text-sm">
+              잠시만 기다려주세요, 당신을 위한 특별한 질문을 만들고 있습니다.
             </p>
           </>
         ) : (
           <>
-            <h2 className="text-2xl font-bold mb-2">AI가 일기를 요약 중...</h2>
-            <p className="text-gray-600 mb-6">응답을 정리해 자연스러운 일기 형태로 다듬고 있어요.</p>
+            <h2 className="text-2xl font-bold mb-2 text-gray-800">AI가 일기를 요약 중...</h2>
+            <p className="text-gray-500 mb-6 text-sm">응답을 정리해 자연스러운 일기 형태로 다듬고 있어요.</p>
           </>
         )}
-        <div className="w-full max-w-lg">
-          <div className="h-3 rounded-full bg-gray-200 overflow-hidden">
-            <div className="w-full h-full bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 animate-[pulse_1.5s_ease-in-out_infinite]" />
+        
+        <div className="w-full max-w-md space-y-2">
+          <div className="h-2 rounded-full bg-gray-100 overflow-hidden border border-gray-200">
+            <div className="w-full h-full bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 animate-[progress_2s_ease-in-out_infinite] origin-left" />
           </div>
-        </div>
-        <div className="text-sm text-gray-500 mt-4">
-          신뢰도: 90% 이상
+          <div className="flex justify-between text-xs text-gray-400 px-1">
+            <span>AI 분석 중...</span>
+            <span>신뢰도 90% 이상</span>
+          </div>
         </div>
       </div>
     );
