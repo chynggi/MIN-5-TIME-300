@@ -21,6 +21,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { SpotifyModule } from './spotify/spotify.module';
 import { CheckinModule } from './checkin/checkin.module';
 import { AdviceModule } from './advice/advice.module';
+import { VideoModule } from './video/video.module';
 @Module({
   imports: [
     JwtModule.register({
@@ -45,6 +46,7 @@ import { AdviceModule } from './advice/advice.module';
     SpotifyModule,
     CheckinModule,
     AdviceModule,
+    VideoModule,
   ],
   controllers: [AppController],
   providers: [AppService, ChatGateway],

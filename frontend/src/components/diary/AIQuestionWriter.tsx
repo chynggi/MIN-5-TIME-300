@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import api from "@/lib/axios";
 import type { DiarySelectedQuestion, DiaryQuestionDomain } from "@/types/diary";
+import { useAuth } from "../../context/AuthContext";
 
 interface Question {
   id: string; // 내부 UI 식별자
@@ -60,6 +61,7 @@ const availableModels: AIModel[] = [
 const emojiOptions = ["😊", "😢", "😡", "😴", "🤔", "😍", "😎", "🥳", "😅", "🤗", "😰", "🙄"];
 
 export default function AIQuestionWriter({ onComplete, onBack, initialQuestions, initialTitle = "", targetDate }: AIQuestionWriterProps) {
+  const { user } = useAuth();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -85,6 +87,25 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
   
   // 로딩 메시지 상태
   const [loadingMessage, setLoadingMessage] = useState("AI가 질문을 생성하고 있어요...");
+  // 추천 비디오 URL 상태
+  const [videoUrl, setVideoUrl] = useState<string>("https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4");
+
+  // 비디오 추천 가져오기
+  useEffect(() => {
+    if (isGenerating) {
+      // 사용자 관심사 추출 (없으면 기본값 nature)
+      const interests = user?.interests?.map(i => i.interest).join(',') || 'nature';
+      
+      // 관심사 기반 비디오 요청
+      api.get(`/videos/recommendation?interest=${encodeURIComponent(interests)}`)
+        .then(res => {
+          if (res.data && res.data.url) {
+            setVideoUrl(res.data.url);
+          }
+        })
+        .catch(err => console.error('비디오 추천 로드 실패:', err));
+    }
+  }, [isGenerating, user]);
 
   // 로딩 메시지 순환 효과
   useEffect(() => {
@@ -412,7 +433,7 @@ export default function AIQuestionWriter({ onComplete, onBack, initialQuestions,
         {/* 비디오 재생 영역 */}
         <div className="relative w-full max-w-md aspect-video bg-black rounded-xl overflow-hidden shadow-2xl mb-8 group">
           <video
-            src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" // TODO: 실제 광고/추천 영상 URL로 교체 필요
+            src={videoUrl}
             autoPlay
             loop
             muted
