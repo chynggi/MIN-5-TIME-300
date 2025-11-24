@@ -15,12 +15,18 @@ async function main() {
         bio: true,
         birthDate: true,
         gender: true,
-        workStyle: true,
-        exerciseFrequency: true,
-        sleepPattern: true,
-        socialActivity: true,
-        interests: true,
-        lifestyleAnswers: true,
+        interests: 
+        {
+          select: {
+            interest: true
+          }
+        },
+        lifestyleAnswers: 
+        {
+          select: {
+            question: true
+          }
+        },
         journals: {
           select: {
             selectedQuestionTexts: true,
@@ -71,10 +77,6 @@ async function main() {
       bio: user.bio,
       birthDate: user.birthDate,
       gender: user.gender,
-      workStyle: user.workStyle,
-      exerciseFrequency: user.exerciseFrequency,
-      sleepPattern: user.sleepPattern,
-      socialActivity: user.socialActivity,
       interests: user.interests,
       lifestyleAnswers: user.lifestyleAnswers,
       journals: user.journals.map(j => ({
