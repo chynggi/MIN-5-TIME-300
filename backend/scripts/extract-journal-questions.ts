@@ -13,6 +13,7 @@ async function main() {
         journals: {
           select: {
             selectedQuestionTexts: true,
+            selectedQuestionDomains: true,
             diaryDate: true,
           },
           where: {
@@ -28,11 +29,18 @@ async function main() {
       username: user.username,
       journals: user.journals.map(j => ({
         diaryDate: j.diaryDate,
-        questions: j.selectedQuestionTexts
+        questions: j.selectedQuestionTexts,
+        domains: j.selectedQuestionDomains
       }))
     }));
 
-    console.log(JSON.stringify(result, null, 2));
+    const outputFile = process.argv[2] || 'journal-questions.json';
+    const outputPath = path.isAbsolute(outputFile) 
+      ? outputFile 
+      : path.join(process.cwd(), outputFile);
+
+    fs.writeFileSync(outputPath, JSON.stringify(result, null, 2));
+    console.log(`Data successfully written to: ${outputPath}`);
   } catch (error) {
     console.error('Error extracting data:', error);
     process.exit(1);
