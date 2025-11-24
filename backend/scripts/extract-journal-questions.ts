@@ -16,6 +16,7 @@ async function main() {
             selectedQuestionDomains: true,
             selectedQuestionAnswers: true,
             diaryDate: true,
+            writingDuration: true,
           },
           where: {
             selectedQuestionTexts: {
@@ -32,7 +33,8 @@ async function main() {
         diaryDate: j.diaryDate,
         questions: j.selectedQuestionTexts,
         domains: j.selectedQuestionDomains,
-        answers: j.selectedQuestionAnswers
+        answers: j.selectedQuestionAnswers,
+        writingDuration: j.writingDuration
       }))
     }));
 
