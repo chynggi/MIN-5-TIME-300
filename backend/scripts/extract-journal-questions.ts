@@ -9,6 +9,7 @@ async function main() {
   try {
     const users = await prisma.user.findMany({
       select: {
+        id: true,
         username: true,
         journals: {
           select: {
@@ -32,7 +33,7 @@ async function main() {
       for (const journal of user.journals) {
         const checkin = await prisma.dailyCheckin.findFirst({
           where: {
-            userId: user.username,
+            userId: user.id,
             diaryDate: journal.diaryDate
           },
           select: //select all 
