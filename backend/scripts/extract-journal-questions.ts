@@ -7,10 +7,20 @@ const prisma = new PrismaClient();
 
 async function main() {
   try {
-    const users = await prisma.user.findMany({
+    const users = await prisma.user.findMany({           
       select: {
         id: true,
         username: true,
+        mbti: true,
+        bio: true,
+        birthDate: true,
+        gender: true,
+        workStyle: true,
+        exerciseFrequency: true,
+        sleepPattern: true,
+        socialActivity: true,
+        interests: true,
+        lifestyleAnswers: true,
         journals: {
           select: {
             selectedQuestionTexts: true,
@@ -57,6 +67,16 @@ async function main() {
 
     const result = users.map(user => ({
       username: user.username,
+      mbti: user.mbti,
+      bio: user.bio,
+      birthDate: user.birthDate,
+      gender: user.gender,
+      workStyle: user.workStyle,
+      exerciseFrequency: user.exerciseFrequency,
+      sleepPattern: user.sleepPattern,
+      socialActivity: user.socialActivity,
+      interests: user.interests,
+      lifestyleAnswers: user.lifestyleAnswers,
       journals: user.journals.map(j => ({
         diaryDate: j.diaryDate,
         questions: j.selectedQuestionTexts,
