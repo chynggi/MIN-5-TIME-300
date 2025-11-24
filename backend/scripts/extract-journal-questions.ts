@@ -17,6 +17,7 @@ async function main() {
             selectedQuestionAnswers: true,
             diaryDate: true,
             writingDuration: true,
+            checkin: true
           },
           where: {
             selectedQuestionTexts: {
@@ -34,7 +35,8 @@ async function main() {
         questions: j.selectedQuestionTexts,
         domains: j.selectedQuestionDomains,
         answers: j.selectedQuestionAnswers,
-        writingDuration: j.writingDuration
+        writingDuration: j.writingDuration,
+        checkin: j.checkin
       }))
     }));
 
