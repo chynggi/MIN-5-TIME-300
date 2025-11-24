@@ -14,6 +14,7 @@ async function main() {
           select: {
             selectedQuestionTexts: true,
             selectedQuestionDomains: true,
+            selectedQuestionAnswers: true,
             diaryDate: true,
           },
           where: {
@@ -30,7 +31,8 @@ async function main() {
       journals: user.journals.map(j => ({
         diaryDate: j.diaryDate,
         questions: j.selectedQuestionTexts,
-        domains: j.selectedQuestionDomains
+        domains: j.selectedQuestionDomains,
+        answers: j.selectedQuestionAnswers
       }))
     }));
 
