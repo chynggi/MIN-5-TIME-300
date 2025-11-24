@@ -21,7 +21,8 @@
     "test:mbti:e2e": "npm run generate:mbti:data && jest --config ./test/jest-e2e.json --runTestsByPath ./test/mbti-diary.e2e-spec.ts",
     "generate:mbti:texts": "ts-node ./scripts/generate-mbti-texts.ts",
     "generate:mbti:users": "ts-node ./scripts/generate-fake-users.ts",
-    "generate:mbti:data": "npm run generate:mbti:users && npm run generate:mbti:texts"
+    "generate:mbti:data": "npm run generate:mbti:users && npm run generate:mbti:texts",
+    "extract:questions": "ts-node ./scripts/extract-journal-questions.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.60.0",
