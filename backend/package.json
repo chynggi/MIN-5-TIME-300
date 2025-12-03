@@ -18,6 +18,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:e2e:full": "jest --config ./test/jest-e2e.json --testPathPattern=full-integration",
+    "test:e2e:verbose": "jest --config ./test/jest-e2e.json --verbose",
     "test:mbti:e2e": "npm run generate:mbti:data && jest --config ./test/jest-e2e.json --runTestsByPath ./test/mbti-diary.e2e-spec.ts",
     "generate:mbti:texts": "ts-node ./scripts/generate-mbti-texts.ts",
     "generate:mbti:users": "ts-node ./scripts/generate-fake-users.ts",
