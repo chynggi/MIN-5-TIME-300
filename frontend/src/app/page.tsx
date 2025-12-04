@@ -1,13 +1,34 @@
 
 "use client";
 
-import { useContext, useEffect } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthContext } from '../context/AuthContext';
+
+const SPLASH_MESSAGES = [
+  "당신의 소중한 하루를 기록해보세요",
+  "나를 더 깊이 알아가는 시간",
+  "친구들과 함께 나누는 즐거움",
+  "WITH ME와 함께 시작하세요"
+];
 
 export default function Home() {
   const { user } = useContext(AuthContext);
   const router = useRouter();
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [fade, setFade] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFade(false);
+      setTimeout(() => {
+        setMessageIndex((prev) => (prev + 1) % SPLASH_MESSAGES.length);
+        setFade(true);
+      }, 500); // 0.5초 동안 페이드 아웃 후 문구 변경
+    }, 3500); // 3.5초마다 변경
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     // 로그인된 사용자는 대시보드로 리다이렉트
@@ -51,6 +72,17 @@ export default function Home() {
       <div className="relative z-10 flex flex-col justify-end min-h-screen">
         {/* 하단 버튼 패널 - 모바일 앱 safe area 느낌 */}
         <div className="mt-auto px-4 pb-6 pt-8">
+          {/* 스플래시 문구 애니메이션 */}
+          <div className="h-20 mb-6 flex items-end justify-start">
+            <p
+              className={`text-white text-3xl md:text-5xl font-bold tracking-tight drop-shadow-lg transition-opacity duration-500 ease-in-out ${
+                fade ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              {SPLASH_MESSAGES[messageIndex]}
+            </p>
+          </div>
+
           <div className="backdrop-blur-md bg-white/15 border border-white/20 rounded-2xl shadow-lg overflow-hidden">
             <div className="grid grid-cols-2">
               <a
