@@ -258,7 +258,7 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
     }
     for (let i = 0; i < length; i++) {
       mixed[i] /= buffer.numberOfChannels;
-    }
+    }	
     return mixed;
   };
 
@@ -290,7 +290,10 @@ export default function EmotionVoice({ emotion, onEmotionChange, onVoiceRecord }
       mp3Data.push(mp3buf);
     }
 
-    return new Blob(mp3Data, { type: 'audio/mpeg' });
+    return new Blob(
+      mp3Data.map(chunk => new Uint8Array(chunk)),
+      { type: 'audio/mpeg' }
+    );
   };
 
   const startRecording = async () => {
